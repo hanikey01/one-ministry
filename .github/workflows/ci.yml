@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Prepare local test secrets
+        run: |
+          printf 'APP_KEY=base64:%s\n' "$(openssl rand -base64 32)" > .env
+          printf 'DB_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> .env
+          mkdir -p secrets backups
+          openssl rand -hex 48 > secrets/backup_passphrase
+      - name: Install API test dependencies
+        run: docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/services/api:/app" -w /app composer:2 install --prefer-dist --no-interaction --no-progress
+      - name: Start test dependencies
+        run: |
+          docker compose up -d db redis
+          docker compose exec -T db createdb -U ministry ministry_test
+      - name: API tests and formatting
+        run: |
+          docker compose -f compose.yaml -f compose.test.yaml run --rm api php artisan test --compact
+          docker compose -f compose.yaml -f compose.test.yaml run --rm api php vendor/bin/pint --test
+      - name: Web checks
+        run: |
+          npm ci --prefix apps/web
+          npm run lint --prefix apps/web
+          npm run build --prefix apps/web
+      - name: Build distributable images
+        run: docker compose --profile ops build api web backup
+      - name: Check local setup and production guard
+        run: |
+          docker compose run --rm api php artisan ministry:doctor --profile=local --json
+          if docker compose run --rm api php artisan ministry:doctor --profile=production --json; then
+            echo 'The production doctor accepted an incomplete CI configuration.' >&2
+            exit 1
+          fi
+      - name: Test encrypted backup and isolated restore with data
+        run: |
+          docker compose exec -T db createdb -U ministry ministry_backup_fixture
+          docker compose run --rm -e DB_DATABASE=ministry_backup_fixture api php artisan migrate --force
+          docker compose exec -T db psql -v ON_ERROR_STOP=1 -U ministry -d ministry_backup_fixture < infra/backup/fixture.sql
+          docker compose --profile ops run --rm -e PGDATABASE=ministry_backup_fixture backup backup
+          archive="$(find backups -maxdepth 1 -name '*.pgdump.gpg' -printf '%f\n' | head -n 1)"
+          test -n "$archive"
+          docker compose --profile ops run --rm backup restore-verify "$archive" | tee restore.log
+          grep -Eq 'Counts .*\|1\|1\|1\|0$' restore.log

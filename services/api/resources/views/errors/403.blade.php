@@ -1,0 +1,1 @@
+<x-errors.page code="403" title="You do not have access to this area." message="Your account does not have the permission required for this page. Ask a ministry administrator if you believe this is unexpected." action-label="Open workspace" action-url="/staff" />

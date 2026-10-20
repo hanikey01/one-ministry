@@ -1,0 +1,15 @@
+/.env
+/.env.*
+!/.env.example
+/.cache-composer/
+/.cache-npm/
+/.phpunit.cache/
+/services/api/database/database.sqlite
+/backups/
+/secrets/
+/services/api/storage/app/private/
+/services/api/storage/logs/*.log
+/services/api/vendor/
+/apps/web/node_modules/
+/apps/web/.next/
+/services/api/public/build/

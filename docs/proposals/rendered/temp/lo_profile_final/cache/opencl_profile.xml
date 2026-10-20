@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<profile>
+ <version>LibreOffice v1</version>
+ <device>
+  <type>opencl</type>
+  <name>Intel(R) HD Graphics 5300</name>
+  <driver>20.19.15.5126</driver>
+  <time>max</time>
+  <errors>false</errors>
+ </device>
+ <device>
+  <type>opencl</type>
+  <name>Intel(R) Core(TM) M-5Y71 CPU @ 1.20GHz</name>
+  <driver>5.2.0.10094</driver>
+  <time>1316949</time>
+  <errors>false</errors>
+ </device>
+ <device>
+  <type>native</type>
+  <time>13532160</time>
+  <errors>false</errors>
+ </device>
+</profile>

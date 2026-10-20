@@ -1,0 +1,1 @@
+import LibraryPage from "../../library/LibraryPage"; export default function Video(){return <LibraryPage library="video_sermons" title="Video sermons" eyebrow="Watch" copy="Messages and teaching from our ministry."/>}

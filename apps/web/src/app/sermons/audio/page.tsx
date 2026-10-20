@@ -1,0 +1,1 @@
+import LibraryPage from "../../library/LibraryPage"; export default function Audio(){return <LibraryPage library="audio_sermons" title="Audio sermons" eyebrow="Listen" copy="Teaching and messages to take with you."/>}

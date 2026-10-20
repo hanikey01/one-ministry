@@ -1,0 +1,1 @@
+<x-errors.page code="409" title="That change cannot be completed right now." message="The information changed while this page was open, or the action conflicts with the current record. Refresh and try again." action-label="Return to workspace" action-url="/staff" />

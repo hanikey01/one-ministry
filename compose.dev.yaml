@@ -1,0 +1,34 @@
+# Local development only. Combine with compose.yaml; do not use in production.
+services:
+  api:
+    command: ["php-fpm"]
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "false"
+      CACHE_STORE: file
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: database
+    volumes:
+      - ./services/api/app:/var/www/html/app
+      - ./services/api/config:/var/www/html/config
+      - ./services/api/database:/var/www/html/database
+      - ./services/api/public:/var/www/html/public
+      - ./services/api/resources:/var/www/html/resources
+      - ./services/api/routes:/var/www/html/routes
+      - ./services/api/artisan:/var/www/html/artisan:ro
+      - public_build:/var/www/html/public/build
+
+  vite:
+    image: node:22-alpine
+    working_dir: /var/www/html
+    command: ["sh", "-c", "if [ ! -d node_modules/.vite ]; then npm ci --no-audit --no-fund; fi; exec npm run build -- --watch"]
+    volumes:
+      - ./services/api:/var/www/html
+      - vite_node_modules:/var/www/html/node_modules
+      - public_build:/var/www/html/public/build
+    depends_on:
+      - api
+
+volumes:
+  vite_node_modules:
+

@@ -1,0 +1,1 @@
+import LibraryPage from "../library/LibraryPage"; export default function Books(){return <LibraryPage library="books_library" title="Books & resources" eyebrow="Library" copy="Books, study guides, and resources for your journey."/>}

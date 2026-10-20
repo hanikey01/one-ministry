@@ -1,0 +1,1 @@
+import LibraryPage from "../../library/LibraryPage"; export default function Series(){return <LibraryPage library="sermon_series" title="Sermon series" eyebrow="Explore" copy="Walk through a connected collection of messages."/>}

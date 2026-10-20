@@ -1,0 +1,11 @@
+services:
+  api:
+    volumes:
+      - ./services/api:/var/www/html
+    environment:
+      APP_ENV: testing
+      APP_DEBUG: "true"
+      DB_DATABASE: ministry_test
+      CACHE_STORE: array
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: database
