@@ -87,7 +87,7 @@ jobs:
           base64 -w 0 dist/release-manifest.sig > dist/release-manifest.sig.b64
           rm dist/release-manifest.sig
       - name: Publish GitHub release assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: One Ministry ${{ github.ref_name }}
           prerelease: ${{ contains(github.ref_name, '-') }}
