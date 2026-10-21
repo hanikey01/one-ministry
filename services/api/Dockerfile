@@ -11,7 +11,7 @@ COPY resources ./resources
 COPY vite.config.js ./
 RUN npm run build
 
-FROM php:8.5.12-fpm-alpine3.24
+FROM php:8.6.0RC3-fpm-alpine3.24
 ARG INSTALL_REDIS_EXTENSION=true
 RUN apk add --no-cache libpq libpq-dev linux-headers $PHPIZE_DEPS \
     && docker-php-ext-install pdo_pgsql pdo_mysql \
