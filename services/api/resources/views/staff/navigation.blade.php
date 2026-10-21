@@ -88,17 +88,32 @@
             <div><p>PUBLIC WEBSITE</p><h2>Visitor menus</h2><span>Choose the links visitors see on the public website. The first five enabled mobile links appear in the footer.</span></div>
         </header>
 
-        <div class="navigation-public-grid">
+        <div class="navigation-layout-grid navigation-public-grid">
             <section class="navigation-layout-card navigation-public-list">
-                <header class="navigation-layout-card-heading"><div><p>Public menu</p><span>Arrange visitor links and control where each one appears.</span></div><span class="navigation-selection-count" data-navigation-public-count>{{ $items->count() }} {{ str('link')->plural($items->count()) }}</span></header>
-                <div data-navigation-order>
-                    @forelse($items as $item)
-                        @include('staff.navigation-item', ['item' => $item])
-                    @empty
-                        <div class="empty-cell">No public menu links yet. Add a destination to get started.</div>
-                    @endforelse
-                </div>
-                <form method="POST" action="{{ route('staff.navigation.reorder') }}" data-navigation-order-form>@csrf @method('PUT')<input type="hidden" name="items" data-navigation-order-input><button class="button" type="submit">Save menu order</button></form>
+                @php($selectedPublicItems = $items->filter(fn ($item) => (bool) $item->is_enabled))
+                @php($availablePublicItems = $items->reject(fn ($item) => (bool) $item->is_enabled))
+                <header class="navigation-layout-card-heading"><div><p>Public menu</p><span>Select links, arrange their order, and choose a section and icon.</span></div><span class="navigation-selection-count" data-navigation-public-count>{{ $selectedPublicItems->count() }} of {{ $items->count() }} selected</span></header>
+                <form id="public-navigation-settings" method="POST" action="{{ route('staff.navigation.reorder') }}" data-navigation-order-form>
+                    @csrf @method('PUT')
+                    <div data-navigation-order>
+                        @forelse($selectedPublicItems as $item)
+                            @include('staff.navigation-item', ['item' => $item, 'icons' => $icons, 'publicSections' => $publicSections])
+                        @empty
+                            <div class="empty-cell" data-public-list-empty>No links selected. Add one from the available links below.</div>
+                        @endforelse
+                    </div>
+                    <details class="navigation-destination-library navigation-add-destinations navigation-public-available" data-public-available-disclosure @if($availablePublicItems->isEmpty()) hidden @endif>
+                        <summary><span class="navigation-add-symbol">+</span><span><strong>Add existing links</strong><small><span data-public-available-count>{{ $availablePublicItems->count() }}</span> available</small></span><x-ui.icon name="chevron-down" :size="16"/></summary>
+                        <div class="navigation-available-list" data-navigation-available>
+                            @forelse($availablePublicItems as $item)
+                                @include('staff.navigation-item', ['item' => $item, 'icons' => $icons, 'publicSections' => $publicSections])
+                            @empty
+                                <div class="empty-cell" data-public-available-empty>No saved links are available to add.</div>
+                            @endforelse
+                        </div>
+                    </details>
+                    <button class="button" type="submit">Save menu changes</button>
+                </form>
             </section>
 
             <aside id="navigation-public-add" class="navigation-layout-card navigation-public-add">
@@ -127,13 +142,27 @@
                     @include('staff.navigation-fields', ['item' => null])
                     <button class="button" type="submit"><x-ui.icon name="add" :size="15"/>Add link</button>
                 </form>
+                @if($items->isNotEmpty())
+                    <details class="navigation-public-details">
+                        <summary><span><strong>Manage link details</strong><small>Change labels, destinations, visibility, or remove links</small></span><x-ui.icon name="chevron-down" :size="16"/></summary>
+                        <div class="navigation-public-details-list">
+                            @foreach($items as $item)
+                                <details class="navigation-public-detail-item" data-dismiss-on-outside>
+                                    <summary>{{ $item->label }} <span>{{ $item->url }}</span></summary>
+                                    <form method="POST" action="{{ route('staff.navigation.update', $item->id) }}">@csrf @method('PUT') @include('staff.navigation-fields', ['item' => $item, 'showIcon' => false])<button class="button" type="submit">Save link details</button></form>
+                                    <form method="POST" action="{{ route('staff.navigation.destroy', $item->id) }}">@csrf @method('DELETE')<button class="button button-secondary" type="submit">Remove link</button></form>
+                                </details>
+                            @endforeach
+                        </div>
+                    </details>
+                @endif
             </aside>
         </div>
     </section>
 
     <template id="navigation-icon-options">
         @foreach($icons as $icon)
-            <button class="icon-picker-option" type="button" aria-label="{{ str($icon)->headline() }}" title="{{ str($icon)->headline() }}" data-icon-picker-option data-icon="{{ $icon }}" data-icon-search="{{ str($icon)->headline() }}"><x-ui.icon :name="$icon" :size="20"/><span>{{ str($icon)->headline() }}</span></button>
+            <button class="icon-picker-option" type="button" aria-label="{{ str($icon)->headline() }}" title="{{ str($icon)->headline() }}" data-icon-picker-option data-icon="{{ $icon }}" data-icon-search="{{ str($icon)->headline() }}"><x-ui.icon :name="$icon" :size="16"/><span>{{ str($icon)->headline() }}</span></button>
         @endforeach
     </template>
     <script>
@@ -181,14 +210,17 @@
                     const value = theme.getPropertyValue(token).trim();
                     if (value) panel.style.setProperty(token, value);
                 });
-                const width = Math.min(360, window.innerWidth - 24);
+                const width = Math.min(320, window.innerWidth - 24);
                 const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
-                const height = Math.min(390, window.innerHeight - 24);
-                const below = window.innerHeight - rect.bottom;
+                const availableBelow = window.innerHeight - rect.bottom - 12;
+                const availableAbove = rect.top - 12;
+                const openBelow = availableBelow >= availableAbove;
+                const availableSpace = openBelow ? availableBelow : availableAbove;
+                const height = Math.min(320, window.innerHeight - 24, Math.max(160, availableSpace));
                 panel.style.width = `${width}px`;
-                panel.style.maxHeight = `${height}px`;
+                panel.style.setProperty('max-height', `${height}px`, 'important');
                 panel.style.left = `${left}px`;
-                panel.style.top = `${below >= Math.min(280, height) || below >= rect.top ? rect.bottom + 6 : Math.max(12, rect.top - height - 6)}px`;
+                panel.style.top = `${openBelow ? rect.bottom + 6 : Math.max(12, rect.top - height - 6)}px`;
             };
             document.querySelectorAll('[data-icon-picker]').forEach((picker) => {
                 const trigger = picker.querySelector('[data-icon-picker-trigger]');
@@ -340,19 +372,59 @@
 
             const publicList = document.querySelector('[data-navigation-order]');
             if (publicList) {
-                const input = document.querySelector('[data-navigation-order-input]');
                 let dragging = null;
+                const availableList = document.querySelector('[data-navigation-available]');
                 const status = document.querySelector('[data-navigation-quick-add-status]');
-                const saveOrder = () => input.value = JSON.stringify([...publicList.querySelectorAll('[data-navigation-id]')].map((node) => node.dataset.navigationId));
+                const selectionCount = document.querySelector('[data-navigation-public-count]');
+                const availableCount = document.querySelector('[data-public-available-count]');
+                const availableDisclosure = document.querySelector('[data-public-available-disclosure]');
+                const allPublicRows = () => [...publicList.querySelectorAll('[data-navigation-id]'), ...(availableList ? [...availableList.querySelectorAll('[data-navigation-id]')] : [])];
+                const updateEmptyState = (list, selector, message, marker) => {
+                    if (!list) return;
+                    const empty = list.querySelector(selector);
+                    if (list.querySelector('[data-navigation-id]')) empty?.remove();
+                    else if (!empty) {
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'empty-cell';
+                        placeholder.dataset[marker] = '';
+                        placeholder.textContent = message;
+                        list.append(placeholder);
+                    }
+                };
+                const updateSelectionCount = () => {
+                    const rows = allPublicRows();
+                    const selected = rows.filter((row) => row.querySelector('[data-public-enabled]')?.checked).length;
+                    const available = rows.length - selected;
+                    if (selectionCount) selectionCount.textContent = `${selected} of ${rows.length} selected`;
+                    if (availableCount) availableCount.textContent = String(available);
+                    if (availableDisclosure) {
+                        availableDisclosure.hidden = available === 0;
+                        if (available === 0) availableDisclosure.open = false;
+                    }
+                };
                 const bindPublicItem = (node) => {
+                    const checkbox = node.querySelector('[data-public-enabled]');
+                    const controls = node.querySelector('[data-public-controls]');
+                    const syncEnabledState = () => {
+                        const selected = checkbox?.checked ?? true;
+                        node.dataset.selected = String(selected);
+                        if (controls) controls.hidden = !selected;
+                        const target = selected ? publicList : availableList;
+                        if (target && node.parentElement !== target) target.append(node);
+                        updateEmptyState(publicList, '[data-public-list-empty]', 'No links selected. Add one from the available links below.', 'publicListEmpty');
+                        updateEmptyState(availableList, '[data-public-available-empty]', 'No saved links are available to add.', 'publicAvailableEmpty');
+                        updateMoveButtons();
+                        updateSelectionCount();
+                    };
+                    checkbox?.addEventListener('change', syncEnabledState);
                     node.querySelector('[data-public-move="up"]')?.addEventListener('click', () => {
-                        const nodes = [...publicList.querySelectorAll('[data-navigation-id]')];
+                        const nodes = [...publicList.querySelectorAll('[data-navigation-id]')].filter((row) => row.querySelector('[data-public-enabled]')?.checked);
                         const index = nodes.indexOf(node);
                         if (index > 0) publicList.insertBefore(node, nodes[index - 1]);
                         updateMoveButtons();
                     });
                     node.querySelector('[data-public-move="down"]')?.addEventListener('click', () => {
-                        const nodes = [...publicList.querySelectorAll('[data-navigation-id]')];
+                        const nodes = [...publicList.querySelectorAll('[data-navigation-id]')].filter((row) => row.querySelector('[data-public-enabled]')?.checked);
                         const index = nodes.indexOf(node);
                         if (index >= 0 && index < nodes.length - 1) publicList.insertBefore(nodes[index + 1], node);
                         updateMoveButtons();
@@ -367,16 +439,20 @@
                     node.addEventListener('dragend', () => node.classList.remove('is-dragging'));
                 };
                 const updateMoveButtons = () => {
-                    const nodes = [...publicList.querySelectorAll('[data-navigation-id]')];
-                    nodes.forEach((node, index) => {
+                    const nodes = allPublicRows();
+                    const selectedNodes = [...publicList.querySelectorAll('[data-navigation-id]')];
+                    nodes.forEach((node) => {
                         const up = node.querySelector('[data-public-move="up"]');
                         const down = node.querySelector('[data-public-move="down"]');
-                        if (up) up.disabled = index === 0;
-                        if (down) down.disabled = index === nodes.length - 1;
+                        const selectedIndex = selectedNodes.indexOf(node);
+                        if (up) up.disabled = selectedIndex <= 0;
+                        if (down) down.disabled = selectedIndex < 0 || selectedIndex === selectedNodes.length - 1;
+                        const display = node.querySelector('[data-navigation-order-display]');
+                        if (display && selectedIndex >= 0) display.textContent = String(selectedIndex + 1).padStart(2, '0');
                     });
-                    saveOrder();
+                    updateSelectionCount();
                 };
-                publicList.querySelectorAll('[data-navigation-id]').forEach(bindPublicItem);
+                allPublicRows().forEach(bindPublicItem);
                 updateMoveButtons();
 
                 document.querySelectorAll('[data-navigation-quick-add]').forEach((form) => {
@@ -404,11 +480,7 @@
                             publicList.append(node);
                             bindPublicItem(node);
                             updateMoveButtons();
-                            const count = document.querySelector('[data-navigation-public-count]');
-                            if (count) {
-                                const total = publicList.querySelectorAll('[data-navigation-id]').length;
-                                count.textContent = `${total} ${total === 1 ? 'link' : 'links'}`;
-                            }
+                            updateSelectionCount();
                             const section = form.closest('.navigation-destination-grid section');
                             form.remove();
                             if (section && !section.querySelector('form')) section.remove();

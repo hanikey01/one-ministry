@@ -757,7 +757,7 @@
 .public-workspace .workspace-theme-toggle,.public-theme-dark .workspace-theme-toggle { border-color:var(--line-strong); background:var(--surface); color:var(--surface-ink); }
 
 /* Ministry accent is the consistent fill and text contrast for action buttons. */
-.ministry-app :is(button:not(.workspace-backdrop):not(.workspace-menu):not(.member-menu):not(.public-menu):not(.workspace-close):not(.member-close):not(.workspace-theme-toggle):not(.member-theme-toggle):not(.enhanced-select-options button):not(.setup-timezone-list button):not(.navigation-audience-tabs button):not(.navigation-move-controls button):not(.navigation-destination-grid form button):not(.navigation-section-control .enhanced-select-trigger):not(.navigation-icon-control .icon-picker-trigger),input[type="button"],input[type="submit"],input[type="reset"],.button,.public-action,.auth-submit,.school-button,.learning-button,.public-worship-action,.setup-back,.setup-next,.setup-finish,.setup-preview-action,.homepage-delete-form button,.home-quiet-action,.public-footer-cta a,.workspace-sidebar-actions a,.member-sidebar-footer a,[role="button"]) {
+.ministry-app :is(button:not(.workspace-backdrop):not(.workspace-menu):not(.member-menu):not(.public-menu):not(.workspace-close):not(.member-close):not(.workspace-theme-toggle):not(.member-theme-toggle):not(.enhanced-select-options button):not(.setup-timezone-list button):not(.navigation-audience-tabs button):not(.navigation-move-controls button):not(.navigation-destination-grid form button):not(.navigation-section-control .enhanced-select-trigger):not(.navigation-icon-control .icon-picker-trigger):not(.icon-picker-option),input[type="button"],input[type="submit"],input[type="reset"],.button,.public-action,.auth-submit,.school-button,.learning-button,.public-worship-action,.setup-back,.setup-next,.setup-finish,.setup-preview-action,.homepage-delete-form button,.home-quiet-action,.public-footer-cta a,.workspace-sidebar-actions a,.member-sidebar-footer a,[role="button"]) {
     border-color:var(--accent)!important;
     background:var(--accent)!important;
     color:var(--accent-foreground)!important;
@@ -888,26 +888,26 @@
 .icon-picker{position:relative;display:inline-flex;min-width:0;color:var(--ink)}
 .icon-picker-trigger{display:flex!important;width:100%;min-width:126px;min-height:36px;align-items:center;gap:8px;border:1px solid var(--line-strong)!important;border-radius:9px!important;padding:5px 9px!important;background:var(--surface)!important;color:var(--ink)!important;box-shadow:none!important;font:inherit!important;font-size:.72rem!important;text-align:left;cursor:pointer}
 .icon-picker-trigger:hover:not(:disabled){border-color:var(--ink)!important;background:var(--surface-muted)!important;color:var(--ink)!important;transform:none!important}
-.icon-picker-trigger:focus-visible,.icon-picker-search:focus-within,.icon-picker-option:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.icon-picker-trigger:focus-visible,.icon-picker-search:focus-within,.icon-picker-option:focus-visible{outline:2px solid var(--line-strong);outline-offset:2px}
 .icon-picker-trigger-icon{display:grid;width:25px;height:25px;flex:none;place-items:center;border:1px solid var(--line);border-radius:7px;background:var(--surface-muted);color:var(--ink)}
 .icon-picker-trigger-label{min-width:0;flex:1;overflow:hidden;color:var(--ink);text-overflow:ellipsis;white-space:nowrap}
-.icon-picker-panel{position:fixed;z-index:10000;display:grid;grid-template-rows:auto minmax(0,1fr);gap:9px;overflow:hidden;border:1px solid var(--line-strong);border-radius:14px;padding:11px;background:var(--surface);color:var(--ink);box-shadow:0 18px 52px rgb(0 0 0 / 24%);}
+.icon-picker-panel{position:fixed;z-index:10000;display:grid;box-sizing:border-box;grid-template-rows:auto minmax(0,1fr);gap:7px;overflow:hidden;border:1px solid var(--line);border-radius:12px;padding:8px;background:var(--surface);color:var(--ink);box-shadow:0 10px 28px rgb(0 0 0 / 14%);}
 .icon-picker-panel[hidden]{display:none!important}
-.icon-picker-search{display:flex;min-height:38px;align-items:center;gap:8px;border:1px solid var(--line-strong);border-radius:9px;padding:0 10px;background:var(--surface-muted);color:var(--muted)}
+.icon-picker-search{display:flex;min-height:34px;align-items:center;gap:7px;border:1px solid var(--line);border-radius:8px;padding:0 9px;background:var(--surface-muted);color:var(--muted)}
 .icon-picker-search input{width:100%;min-width:0;border:0!important;outline:0!important;background:transparent!important;color:var(--ink)!important;font:inherit!important;font-size:.78rem!important;box-shadow:none!important}
 .icon-picker-search input::placeholder{color:var(--muted)}
-.icon-picker-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-content:start;gap:6px;overflow:auto;padding:2px}
-.icon-picker-option{display:grid!important;min-width:0;min-height:64px;justify-items:center;align-content:center;gap:5px;border:1px solid var(--line)!important;border-radius:9px!important;padding:6px 3px!important;background:var(--surface)!important;color:var(--ink)!important;box-shadow:none!important;font:inherit!important;cursor:pointer}
-.icon-picker-option .ui-icon{width:21px;height:21px;color:currentColor}
-.icon-picker-option span{max-width:100%;overflow:hidden;color:currentColor;font-size:.58rem;font-weight:600;text-overflow:ellipsis;white-space:nowrap}
-.icon-picker-option:hover,.icon-picker-option[aria-pressed="true"]{border-color:var(--ink)!important;background:var(--surface-muted)!important;color:var(--ink)!important;transform:none!important}
-.icon-picker-option[aria-pressed="true"]{box-shadow:inset 0 0 0 1px var(--ink)!important}
+.icon-picker-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-content:start;gap:5px;overflow:auto;padding:1px}
+.icon-picker-option{display:grid!important;min-width:0;min-height:42px;justify-items:center;align-content:center;gap:2px;border:1px solid var(--line)!important;border-radius:8px!important;padding:3px 2px!important;background:var(--surface)!important;color:var(--ink)!important;box-shadow:none!important;font:inherit!important;cursor:pointer}
+.icon-picker-option .ui-icon{width:15px;height:15px;color:currentColor}
+.icon-picker-option span{max-width:100%;overflow:hidden;color:var(--muted);font-size:.54rem;font-weight:560;text-overflow:ellipsis;white-space:nowrap}
+.icon-picker-option:hover,.icon-picker-option[aria-pressed="true"]{border-color:var(--line-strong)!important;background:var(--surface-muted)!important;color:var(--ink)!important;transform:none!important}
+.icon-picker-option[aria-pressed="true"] span{color:var(--ink)}
 .icon-picker-option[hidden]{display:none!important}
 .icon-picker-empty{grid-column:1/-1;margin:0;padding:18px 8px;color:var(--muted);font-size:.78rem;text-align:center}
 .navigation-icon-control .icon-picker-trigger{min-width:108px;min-height:31px;padding:3px 6px!important;font-size:.64rem!important}
 .navigation-icon-control .icon-picker-trigger-icon{width:23px;height:23px}
 .navigation-icon-control .icon-picker-trigger-label{display:none}
-.navigation-field-grid>label .icon-picker{margin-top:2px}
+.navigation-field-grid>.navigation-form-field .icon-picker{margin-top:2px}
 .navigation-add-destinations,.navigation-destination-library{margin-top:10px;border:1px dashed var(--line-strong);border-radius:11px;background:var(--surface)}
 .navigation-add-destinations summary,.navigation-destination-library>summary{display:flex;align-items:center;gap:10px;min-height:55px;padding:8px 11px;list-style:none;cursor:pointer}
 .navigation-add-destinations summary::-webkit-details-marker,.navigation-destination-library>summary::-webkit-details-marker{display:none}
@@ -948,6 +948,8 @@
 .navigation-public-add .navigation-form-hint{margin:6px 0 13px}
 .navigation-public-add form{display:grid;gap:10px}
 .navigation-public-add form>label,.navigation-public-add form .navigation-field-grid label{display:grid;gap:5px;color:var(--ink);font-size:.75rem;font-weight:620}
+.navigation-public-add form .navigation-field-grid>.navigation-form-field{display:grid;min-width:0;gap:5px}
+.navigation-public-add form .navigation-form-label{display:block;margin:0;color:var(--ink);font-size:.75rem;font-weight:620}
 .navigation-public-add form input:not([type=checkbox]),.navigation-public-add form select,.navigation-item details form input:not([type=checkbox]),.navigation-item details form select{width:100%;min-height:39px;padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--ink);font:inherit;font-size:.78rem}
 .navigation-public-add form .navigation-field-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .navigation-public-add .navigation-checks{display:grid;gap:7px}
@@ -1003,3 +1005,35 @@
 .navigation-destination-grid form button>b { display: grid; width: 24px; height: 24px; flex: 0 0 24px; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--brand-text); font-size: .95rem; }
 .navigation-destination-grid form.is-pending button { cursor: wait; opacity: .65; }
 @media(prefers-reduced-motion:reduce){.navigation-destination-grid form button{transition:none}}
+
+.navigation-public-grid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+.navigation-public-add form:not([data-navigation-quick-add]){margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+@media(max-width:1000px){.navigation-public-grid{grid-template-columns:1fr}}
+.navigation-public-list [data-navigation-order-form]{display:grid;gap:10px}
+.navigation-public-list [data-navigation-order]{display:grid;gap:8px}
+.navigation-public-list .navigation-item{overflow:visible}
+.navigation-public-list .navigation-item-summary{display:grid;grid-template-columns:22px minmax(100px,1fr) minmax(112px,150px) 58px 104px 48px;align-items:center;gap:9px}
+.navigation-public-list .navigation-public-section select{width:100%;min-width:0;height:42px;padding:0 26px 0 10px;border:1px solid var(--line-strong);border-radius:9px;background:var(--surface);color:var(--ink);font:inherit;font-size:.75rem;text-overflow:ellipsis}
+.navigation-public-list .navigation-public-section .enhanced-select-trigger{width:100%;min-width:0;height:42px;min-height:42px;padding:0 9px;border-color:var(--line-strong)!important;border-radius:9px!important;background:var(--surface)!important;color:var(--ink)!important;font-size:.72rem;box-shadow:none!important}
+.navigation-public-list .navigation-public-icon-control{min-width:0}
+.navigation-public-list .navigation-public-icon-control .icon-picker-trigger{width:100%;min-width:0!important;height:42px;min-height:42px!important;padding:0 9px;border:1px solid var(--line-strong);border-radius:9px;background:var(--surface);color:var(--ink)}
+.navigation-public-list .navigation-public-icon-control .icon-picker-trigger-icon{display:grid;place-items:center;width:24px;height:24px;flex:0 0 24px;color:var(--ink)}
+.navigation-public-list .navigation-public-icon-control .icon-picker-trigger-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.72rem}
+.navigation-public-list .navigation-public-icon-control .icon-picker-panel{z-index:100}
+.navigation-public-list .navigation-public-order{display:flex;gap:5px}
+.navigation-public-list .navigation-public-order button{width:25px;height:27px}
+.navigation-public-list [data-navigation-order-form]>.button{width:100%}
+/* Public controls share the Staff/Member row; keep form-wide button rules off the move buttons. */
+#navigation-panel-public .navigation-public-destination .navigation-destination-controls{gap:6px}
+#navigation-panel-public .navigation-public-destination .navigation-move-controls button{width:27px!important;min-width:27px!important;max-width:27px!important;height:28px!important;min-height:28px!important;padding:0!important}
+#navigation-panel-public .navigation-public-destination[data-selected=false]{opacity:.68}
+@media(max-width:620px){#navigation-panel-public .navigation-public-destination .navigation-move-controls button{width:24px!important;min-width:24px!important;max-width:24px!important;height:26px!important;min-height:26px!important}.navigation-public-list [data-navigation-order-form]>.button{width:100%}}
+.navigation-public-add .navigation-public-details{margin-top:14px;padding-top:13px;border-top:1px solid var(--line)}
+.navigation-public-details>summary,.navigation-public-detail-item>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px;border:1px solid var(--line);border-radius:9px;color:var(--ink);cursor:pointer;list-style:none}
+.navigation-public-details>summary::-webkit-details-marker,.navigation-public-detail-item>summary::-webkit-details-marker{display:none}
+.navigation-public-details>summary span{display:grid;gap:3px}.navigation-public-details>summary strong{font-size:.78rem}.navigation-public-details>summary small{color:var(--muted);font-size:.68rem}
+.navigation-public-details-list{display:grid;gap:7px;margin-top:9px}
+.navigation-public-detail-item>summary{justify-content:flex-start;font-size:.75rem;font-weight:650}.navigation-public-detail-item>summary span{overflow:hidden;margin-left:auto;color:var(--muted);font-size:.66rem;font-weight:450;text-overflow:ellipsis;white-space:nowrap}
+.navigation-public-detail-item form{display:grid;gap:9px;margin-top:9px;padding:12px;border:1px solid var(--line);border-radius:9px;background:var(--surface-muted,var(--surface))}
+.navigation-public-detail-item form .navigation-field-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:760px){.navigation-public-list .navigation-item-summary{grid-template-columns:34px minmax(0,1fr) 44px 48px;gap:10px}.navigation-public-list .navigation-public-copy{grid-column:2/5}.navigation-public-list .table-status{grid-column:2;font-size:.62rem}.navigation-public-list .navigation-public-section{grid-column:2/4}.navigation-public-list .navigation-public-icon-control{grid-column:4}.navigation-public-list .navigation-public-order{grid-column:1;grid-row:2;align-self:center}.navigation-public-list .navigation-public-order button{width:30px;height:30px}.navigation-public-list .navigation-public-section select,.navigation-public-list .navigation-public-section .enhanced-select-trigger,.navigation-public-list .navigation-public-icon-control .icon-picker-trigger{height:40px;min-height:40px!important}.navigation-public-details>summary{align-items:flex-start}.navigation-public-detail-item>summary{flex-wrap:wrap}.navigation-public-detail-item>summary span{width:100%;margin-left:0}}

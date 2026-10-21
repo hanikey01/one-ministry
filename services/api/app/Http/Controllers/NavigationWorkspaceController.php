@@ -17,6 +17,7 @@ use Illuminate\View\View;
 class NavigationWorkspaceController extends Controller
 {
     private const ICONS = NavigationLayout::ICONS;
+    private const PUBLIC_SECTIONS = ['Main', 'Connect', 'Resources', 'About', 'Member area'];
 
     public function index(Request $request, NavigationLayout $layout): View
     {
@@ -36,6 +37,7 @@ class NavigationWorkspaceController extends Controller
             'pages' => DB::table('pages')->where('status', 'published')->orderBy('title')->get(['title', 'slug']),
             'features' => FeatureSetting::query()->pluck('key')->all(),
             'icons' => self::ICONS,
+            'publicSections' => self::PUBLIC_SECTIONS,
             'destinations' => $this->destinations(),
             'menuLayouts' => $layouts,
             'menuOptions' => collect(NavigationLayout::SURFACES)->mapWithKeys(fn (string $surface): array => [$surface => $layout->options($surface)])->all(),
@@ -156,6 +158,7 @@ class NavigationWorkspaceController extends Controller
                 'html' => view('staff.navigation-item', [
                     'item' => $item,
                     'icons' => self::ICONS,
+                    'publicSections' => self::PUBLIC_SECTIONS,
                     'items' => DB::table('navigation_items')->orderBy('parent_id')->orderBy('position')->get(),
                     'features' => FeatureSetting::query()->pluck('key')->all(),
                 ])->render(),
@@ -188,12 +191,32 @@ class NavigationWorkspaceController extends Controller
 
     public function reorder(Request $request): RedirectResponse
     {
-        $data = $request->validate(['items' => ['required', 'array', 'max:80'], 'items.*' => ['uuid', Rule::exists('navigation_items', 'id')]]);
+        $data = $request->validate([
+            'items' => ['required', 'array', 'max:80'],
+            'items.*' => ['uuid', Rule::exists('navigation_items', 'id')],
+            'enabled' => ['sometimes', 'array', 'max:80'],
+            'enabled.*' => ['uuid', Rule::exists('navigation_items', 'id')],
+            'sections' => ['sometimes', 'array'],
+            'sections.*' => ['required', Rule::in(self::PUBLIC_SECTIONS)],
+            'icons' => ['sometimes', 'array'],
+            'icons.*' => ['required', Rule::in(self::ICONS)],
+        ]);
         DB::transaction(function () use ($data, $request): void {
-            foreach ($data['items'] as $position => $id) DB::table('navigation_items')->where('id', $id)->update(['position' => $position + 1, 'updated_at' => now()]);
-            $this->audit($request, 'navigation.reordered', MinistrySetting::SINGLETON_ID, ['count' => count($data['items'])]);
+            $enabled = array_flip($data['enabled'] ?? []);
+            foreach ($data['items'] as $position => $id) {
+                $changes = ['position' => $position + 1, 'is_enabled' => isset($enabled[$id]), 'updated_at' => now()];
+                if (isset($data['sections'][$id])) $changes['section'] = $data['sections'][$id];
+                if (isset($data['icons'][$id])) $changes['icon'] = $data['icons'][$id];
+                DB::table('navigation_items')->where('id', $id)->update($changes);
+            }
+            $this->audit($request, 'navigation.reordered', MinistrySetting::SINGLETON_ID, [
+                'count' => count($data['items']),
+                'enabled' => $data['enabled'] ?? [],
+                'sections' => $data['sections'] ?? [],
+                'icons' => $data['icons'] ?? [],
+            ]);
         });
-        return back()->with('status', 'Navigation order saved.');
+        return back()->with('status', 'Public menu changes saved.');
     }
 
     /** @return array<int, array{label: string, url: string, icon: string, group: string, required_feature: ?string}> */
@@ -218,10 +241,11 @@ class NavigationWorkspaceController extends Controller
 
     private function data(Request $request, ?string $item = null): array
     {
-        $data = $request->validate(['label' => ['required', 'string', 'max:80'], 'url' => ['required', 'string', 'max:1200'], 'icon' => ['nullable', Rule::in(self::ICONS)], 'parent_id' => ['nullable', 'uuid', Rule::exists('navigation_items', 'id')->where(fn ($query) => $item ? $query->where('id', '!=', $item) : $query)], 'required_feature' => ['nullable', 'string', 'max:80', Rule::exists('feature_settings', 'key')]]);
+        $data = $request->validate(['label' => ['required', 'string', 'max:80'], 'url' => ['required', 'string', 'max:1200'], 'icon' => ['nullable', Rule::in(self::ICONS)], 'section' => ['nullable', Rule::in(self::PUBLIC_SECTIONS)], 'parent_id' => ['nullable', 'uuid', Rule::exists('navigation_items', 'id')->where(fn ($query) => $item ? $query->where('id', '!=', $item) : $query)], 'required_feature' => ['nullable', 'string', 'max:80', Rule::exists('feature_settings', 'key')]]);
         $url = trim($data['url']);
         abort_unless(str_starts_with($url, '/') || filter_var($url, FILTER_VALIDATE_URL), 422, 'Enter an internal path beginning with / or a valid URL.');
-        return [...$data, 'url' => $url, 'parent_id' => $data['parent_id'] ?? null, 'visible_desktop' => $request->boolean('visible_desktop'), 'visible_mobile' => $request->boolean('visible_mobile'), 'open_new_tab' => $request->boolean('open_new_tab')];
+        $section = $data['section'] ?? ($item ? DB::table('navigation_items')->where('id', $item)->value('section') : 'Main');
+        return [...$data, 'url' => $url, 'section' => $section ?: 'Main', 'parent_id' => $data['parent_id'] ?? null, 'visible_desktop' => $request->boolean('visible_desktop'), 'visible_mobile' => $request->boolean('visible_mobile'), 'open_new_tab' => $request->boolean('open_new_tab')];
     }
 
     private function audit(Request $request, string $action, string $subject, array $changes, string $subjectType = 'navigation_items'): void

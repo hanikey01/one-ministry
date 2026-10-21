@@ -14,13 +14,14 @@
             <button type="button" data-move-down aria-label="Move {{ $option['label'] }} down">↓</button>
         </div>
         @if($menuSlot === 'sidebar')
-            <label class="navigation-section-control" data-navigation-section-control @if(!$selected) hidden @endif>
-                <select name="groups[{{ $surface }}][sidebar][{{ $fieldKey }}]" aria-label="Section for {{ $option['label'] }}" data-navigation-group @disabled(!$selected)>
+            <div class="navigation-section-control" data-navigation-section-control @if(!$selected) hidden @endif>
+                <label class="sr-only" for="navigation-section-{{ $surface }}-{{ $fieldKey }}">Section for {{ $option['label'] }}</label>
+                <select id="navigation-section-{{ $surface }}-{{ $fieldKey }}" name="groups[{{ $surface }}][sidebar][{{ $fieldKey }}]" aria-label="Section for {{ $option['label'] }}" data-navigation-group @disabled(!$selected)>
                     @foreach($sidebarSections as $section)
                         <option value="{{ $section }}" @selected($configuredGroup === $section)>{{ $section }}</option>
                     @endforeach
                 </select>
-            </label>
+            </div>
         @endif
         <div class="navigation-icon-control" @if(!$selected) hidden @endif>
             <x-ui.icon-picker :name="'icons['.$surface.']['.$menuSlot.']['.$fieldKey.']'" :value="$configuredIcon" :label="$option['label'].' icon'" :icons="$icons" :id="'navigation-icon-'.$surface.'-'.$menuSlot.'-'.$fieldKey" :disabled="!$selected"/>

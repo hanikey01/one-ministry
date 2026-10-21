@@ -1405,3 +1405,109 @@
     .navigation-public-list [data-navigation-order-form] button { width: 100%; }
     .navigation-public-add .navigation-field-grid { grid-template-columns: 1fr; }
 }
+
+/* The public tab uses the same balanced two-card grid as Staff and Members. */
+.navigation-public-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+@media (max-width: 1000px) { .navigation-public-grid { grid-template-columns: 1fr; } }
+#navigation-panel-public .navigation-public-order button { min-height: 28px !important; padding: 0 !important; border-color: var(--line) !important; background: var(--surface) !important; color: var(--ink) !important; box-shadow: none !important; }
+#navigation-panel-public .navigation-public-order button:hover:not(:disabled) { border-color: var(--line-strong) !important; background: var(--surface-muted) !important; color: var(--ink) !important; }
+#navigation-public-add .navigation-destination-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#navigation-public-add .navigation-destination-grid form button { min-height: 58px; border-color: var(--line) !important; background: var(--surface) !important; color: var(--ink) !important; box-shadow: none !important; }
+#navigation-public-add .navigation-destination-grid form button:hover { border-color: var(--line-strong) !important; background: var(--surface-muted) !important; color: var(--ink) !important; }
+#navigation-public-add .navigation-destination-grid form button > .ui-icon { border-radius: 9px; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--ink); }
+#navigation-public-add .navigation-destination-grid form button > span { display: grid; min-width: 0; flex: 1; }
+#navigation-public-add .navigation-destination-grid form button strong { overflow: hidden; color: var(--ink); font-size: .74rem; text-overflow: ellipsis; white-space: nowrap; }
+#navigation-public-add .navigation-destination-grid form button small { overflow: hidden; color: var(--muted); font-size: .64rem; text-overflow: ellipsis; white-space: nowrap; }
+#navigation-public-add .navigation-destination-grid form button > b { display: grid; width: 24px; height: 24px; flex: 0 0 24px; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: .95rem; }
+@media (max-width: 620px) {
+    #navigation-public-add .navigation-destination-grid { grid-template-columns: minmax(0, 1fr); }
+    #navigation-public-add .navigation-destination-grid > section > div { grid-template-columns: minmax(0, 1fr); }
+    .ministry-app .navigation-public-list .navigation-item-summary { display: grid !important; grid-template-columns: 66px minmax(0, 1fr) 44px 48px !important; grid-template-rows: auto auto auto !important; align-items: center; gap: 6px 10px; }
+    .ministry-app .navigation-public-list .navigation-drag { display: none; }
+    .ministry-app .navigation-public-list .navigation-public-icon { grid-column: 1; grid-row: 1 / 3; }
+    .ministry-app .navigation-public-list .navigation-public-copy { display: grid !important; grid-column: 2; grid-row: 1; width: 100%; min-width: 0; }
+    .ministry-app .navigation-public-list .navigation-public-copy strong { display: block !important; visibility: visible !important; color: var(--ink) !important; }
+    .ministry-app .navigation-public-list .navigation-public-copy small { display: block !important; visibility: visible !important; color: var(--muted) !important; }
+    .ministry-app .navigation-public-list .table-status { grid-column: 3; grid-row: 1; justify-self: end; margin: 0; white-space: nowrap; }
+    .ministry-app .navigation-public-order { grid-column: 1; grid-row: 2; justify-self: start; }
+    .ministry-app .navigation-public-list .navigation-item details { grid-column: 3; grid-row: 2; justify-self: end; margin: 0; }
+    .ministry-app .navigation-public-list .navigation-public-order { display: flex !important; flex-direction: row !important; align-items: center; width: max-content; }
+    .ministry-app .navigation-public-list .navigation-public-order button { width: 27px !important; min-width: 27px !important; max-width: 27px !important; height: 27px !important; min-height: 27px !important; padding: 0 !important; border-color: var(--line) !important; background: var(--surface) !important; color: var(--ink) !important; }
+    .ministry-app .navigation-public-list .navigation-public-order button:hover:not(:disabled) { border-color: var(--accent) !important; background: var(--surface-muted) !important; color: var(--ink) !important; }
+}
+
+/* Public link presentation controls match the staff and member destination rows. */
+.navigation-public-list [data-navigation-order-form] { display: grid; gap: 10px; margin-top: 0; padding-top: 4px; }
+.navigation-public-list [data-navigation-order] { display: grid; gap: 8px; min-width: 0; }
+.navigation-public-list .navigation-item { overflow: visible; }
+.navigation-public-list .navigation-item-summary { display: grid; grid-template-columns: 22px minmax(100px, 1fr) minmax(112px, 150px) 58px 104px 48px; align-items: center; gap: 9px; min-width: 0; padding: 9px; }
+.navigation-public-list .navigation-public-section select { width: 100%; min-width: 0; height: 42px; padding: 0 25px 0 10px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--surface); color: var(--ink); font: inherit; font-size: .75rem; text-overflow: ellipsis; }
+.navigation-public-list .navigation-public-section .enhanced-select-trigger { width: 100%; min-width: 0; height: 42px; min-height: 42px; padding: 0 9px; border-color: var(--line-strong) !important; border-radius: 9px !important; background: var(--surface) !important; color: var(--ink) !important; font-size: .72rem; box-shadow: none !important; }
+.navigation-public-inherited-section { color: var(--muted); font-size: .68rem; }
+.navigation-public-list .navigation-public-icon-control { min-width: 0; }
+.navigation-public-list .navigation-public-icon-control .icon-picker-trigger { display: flex; width: 100%; min-width: 0 !important; height: 42px; min-height: 42px !important; gap: 6px; padding: 0 8px !important; border: 1px solid var(--line-strong) !important; border-radius: 9px !important; background: var(--surface) !important; color: var(--ink) !important; }
+.navigation-public-list .navigation-public-icon-control .icon-picker-trigger-icon { display: grid; width: 24px; height: 24px; flex: 0 0 24px; place-items: center; border: 0; background: transparent; color: var(--ink); }
+.navigation-public-list .navigation-public-icon-control .icon-picker-trigger-label { min-width: 0; overflow: hidden; color: var(--ink); font-size: .68rem; text-overflow: ellipsis; white-space: nowrap; }
+.navigation-public-list .navigation-public-icon-control .icon-picker-panel { z-index: 100; }
+.navigation-public-list .navigation-public-order { display: flex; gap: 4px; }
+.navigation-public-list .navigation-public-order button { width: 25px; height: 27px; }
+.navigation-public-list [data-navigation-order-form] > .button { width: 100%; }
+/* The Public editor now shares the compact Staff/Member destination row. */
+#navigation-panel-public .navigation-public-destination .navigation-destination-controls { gap: 6px; }
+#navigation-panel-public .navigation-public-destination .navigation-move-controls button { width: 27px !important; min-width: 27px !important; max-width: 27px !important; height: 28px !important; min-height: 28px !important; padding: 0 !important; }
+#navigation-panel-public .navigation-public-destination[data-selected="false"] { opacity: .68; }
+#navigation-public-add .navigation-form-field { display: grid; min-width: 0; gap: 5px; }
+#navigation-public-add .navigation-form-label { display: block; margin: 0; color: var(--ink); font-size: .75rem; font-weight: 620; }
+.icon-picker-panel { border-color: var(--line) !important; border-radius: 12px !important; padding: 8px !important; background: var(--surface) !important; color: var(--ink) !important; box-shadow: 0 14px 38px rgb(0 0 0 / 20%) !important; }
+.icon-picker-search { min-height: 34px !important; gap: 7px !important; border-color: var(--line) !important; border-radius: 8px !important; padding: 0 9px !important; background: var(--surface-muted) !important; color: var(--muted) !important; }
+.icon-picker-search input { color: var(--ink) !important; font-size: .72rem !important; }
+.icon-picker-grid { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; gap: 5px !important; padding: 1px !important; }
+.icon-picker-option { min-height: 46px !important; gap: 3px !important; border-color: var(--line) !important; border-radius: 8px !important; padding: 4px 2px !important; background: var(--surface) !important; color: var(--ink) !important; }
+.icon-picker-option .ui-icon { width: 16px !important; height: 16px !important; }
+.icon-picker-option span { color: var(--muted) !important; font-size: .56rem !important; }
+.icon-picker-option:hover, .icon-picker-option[aria-pressed="true"] { border-color: var(--line-strong) !important; background: var(--surface-muted) !important; color: var(--ink) !important; }
+.icon-picker-option:focus-visible, .icon-picker-search:focus-within { outline-color: var(--line-strong) !important; }
+.icon-picker-option[aria-pressed="true"] span { color: var(--ink) !important; }
+.ministry-app .icon-picker-panel { width: min(320px, calc(100vw - 24px)) !important; max-height: min(320px, calc(100vh - 24px)) !important; gap: 7px !important; border-color: var(--line) !important; border-radius: 12px !important; padding: 8px !important; background: var(--surface) !important; color: var(--ink) !important; box-shadow: 0 10px 28px rgb(0 0 0 / 14%) !important; }
+.ministry-app .icon-picker-panel .icon-picker-search { min-height: 33px !important; border-color: var(--line) !important; background: var(--surface-muted) !important; color: var(--muted) !important; }
+.ministry-app .icon-picker-panel .icon-picker-search input { color: var(--ink) !important; }
+.ministry-app .icon-picker-panel .icon-picker-grid { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; gap: 5px !important; }
+.ministry-app .icon-picker-panel .icon-picker-option { min-height: 42px !important; gap: 2px !important; border-color: var(--line) !important; border-radius: 8px !important; padding: 3px 2px !important; background: var(--surface) !important; color: var(--ink) !important; box-shadow: none !important; }
+.ministry-app .icon-picker-panel .icon-picker-option .ui-icon { width: 15px !important; height: 15px !important; color: currentColor !important; }
+.ministry-app .icon-picker-panel .icon-picker-option span { color: var(--muted) !important; font-size: .54rem !important; }
+.ministry-app .icon-picker-panel .icon-picker-option:hover, .ministry-app .icon-picker-panel .icon-picker-option[aria-pressed="true"] { border-color: var(--line-strong) !important; background: var(--surface-muted) !important; color: var(--ink) !important; }
+.ministry-app .icon-picker-panel .icon-picker-option[aria-pressed="true"] span { color: var(--ink) !important; }
+.ministry-app .icon-picker-panel .icon-picker-option:focus-visible { outline: 2px solid var(--line-strong) !important; outline-offset: 1px !important; }
+/* Keep the picker neutral against the compiled app's broad accent-button selector. */
+body.ministry-app .icon-picker-panel .icon-picker-option:not(#icon-picker-theme-override) { background: var(--surface) !important; color: var(--ink) !important; }
+body.ministry-app .icon-picker-panel .icon-picker-option:hover, body.ministry-app .icon-picker-panel .icon-picker-option[aria-pressed="true"] { background: var(--surface-muted) !important; color: var(--ink) !important; }
+body.ministry-app .icon-picker-panel .icon-picker-option span { color: var(--muted) !important; }
+body.ministry-app .icon-picker-panel .icon-picker-option[aria-pressed="true"] span { color: var(--ink) !important; }
+@media (max-width: 620px) {
+    #navigation-panel-public .navigation-public-destination .navigation-move-controls button { width: 24px !important; min-width: 24px !important; max-width: 24px !important; height: 26px !important; min-height: 26px !important; padding: 0 !important; }
+}
+.navigation-public-add .navigation-public-details { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line); }
+.navigation-public-details > summary, .navigation-public-detail-item > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); cursor: pointer; list-style: none; }
+.navigation-public-details > summary::-webkit-details-marker, .navigation-public-detail-item > summary::-webkit-details-marker { display: none; }
+.navigation-public-details > summary span { display: grid; gap: 3px; }
+.navigation-public-details > summary strong { font-size: .78rem; }
+.navigation-public-details > summary small { color: var(--muted); font-size: .68rem; }
+.navigation-public-details-list { display: grid; gap: 7px; margin-top: 9px; }
+.navigation-public-detail-item > summary { justify-content: flex-start; font-size: .75rem; font-weight: 650; }
+.navigation-public-detail-item > summary span { overflow: hidden; margin-left: auto; color: var(--muted); font-size: .66rem; font-weight: 450; text-overflow: ellipsis; white-space: nowrap; }
+.navigation-public-detail-item form { display: grid; gap: 9px; margin-top: 9px; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-muted); }
+.navigation-public-detail-item form .navigation-field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 760px) {
+    .navigation-public-list .navigation-item-summary { grid-template-columns: 34px minmax(0, 1fr) 44px 48px; gap: 10px; }
+    .navigation-public-list .navigation-public-copy { grid-column: 2 / 5; }
+    .navigation-public-list .table-status { grid-column: 2; font-size: .62rem; }
+    .navigation-public-list .navigation-public-section { grid-column: 2 / 4; min-width: 0; }
+    .navigation-public-inherited-section { grid-column: 2 / 4; }
+    .navigation-public-list .navigation-public-icon-control { grid-column: 4; min-width: 0; }
+    .navigation-public-list .navigation-public-order { grid-column: 1; grid-row: 2; align-self: center; }
+    .navigation-public-list .navigation-public-order button { width: 30px; height: 30px; }
+    .navigation-public-list .navigation-public-section select, .navigation-public-list .navigation-public-section .enhanced-select-trigger, .navigation-public-list .navigation-public-icon-control .icon-picker-trigger { height: 40px; min-height: 40px !important; }
+    .navigation-public-detail-item > summary { flex-wrap: wrap; }
+    .navigation-public-detail-item > summary span { width: 100%; margin-left: 0; }
+    .navigation-public-detail-item form .navigation-field-grid { grid-template-columns: 1fr; }
+}

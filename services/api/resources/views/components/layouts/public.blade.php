@@ -19,17 +19,17 @@
                         @if($staffPermissions !== [])<a href="{{ route('staff.overview') }}"><x-ui.icon name="settings"/><span>Staff dashboard</span></a>@endif
                     </div>
                 @endauth
-                @php($navigation = \Illuminate\Support\Facades\DB::table('navigation_items')->whereNull('parent_id')->where('visible_desktop', true)->orderBy('position')->get())
-                <div class="workspace-nav-group"><p>Explore</p>
-                    @forelse($navigation as $item)
-                        @if(!$item->required_feature || in_array($item->required_feature, $features, true))
-                            @php($children = \Illuminate\Support\Facades\DB::table('navigation_items')->where('parent_id', $item->id)->where('visible_desktop', true)->orderBy('position')->get())
+                @php($navigation = \Illuminate\Support\Facades\DB::table('navigation_items')->whereNull('parent_id')->where('is_enabled', true)->where('visible_desktop', true)->orderBy('position')->get()->filter(fn ($item) => ! $item->required_feature || in_array($item->required_feature, $features, true)))
+                @forelse($navigation->groupBy(fn ($item) => $item->section ?: 'Main') as $section => $sectionItems)
+                    <div class="workspace-nav-group public-nav-section"><p>{{ $section }}</p>
+                        @foreach($sectionItems as $item)
+                            @php($children = \Illuminate\Support\Facades\DB::table('navigation_items')->where('parent_id', $item->id)->where('is_enabled', true)->where('visible_desktop', true)->orderBy('position')->get())
                             @if($children->isEmpty())<a href="{{ $item->url }}" @if($item->open_new_tab) target="_blank" rel="noopener noreferrer" @endif><x-ui.icon :name="$item->icon ?: 'external'"/><span>{{ $terminology->navigationLabel($item->url, $item->label) }}</span></a>@else<details class="public-nav-dropdown" data-dismiss-on-outside><summary><x-ui.icon :name="$item->icon ?: 'external'"/><span>{{ $terminology->navigationLabel($item->url, $item->label) }}</span><x-ui.icon name="chevron-down" :size="14"/></summary><div>@foreach($children as $child)@if(!$child->required_feature || in_array($child->required_feature, $features, true))<a href="{{ $child->url }}" @if($child->open_new_tab) target="_blank" rel="noopener noreferrer" @endif>@if($child->icon)<x-ui.icon :name="$child->icon" :size="15"/>@endif<span>{{ $terminology->navigationLabel($child->url, $child->label) }}</span></a>@endif@endforeach</div></details>@endif
-                        @endif
-                    @empty
-                        <a href="{{ route('public.home') }}"><x-ui.icon name="home"/><span>Home</span></a><a href="{{ route('public.events') }}"><x-ui.icon name="calendar"/><span>Events</span></a>@if(in_array('groups',$features,true))<a href="{{ route('public.groups') }}"><x-ui.icon name="groups"/><span>{{ $terminology->label('group', 'plural') }}</span></a>@endif<a href="{{ route('public.locations') }}"><x-ui.icon name="location"/><span>{{ $terminology->label('location', 'plural') }}</span></a>
-                    @endforelse
-                </div>
+                        @endforeach
+                    </div>
+                @empty
+                    <div class="workspace-nav-group"><p>Explore</p><a href="{{ route('public.home') }}"><x-ui.icon name="home"/><span>Home</span></a><a href="{{ route('public.events') }}"><x-ui.icon name="calendar"/><span>Events</span></a>@if(in_array('groups',$features,true))<a href="{{ route('public.groups') }}"><x-ui.icon name="groups"/><span>{{ $terminology->label('group', 'plural') }}</span></a>@endif<a href="{{ route('public.locations') }}"><x-ui.icon name="location"/><span>{{ $terminology->label('location', 'plural') }}</span></a></div>
+                @endforelse
             </nav>
             <div class="workspace-sidebar-actions"><a href="{{ $worshipUrl }}"><x-ui.icon name="worship"/><span>{{ $worshipLabel }}</span></a></div>
             <div class="workspace-account">
@@ -59,7 +59,7 @@
     <div class="public-footer-bottom"><span>© {{ now()->year }} {{ $settings->name }}. All rights reserved.</span><span>{{ $settings->public_address ?: $settings->timezone }}</span></div>
 </footer>
         </main>
-        @php($publicMobileItems = \Illuminate\Support\Facades\DB::table('navigation_items')->whereNull('parent_id')->where('visible_mobile', true)->orderBy('position')->get()->filter(fn ($item) => ! $item->required_feature || in_array($item->required_feature, $features, true))->take(5))
+        @php($publicMobileItems = \Illuminate\Support\Facades\DB::table('navigation_items')->whereNull('parent_id')->where('is_enabled', true)->where('visible_mobile', true)->orderBy('position')->get()->filter(fn ($item) => ! $item->required_feature || in_array($item->required_feature, $features, true))->take(5))
         <nav class="workspace-mobile-nav public-mobile-nav" aria-label="Public mobile navigation">
             @forelse($publicMobileItems as $item)<a href="{{ $item->url }}" @if($item->open_new_tab) target="_blank" rel="noopener noreferrer" @endif @if(str_starts_with($item->url, '/') && request()->path() === trim(parse_url($item->url, PHP_URL_PATH) ?: '/', '/')) aria-current="page" @endif><x-ui.icon :name="$item->icon ?: 'external'"/><span>{{ $terminology->navigationLabel($item->url, $item->label) }}</span></a>@empty<a href="{{ route('public.home') }}" @if(request()->routeIs('public.home')) aria-current="page" @endif><x-ui.icon name="home"/><span>Home</span></a><a href="{{ route('public.events') }}" @if(request()->routeIs('public.events')) aria-current="page" @endif><x-ui.icon name="calendar"/><span>Events</span></a>@if(in_array('groups',$features,true))<a href="{{ route('public.groups') }}" @if(request()->routeIs('public.groups')) aria-current="page" @endif><x-ui.icon name="groups"/><span>{{ $terminology->label('group', 'plural') }}</span></a>@else<a href="{{ route('public.locations') }}" @if(request()->routeIs('public.locations')) aria-current="page" @endif><x-ui.icon name="location"/><span>{{ $terminology->label('location', 'singular') }}</span></a>@endif<a href="{{ $worshipUrl }}"><x-ui.icon name="worship"/><span>Worship</span></a>@endforelse
         </nav>

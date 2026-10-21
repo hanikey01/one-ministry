@@ -1,14 +1,25 @@
-<article class="navigation-item" draggable="true" data-navigation-id="{{ $item->id }}">
-    <div class="navigation-item-summary">
-        <span class="navigation-drag" aria-hidden="true" title="Drag to reorder">⠿</span>
-        <span class="navigation-public-icon">@if($item->icon)<x-ui.icon :name="$item->icon" :size="17"/>@endif</span>
-        <div class="navigation-public-copy"><strong>{{ $item->label }}</strong><small>{{ $item->url }} @if($item->parent_id) · Dropdown item @endif @if($item->required_feature) · {{ str($item->required_feature)->headline() }} module @endif</small></div>
-        <span class="table-status">{{ $item->visible_desktop ? 'Desktop' : 'Hidden desktop' }} · {{ $item->visible_mobile ? 'Mobile' : 'Hidden mobile' }}</span>
-        <div class="navigation-public-order" aria-label="Reorder {{ $item->label }}"><button type="button" data-public-move="up" aria-label="Move {{ $item->label }} up">↑</button><button type="button" data-public-move="down" aria-label="Move {{ $item->label }} down">↓</button></div>
-        <details data-dismiss-on-outside>
-            <summary>Edit</summary>
-            <form method="POST" action="{{ route('staff.navigation.update', $item->id) }}">@csrf @method('PUT') @include('staff.navigation-fields', ['item' => $item])<button class="button" type="submit">Save link</button></form>
-            <form method="POST" action="{{ route('staff.navigation.destroy', $item->id) }}">@csrf @method('DELETE')<button class="button button-secondary" type="submit">Remove link</button></form>
-        </details>
+@php($enabled = (bool) ($item->is_enabled ?? true))
+<article class="navigation-destination-row navigation-public-destination" data-navigation-row data-navigation-id="{{ $item->id }}" data-selected="{{ $enabled ? 'true' : 'false' }}">
+    <input id="public-menu-choice-{{ $item->id }}" type="checkbox" name="enabled[]" value="{{ $item->id }}" aria-label="Include {{ $item->label }} in the public menu" data-public-enabled @checked($enabled)>
+    <div class="navigation-destination-label">
+        <span class="navigation-destination-icon"><x-ui.icon :name="$item->icon ?: 'external'" :size="17"/></span>
+        <span class="navigation-destination-copy"><strong>{{ $item->label }}</strong><small>{{ $item->url }}@if($item->parent_id) · Dropdown item @endif @if($item->required_feature) · {{ str($item->required_feature)->headline() }} module @endif</small></span>
     </div>
+    <div class="navigation-destination-controls" data-public-controls @if(!$enabled) hidden @endif>
+        <div class="navigation-move-controls" aria-label="Reorder {{ $item->label }}">
+            <button type="button" data-public-move="up" aria-label="Move {{ $item->label }} up">↑</button>
+            <button type="button" data-public-move="down" aria-label="Move {{ $item->label }} down">↓</button>
+        </div>
+        @if(!$item->parent_id)
+            <div class="navigation-section-control navigation-public-section">
+                <label class="sr-only" for="public-navigation-section-{{ $item->id }}">Section for {{ $item->label }}</label>
+                <select id="public-navigation-section-{{ $item->id }}" name="sections[{{ $item->id }}]" aria-label="Section for {{ $item->label }}">
+                    @foreach($publicSections as $section)<option value="{{ $section }}" @selected($item->section === $section)>{{ $section }}</option>@endforeach
+                </select>
+            </div>
+        @endif
+        <div class="navigation-icon-control navigation-public-icon-control"><x-ui.icon-picker :name="'icons['.$item->id.']'" :value="$item->icon ?: 'external'" :label="$item->label.' icon'" :icons="$icons" :id="'public-navigation-icon-'.$item->id"/></div>
+        <span class="navigation-order-display" data-navigation-order-display>{{ str_pad((string) $item->position, 2, '0', STR_PAD_LEFT) }}</span>
+    </div>
+    <input type="hidden" name="items[]" value="{{ $item->id }}">
 </article>

@@ -124,3 +124,11 @@ When a question is resolved, record date, decision maker, evidence, alternatives
 **Reason:** Ministries use different words for their gatherings and community structure, and those words should appear consistently without changing application behavior or creating a separate codebase.
 
 **Status:** Accepted by user direction, 2026-10-21. Initial terminology configuration is implemented for service, meeting, group, location, volunteer, department, and member labels. Labels now flow into the shared staff/member/public navigation, primary directory headings, staff overview summaries, and public fallback links. Remaining user-facing labels are being covered alongside the navigation configuration work.
+
+### D-033 — Public navigation sections and inline presentation controls
+
+**Decision:** Public menu rows use the same compact checkbox, label, order, section, and icon controls as Staff and Member navigation. The checkbox includes or excludes a configured link from public rendering without deleting its saved configuration; permanent deletion remains in Manage link details. Inline selection, order, section, and icon values save together. Public sidebar entries are grouped by the selected section. The initial controlled sections are Main, Connect, Resources, About, and Member area. Label, URL, device visibility, module requirement, parent link, open-new-tab behavior, and permanent removal remain in a separate Manage link details area.
+
+**Reason:** User direction, 2026-10-21. The Public menu should follow the same direct row pattern as Staff and Member navigation, while preserving the existing public-link management capabilities.
+
+**Status:** Accepted and implemented with additive section and menu-selection migrations. Existing links default to Main and remain selected. Both migrations are applied in the local Compose database; the compact responsive Public rows and selection interaction were reviewed in the local browser.
