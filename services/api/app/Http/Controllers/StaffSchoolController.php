@@ -251,7 +251,7 @@ class StaffSchoolController extends Controller
 
     private function enabled(): void
     {
-        abort_unless(DB::table('feature_settings')->where(['key' => 'digital_school', 'state' => 'enabled'])->exists(), 404);
+        abort_unless(app(\App\Services\ModuleAvailability::class)->visibleToStaff('digital_school', auth()->user()), 404);
     }
 
     /** @return array<string, mixed> */

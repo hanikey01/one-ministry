@@ -225,7 +225,7 @@ Each installation chooses its own provider and bears its own provider charges. T
 
 ### M-1 — Provider settings and meeting policy
 
-- Feature gate `interactive_meetings`.
+- Feature gate `interactive_meetings`, disabled by default on fresh and upgraded installations.
 - Installation-owned provider configuration and preflight.
 - Meeting templates, occurrences, policy, role assignments, and invitations.
 - Staff creation/list/detail screens and member meeting list.
@@ -234,7 +234,7 @@ Each installation chooses its own provider and bears its own provider charges. T
 ### M-2 — Secure join and core room
 
 - Pre-join device check, waiting room, short-lived provider grants, participant presence, chat, raise hand, participant list, and stage rendering.
-- Host lobby, mute/remove, shared stage, room lock/end, audit events.
+- Host lobby admission and decline, mute/remove, shared stage, room lock/end, audit events.
 - Accessibility: keyboard controls, focus order, labels, captions control states, reduced-motion layout.
 
 ### M-3 — Collaboration and care

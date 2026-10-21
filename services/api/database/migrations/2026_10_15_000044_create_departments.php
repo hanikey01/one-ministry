@@ -37,9 +37,11 @@ return new class extends Migration
         DB::table('permissions')->insertOrIgnore([
             ['key' => 'departments.manage', 'description' => 'Create departments and appoint department leaders', 'created_at' => now(), 'updated_at' => now()],
         ]);
-        DB::table('role_permissions')->insertOrIgnore([
-            ['role_key' => 'ministry_administrator', 'permission_key' => 'departments.manage'],
-        ]);
+        if (DB::table('roles')->where('key', 'ministry_administrator')->exists()) {
+            DB::table('role_permissions')->insertOrIgnore([
+                ['role_key' => 'ministry_administrator', 'permission_key' => 'departments.manage'],
+            ]);
+        }
 
         if (DB::table('ministry_settings')->exists()) {
             foreach (self::defaults() as $department) {

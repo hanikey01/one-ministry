@@ -15,8 +15,8 @@ class InstallMinistryCommand extends Command
         {--location=Main Campus : First location name}
         {--tagline= : Public tagline}
         {--contact-email= : Public contact email}
-        {--primary-color=#17324D : Primary brand color in hex}
-        {--accent-color=#D9A441 : Accent brand color in hex}
+        {--primary-color=#343A40 : Primary brand color in hex}
+        {--accent-color=#697386 : Accent brand color in hex}
         {--admin-name= : Initial administrator name}
         {--admin-email= : Initial administrator email}';
 

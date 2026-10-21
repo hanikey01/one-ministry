@@ -204,6 +204,11 @@ class LibraryController extends Controller
     private function requireEnabled(string $library): void
     {
         $this->requireLibrary($library);
-        abort_unless(FeatureSetting::query()->where('key', $library)->value('state') === 'enabled', 404);
+        $modules = app(\App\Services\ModuleAvailability::class);
+        $staffRoute = request()->is('staff/*') || request()->is('api/v1/staff/*');
+        $available = $staffRoute
+            ? $modules->visibleToStaff($library, request()->user())
+            : $modules->enabled($library);
+        abort_unless($available, 404);
     }
 }

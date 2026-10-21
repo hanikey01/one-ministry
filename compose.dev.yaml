@@ -1,6 +1,10 @@
 # Local development only. Combine with compose.yaml; do not use in production.
 services:
   api:
+    build:
+      context: ./services/api
+      args:
+        INSTALL_REDIS_EXTENSION: "true"
     command: ["php-fpm"]
     environment:
       APP_ENV: local

@@ -6,7 +6,7 @@
 
 Build vertical slices across database, API, UI, background jobs, provider adapter, documentation, and tests. No module is complete because its controller or page exists. Every phase has a demo path, security checks, failure checks, and install/upgrade verification. Keep features in `staff_preview` until their gate passes; release to the public through an audited setting change.
 
-For each slice: define contract → migrate → implement domain rules and policy → implement Laravel route/Livewire or Blade interface → preserve internal API only where it has an integration or polling consumer → add meaningful automated tests → run the end-to-end demo → update operations and docs. Media and provider integrations also need a simulated failure test.
+For each slice: define contract → migrate → implement domain rules and policy → implement Laravel route/Livewire or Blade interface → preserve internal API only where it has an integration or polling consumer → add meaningful automated tests → run the end-to-end demo → update operations and docs. Media and provider integrations also need a simulated failure test. User-facing writes should use the shared viewport notification component and prefer progressive in-place saves when the endpoint can return authoritative state safely; keep the normal server-rendered submission as a fallback and migrate existing workflows route by route. Shared navigation must use versioned, cacheable assets; optional media SDKs load only on routes and actions that need them. Adopt seamless Livewire navigation incrementally after the affected JavaScript initializes correctly on each navigation event.
 
 ## 2. Phase 0 — Portable foundation
 
@@ -15,7 +15,10 @@ For each slice: define contract → migrate → implement domain rules and polic
 **Gate:**
 
 - A fresh installation can be configured without editing source code.
-- Administrator can brand site, create two locations, invite staff, revoke a session, and switch a module into staff preview.
+- Administrator can configure ministry-owned branding and light/dark canvas, panel, and sidebar colors, create two locations, invite staff, revoke a session, and switch a module into staff preview.
+- A theme change keeps neutral light/dark defaults unless the ministry chooses its own palette; the shared shell resolves the saved palette consistently across staff, member, public, and worship surfaces.
+- An administrator can set singular and plural ministry-facing labels for supported concepts; shared UI surfaces use the override while route names, permission keys, data values, and public/API identifiers remain stable.
+- A representative enhanced settings save shows pending and completion/failure feedback in the current viewport without a page reload, while its server-rendered fallback still works.
 - Unauthorized location/group access is denied through direct API calls.
 - Backup is restored into a clean test installation and compared with expected records and media manifests.
 - Clean migration and upgrade migration pass; queued jobs and scheduler run; failing dependency appears in operator health.
@@ -25,6 +28,8 @@ For each slice: define contract → migrate → implement domain rules and polic
 ## 3. Phase 1 — Public presence and digital church
 
 **Build:** Pages, content and homepage carousel; service templates/occurrences/run sheet; media provider adapter; broadcast playback; live state machine; host dashboard; public worship room; chat/moderation; newcomer/prayer response forms; service notes and prompts; fallback and interruption flows.
+
+The bounded AI page editor is a separately feature-gated content-authoring enhancement, not an AI service requirement for the core public site. Its foundation is built in one vertical slice: ministry-owned provider credentials, dynamic model catalog, structured-output route test, staff settings, and audit. Full-page planning consumes only the staff-entered brief and optional public details, validates a structured composition against approved page blocks, and shows an outline for staff approval before changing the normal editor. Section editing sends the ordered public page draft for context and returns only the selected block's existing fields for staff review and approval. Staff select media and link destinations, then save through the existing draft flow, which creates the page revision; publisher review remains mandatory before `ai_page_editor` can pass its release gate.
 
 **Gate:**
 

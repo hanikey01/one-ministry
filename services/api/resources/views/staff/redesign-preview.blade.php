@@ -1,3 +1,4 @@
+@php($themeSettings = \App\Models\MinistrySetting::find(\App\Models\MinistrySetting::SINGLETON_ID))
 <!doctype html>
 <html lang="en">
 <head>
@@ -20,8 +21,17 @@
         @media(max-width:900px){.app{grid-template-columns:76px minmax(0,1fr)}.sidebar{padding:18px 10px}.brand{justify-content:center;padding:6px 0 22px}.brand>span:last-child,.nav-label,.nav a span,.nav .badge,.user div,.more{display:none}.nav a{justify-content:center;padding:0}.sidebar-bottom{padding:15px 0 0}.user{justify-content:center}.metrics{grid-template-columns:repeat(2,1fr)}.grid,.section-grid{grid-template-columns:1fr}.top-search{display:none}}
         @media(max-width:620px){.app{display:block}.sidebar{position:fixed;z-index:9;width:280px;transform:translateX(-105%);transition:transform .22s ease}.sidebar.open{transform:translateX(0)}.sidebar.open .brand>span:last-child,.sidebar.open .nav-label,.sidebar.open .nav a span,.sidebar.open .nav .badge,.sidebar.open .user div,.sidebar.open .more{display:block}.sidebar.open .brand{justify-content:flex-start;padding-left:10px}.sidebar.open .nav a{justify-content:flex-start}.sidebar.open .user{justify-content:flex-start}.mobile-menu{display:grid}.topbar{min-height:67px;padding:0 16px;gap:10px}.crumb{font-size:.66rem}.top-actions .add{width:38px;padding:0;justify-content:center}.top-actions .add span{display:none}.content{padding:29px 17px}.heading-row{align-items:start;flex-direction:column}.date-control{display:none}.metrics{grid-template-columns:1fr 1fr;gap:10px;margin-top:22px}.metric{padding:15px}.metric strong{font-size:1.45rem}.panel-header{padding:17px 17px 14px}.service-list,.activity{padding-right:17px;padding-left:17px}.care,.teams{padding-right:17px;padding-left:17px}.top-actions .icon-button:first-child{display:none}}
     </style>
+    <style>
+        body{background:var(--theme-light-canvas-color);color:var(--theme-light-ink)}
+        .sidebar{background:var(--theme-light-sidebar-color);color:var(--theme-light-sidebar-ink)}
+        .brand-mark,.nav .badge{background:var(--accent);color:var(--accent-foreground)}
+        .brand strong,.nav a.active,.nav a:hover{color:var(--theme-light-sidebar-ink)}
+        .nav a.active{background:color-mix(in srgb,var(--brand) 30%,var(--theme-light-sidebar-color));box-shadow:inset 2px 0 var(--accent)}
+        .topbar,.metric,.panel,.section-card{background:var(--theme-light-surface-color);color:var(--theme-light-surface-ink)}
+        .add,.primary-action{background:var(--brand);color:var(--brand-foreground)}
+    </style>
 </head>
-<body>
+<body style="{{ \App\Support\MinistryTheme::cssVariables($themeSettings) }};--brand:var(--theme-primary-color);--accent:var(--theme-accent-color);--brand-foreground:{{ \App\Support\MinistryTheme::colors($themeSettings)['primary_foreground'] }};--accent-foreground:{{ \App\Support\MinistryTheme::colors($themeSettings)['accent_foreground'] }}">
 <div class="app" id="app">
     <aside class="sidebar" id="sidebar">
         <div class="brand"><span class="brand-mark">L</span><span><strong>Light Of The World</strong><small>Ministry workspace</small></span></div>

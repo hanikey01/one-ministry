@@ -44,8 +44,14 @@ class InstallMinistry
                 'public_domain' => strtolower($input['domain']),
                 'contact_email' => $input['contact_email'] ?? null,
                 'timezone' => $input['timezone'],
-                'primary_color' => $input['primary_color'] ?? '#17324D',
-                'accent_color' => $input['accent_color'] ?? '#D9A441',
+                'primary_color' => $input['primary_color'] ?? '#343A40',
+                'accent_color' => $input['accent_color'] ?? '#697386',
+                'light_canvas_color' => \App\Support\MinistryTheme::DEFAULTS['light_canvas_color'],
+                'light_surface_color' => \App\Support\MinistryTheme::DEFAULTS['light_surface_color'],
+                'light_sidebar_color' => \App\Support\MinistryTheme::DEFAULTS['light_sidebar_color'],
+                'dark_canvas_color' => \App\Support\MinistryTheme::DEFAULTS['dark_canvas_color'],
+                'dark_surface_color' => \App\Support\MinistryTheme::DEFAULTS['dark_surface_color'],
+                'dark_sidebar_color' => \App\Support\MinistryTheme::DEFAULTS['dark_sidebar_color'],
             ]);
 
             Location::create([
@@ -89,6 +95,7 @@ class InstallMinistry
                 'locations.manage' => 'Create and update ministry locations',
                 'features.read' => 'View module states',
                 'features.manage' => 'Change module states',
+                'ai.manage' => 'Configure AI providers and page drafting models',
                 'services.manage' => 'Create and operate service occurrences',
                 'departments.manage' => 'Create departments and appoint department leaders',
             ] as $key => $description) {
@@ -100,7 +107,7 @@ class InstallMinistry
                 ]);
             }
 
-            foreach (['settings.read', 'settings.update', 'locations.read', 'locations.manage', 'features.read', 'features.manage', 'services.manage', 'departments.manage', 'content.manage', 'content.publish'] as $permission) {
+            foreach (['settings.read', 'settings.update', 'locations.read', 'locations.manage', 'features.read', 'features.manage', 'ai.manage', 'services.manage', 'departments.manage', 'content.manage', 'content.publish'] as $permission) {
                 if (DB::table('permissions')->where('key', $permission)->exists()) {
                     DB::table('role_permissions')->insertOrIgnore(['role_key' => 'ministry_administrator', 'permission_key' => $permission]);
                 }
@@ -118,7 +125,7 @@ class InstallMinistry
                 DB::table('role_permissions')->insertOrIgnore(['role_key' => 'site_editor', 'permission_key' => $permission]);
             }
 
-            foreach (['digital_church', 'people', 'groups', 'giving', 'books_library', 'audio_sermons', 'video_sermons', 'sermon_series'] as $feature) {
+            foreach (['digital_church', 'interactive_meetings', 'people', 'groups', 'giving', 'books_library', 'audio_sermons', 'video_sermons', 'sermon_series'] as $feature) {
                 FeatureSetting::firstOrCreate(['key' => $feature], ['state' => 'disabled']);
             }
 

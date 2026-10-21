@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\MeetingAccessService;
+use App\Models\FeatureSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -13,11 +14,13 @@ class StaffMeetingsMediaController extends Controller
 {
     public function meetings(): JsonResponse
     {
+        $this->ensureMeetingsEnabled();
         return response()->json(['data' => DB::table('meetings')->latest()->get()]);
     }
 
     public function meeting(Request $r): JsonResponse
     {
+        $this->ensureMeetingsEnabled();
         $d = $r->validate([
             'title' => ['required', 'string', 'max:200'], 'starts_at' => ['nullable', 'date'], 'recording_notice' => ['sometimes', 'boolean'],
             'access_policy' => ['sometimes', 'in:member_only,invitation_only'], 'entry_policy' => ['sometimes', 'in:open_room,waiting_room'],
@@ -46,12 +49,18 @@ class StaffMeetingsMediaController extends Controller
 
     public function token(Request $r, string $meeting, MeetingAccessService $access): JsonResponse
     {
+        $this->ensureMeetingsEnabled();
         $d = $r->validate(['display_name' => ['required', 'string', 'max:160']]);
         $record = DB::table('meetings')->where('id', $meeting)->where('provider', 'zoom_video_sdk')->first();
         abort_unless($record, 404);
         $result = $access->join($record, $r->user(), $d['display_name'], $r->ip());
 
         return response()->json(['data' => $result]);
+    }
+
+    private function ensureMeetingsEnabled(): void
+    {
+        abort_unless(app(\App\Services\ModuleAvailability::class)->visibleToStaff('interactive_meetings', auth()->user()), 404);
     }
 
     public function media(): JsonResponse

@@ -41,8 +41,9 @@ Roles are permission bundles, not a rigid hierarchy. A person may hold more than
 
 ### 4.1 Installation and branding
 
-- First-run setup collects ministry name, domain, logo, colors, time zone, primary location, service schedule, initial administrator, and contact details.
-- Administrators can configure terminology such as *campus* versus *branch*, and can enable or hide modules.
+- First-run setup collects ministry name, domain, logo, colors, time zone, primary location, service schedule, initial administrator, and contact details. New installations begin with neutral light surfaces (white and gray) and neutral dark surfaces (charcoal and near-black); every later interface palette choice belongs to that installation.
+- Administrators control the ministry's primary and accent colors, light/dark canvas, panels, and sidebar. Shared theme tokens apply these choices consistently to staff, member, public, worship, and meeting interfaces; readable foregrounds are derived for ministry-selected surfaces.
+- Administrators can configure terminology such as *campus* versus *branch*, and can enable or hide modules. Core interface terms use installation-owned singular/plural display overrides; these never change internal route names, permission keys, or stored domain values.
 - Site navigation, homepage sections, footer, social links, and public contact methods are editable.
 - Administrators select a feature-aware homepage preset and arrange approved sections. The available section set is derived from activated modules, while branding, content, and section order remain ministry-owned.
 - The homepage editor provides four theme families and four lead layouts. It supports up to four curated carousel slides, each using a ministry-owned image, hosted video, or approved external video URL, with accessible text and an optional action. Below the lead, ministries select and configure approved sections such as service times, locations, events, groups, sermons, libraries, giving, prayer, volunteering, announcements, newsletter, FAQ, and custom welcome content.
@@ -55,6 +56,7 @@ Roles are permission bundles, not a rigid hierarchy. A person may hold more than
 - Search, categories, publication status, scheduled publishing, and editorial review.
 - Event calendar with detail pages, registration, capacity, reminders, and cancellation notices.
 - Public contact, newcomer, prayer, and testimony forms with configurable fields and routing.
+- Optional AI-assisted page planning and section revision through an installation-configured provider. AI works with staff-entered instructions and public page content, returns approved page blocks for staff review, and never saves or publishes without staff action. Provider credentials remain installation-owned; see D-029 and D-031 for the boundary and review rules.
 
 ### 4.3 Dynamic homepage lead section
 
@@ -175,6 +177,8 @@ A large service uses a broadcast viewing experience with app-based chat and resp
 - The public website remains useful when the live media service is unavailable.
 - Live status, stream health, and service incidents are visible to operators.
 - Core interactions support keyboard use, readable contrast, captions where available, and mobile layouts.
+- Common successful actions and warnings appear in a shared, dismissible notification area inside the current viewport. Notifications use the active light/dark theme, announce state accessibly, and remain visible long enough to read; field validation stays beside the affected field.
+- Prefer in-place form saves when the server can return a safe, bounded result. Show pending, success, and failure states, prevent duplicate submissions, preserve entered values on failure, and retain ordinary server-submission fallback. Extend this behavior route by route rather than assuming every workflow has already migrated.
 - Important jobs such as reminders and follow-up routing are retryable and visible when they fail.
 - Define measurable performance, availability, recovery, and video capacity targets before implementation.
 
@@ -211,7 +215,7 @@ Keep one canonical owner for each rule. Other documents should link to that owne
 
 **Confirmed direction:** Laravel renders public and authenticated interfaces with Blade, Livewire, Alpine.js, and Tailwind CSS. Laravel also owns domain rules, background work, and provider adapters. MySQL/MariaDB is a required shared-hosting database target; PostgreSQL remains supported. The baseline uses host cron plus a database queue or bounded synchronous fallback. Redis, realtime broadcasting, Docker Compose, and self-hosted media are optional enhancement profiles. Large services use a provider-owned broadcast/HLS path; small interactive meetings use a configured external meeting provider.
 
-The application must not assume a single commercial cloud account or a central operator. Large-service video remains provider-configurable. The in-product interactive meeting experience uses ministry-owned Zoom Video SDK credentials; its exact integration and capacity targets belong in the architecture document after §12 is resolved.
+The application must not assume a single commercial cloud account or a central operator. Large-service video remains provider-configurable. The in-product interactive meeting experience uses ministry-owned Zoom Video SDK credentials; its exact integration and capacity targets belong in the architecture document after §12 is resolved. Optional public-page AI drafting uses provider-neutral model routes configured by the installing ministry, with Gemini and OpenRouter as the initial provider connections; see D-029 for its data and release boundaries.
 
 ## 12. Open product decisions
 

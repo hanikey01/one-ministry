@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ServiceOccurrence;
+use App\Models\FeatureSetting;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,7 +23,10 @@ class ServiceScheduleController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $data = $request->validate(['title' => ['required', 'string', 'max:160'], 'service_type' => ['required', Rule::in(['broadcast', 'meeting', 'in_person', 'hybrid'])], 'timezone' => ['required', 'timezone'], 'frequency' => ['required', Rule::in(['weekly', 'monthly'])], 'interval' => ['sometimes', 'integer', 'min:1', 'max:12'], 'weekdays' => ['nullable', 'array'], 'weekdays.*' => ['integer', 'between:0,6'], 'day_of_month' => ['nullable', 'integer', 'between:1,28'], 'starts_on' => ['required', 'date'], 'ends_on' => ['nullable', 'date', 'after_or_equal:starts_on'], 'starts_at_local' => ['required', 'date_format:H:i'], 'duration_minutes' => ['sometimes', 'integer', 'min:15', 'max:720'], 'location_id' => ['nullable', 'uuid', 'exists:locations,id'], 'service_template_id' => ['nullable', 'uuid', 'exists:service_templates,id']]);
+        $serviceTypes = FeatureSetting::query()->where(['key' => 'interactive_meetings', 'state' => 'enabled'])->exists()
+            ? ['broadcast', 'meeting', 'hybrid', 'in_person']
+            : ['broadcast', 'in_person'];
+        $data = $request->validate(['title' => ['required', 'string', 'max:160'], 'service_type' => ['required', Rule::in($serviceTypes)], 'timezone' => ['required', 'timezone'], 'frequency' => ['required', Rule::in(['weekly', 'monthly'])], 'interval' => ['sometimes', 'integer', 'min:1', 'max:12'], 'weekdays' => ['nullable', 'array'], 'weekdays.*' => ['integer', 'between:0,6'], 'day_of_month' => ['nullable', 'integer', 'between:1,28'], 'starts_on' => ['required', 'date'], 'ends_on' => ['nullable', 'date', 'after_or_equal:starts_on'], 'starts_at_local' => ['required', 'date_format:H:i'], 'duration_minutes' => ['sometimes', 'integer', 'min:15', 'max:720'], 'location_id' => ['nullable', 'uuid', 'exists:locations,id'], 'service_template_id' => ['nullable', 'uuid', 'exists:service_templates,id']]);
         if ($data['frequency'] === 'weekly' && empty($data['weekdays'])) {
             return response()->json(['error' => ['code' => 'weekday_required', 'message' => 'Choose at least one weekday.']], 422);
         }
@@ -39,7 +43,10 @@ class ServiceScheduleController extends Controller
 
     public function oneTime(Request $request): JsonResponse
     {
-        $data = $request->validate(['title' => ['required', 'string', 'max:160'], 'service_type' => ['required', Rule::in(['broadcast', 'meeting', 'in_person', 'hybrid'])], 'timezone' => ['required', 'timezone'], 'starts_at' => ['required', 'date'], 'ends_at' => ['nullable', 'date', 'after:starts_at'], 'location_id' => ['nullable', 'uuid', 'exists:locations,id']]);
+        $serviceTypes = FeatureSetting::query()->where(['key' => 'interactive_meetings', 'state' => 'enabled'])->exists()
+            ? ['broadcast', 'meeting', 'hybrid', 'in_person']
+            : ['broadcast', 'in_person'];
+        $data = $request->validate(['title' => ['required', 'string', 'max:160'], 'service_type' => ['required', Rule::in($serviceTypes)], 'timezone' => ['required', 'timezone'], 'starts_at' => ['required', 'date'], 'ends_at' => ['nullable', 'date', 'after:starts_at'], 'location_id' => ['nullable', 'uuid', 'exists:locations,id']]);
 
         return response()->json(['data' => ServiceOccurrence::create($data)], 201);
     }

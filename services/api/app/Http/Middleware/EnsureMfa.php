@@ -15,7 +15,7 @@ class EnsureMfa
     {
         if (! $this->mfa->enabled($request->user()) || (int) $request->session()->get('mfa_verified_at', 0) <= now()->subHours(12)->timestamp) {
             if (! $request->expectsJson()) {
-                return to_route('staff.security')->with('security_notice', 'Two-factor authentication is required before you can manage staff access. Set it up or verify this session to continue.');
+                return to_route('staff.security')->with('security_notice', 'Set up two-factor authentication or verify this session to continue with this action.');
             }
 
             return response()->json(['error' => ['code' => 'mfa_required', 'message' => 'Multifactor verification is required for this action.', 'fields' => (object) []]], 403);

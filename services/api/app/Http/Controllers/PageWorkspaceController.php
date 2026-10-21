@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\FeatureSetting;
 use App\Models\MinistrySetting;
 use App\Services\PermissionChecker;
+use App\Services\ModuleAvailability;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -39,7 +40,26 @@ class PageWorkspaceController extends Controller
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
         $starter = self::STARTERS[$request->string('template')->toString()] ?? self::STARTERS['blank'];
 
-        return view('staff.pages.form', compact('settings', 'starter') + ['user' => $request->user(), 'page' => null, 'blocks' => $this->starterBlocks($request->string('template')->toString(), $starter['body']), 'features' => $this->enabledFeatures(), 'mediaAssets' => $this->pageMediaAssets()]);
+        return view('staff.pages.form', compact('settings', 'starter') + ['user' => $request->user(), 'page' => null, 'blocks' => $this->starterBlocks($request->string('template')->toString(), $starter['body']), 'features' => $this->enabledFeatures(), 'mediaAssets' => $this->pageMediaAssets(), 'aiDraftAvailable' => app(ModuleAvailability::class)->visibleToStaff('ai_page_editor', $request->user()), 'aiDraftRoute' => DB::table('ai_task_routes')->where('task_key', 'page_editor')->first()]);
+    }
+
+    public function preview(Request $request): View
+    {
+        $input = $request->validate([
+            'title' => ['required', 'string', 'max:200'],
+            'blocks' => ['required', 'string', 'max:100000'],
+        ]);
+        $blocks = $this->normaliseBlocks($input['blocks'], null);
+        $page = (object) [
+            'title' => $input['title'],
+            'seo_title' => $input['title'],
+            'blocks' => json_encode($blocks, JSON_THROW_ON_ERROR),
+            'body' => $this->plainTextFromBlocks($blocks),
+        ];
+        $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
+        $features = $this->enabledFeatures();
+
+        return view('public.page', compact('page', 'settings', 'features') + ['editorPreview' => true]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -62,7 +82,7 @@ class PageWorkspaceController extends Controller
         $revisions = DB::table('content_revisions')->where('page_id', $page->id)->orderByDesc('revision')->get(['revision', 'created_at']);
         $canPublish = app(PermissionChecker::class)->allows($request->user(), 'content.publish');
 
-        return view('staff.pages.form', compact('settings', 'page', 'revisions', 'canPublish') + ['user' => $request->user(), 'starter' => null, 'blocks' => $this->editorBlocks($page->blocks ?? null, $page->body), 'features' => $this->enabledFeatures(), 'mediaAssets' => $this->pageMediaAssets()]);
+        return view('staff.pages.form', compact('settings', 'page', 'revisions', 'canPublish') + ['user' => $request->user(), 'starter' => null, 'blocks' => $this->editorBlocks($page->blocks ?? null, $page->body), 'features' => $this->enabledFeatures(), 'mediaAssets' => $this->pageMediaAssets(), 'aiDraftAvailable' => app(ModuleAvailability::class)->visibleToStaff('ai_page_editor', $request->user()), 'aiDraftRoute' => DB::table('ai_task_routes')->where('task_key', 'page_editor')->first()]);
     }
 
     public function update(Request $request, string $page): RedirectResponse
@@ -83,6 +103,18 @@ class PageWorkspaceController extends Controller
     {
         $record = DB::table('pages')->where('id', $page)->where('status', 'draft')->first();
         abort_unless($record, 404);
+        $blocks = $this->normaliseBlocks($record->blocks ?? null, $record->body ?? null);
+        foreach ($blocks as $block) {
+            $data = $block['data'];
+            if (($block['type'] === 'image' && blank($data['url']))
+                || ($block['type'] === 'media_text' && blank($data['media_url']))
+                ) {
+                throw ValidationException::withMessages(['blocks' => 'Choose an image for every image section, or remove sections you do not need.']);
+            }
+            if (in_array($block['type'], ['hero', 'call_to_action', 'media_text'], true) && filled($data['button_label'] ?? '') && blank($data['button_url'] ?? '')) {
+                throw ValidationException::withMessages(['blocks' => 'Choose a destination for every button, or remove its label before publishing.']);
+            }
+        }
         DB::transaction(function () use ($request, $page): void {
             DB::table('pages')->where('id', $page)->where('status', 'draft')->update(['status' => 'published', 'review_notes' => null, 'published_at' => now(), 'published_by' => $request->user()->id, 'updated_at' => now()]);
             $this->audit($request, 'content.page_reviewed', $page, ['status' => 'published']);
@@ -154,7 +186,7 @@ class PageWorkspaceController extends Controller
             'hero' => ['eyebrow', 'title', 'body', 'button_label', 'button_url'],
             'heading' => ['text'],
             'paragraph' => ['text'],
-            'image' => ['url', 'alt', 'caption'],
+            'image' => ['url', 'alt', 'caption', 'image_hint'],
             'gallery' => ['images', 'columns', 'caption'],
             'video_embed' => ['url', 'title', 'caption'],
             'audio' => ['url', 'title', 'caption'],

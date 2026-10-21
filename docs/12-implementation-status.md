@@ -1,9 +1,17 @@
 # 12 — Implementation Status
 
-**Updated:** 2026-10-19  
+**Updated:** 2026-10-21
 **Current phase:** Shared-hosting transition verification — Laravel-first production profile
 
 This file records verified implementation status. Product rules remain in documents `00`–`11`; this file is not a substitute for their quality gates.
+
+## Current product direction — 2026-10-21
+
+- Keep platform defaults neutral across cultures and denominations: white/gray light surfaces and charcoal/near-black dark surfaces. Each installation owns its primary/accent colors, mode-specific canvas/panels/sidebar, and derived readable foregrounds.
+- Build the optional AI page editor around installation-owned provider/model configuration, approved page blocks, section-scoped revisions, and staff review before save or publication.
+- Make routine staff/member operations feel responsive and app-like with in-place saves where safe and a shared, theme-aware viewport notification system. This is an incremental rollout; the AI model settings forms are the first explicit in-place slice, while many existing forms still redirect.
+- Keep shared-host Laravel/Blade behavior and normal form submissions as the portable baseline. Do not describe a source implementation as released until its build, accessibility, browser, migration, and applicable tests pass.
+- Ministry terminology settings are being added as display-only singular/plural overrides. Initial source includes persistence, an audited staff editor, and a shared lookup for core domain labels; consistent use across existing interfaces and browser validation remain pending.
 
 ## Built
 
@@ -22,7 +30,7 @@ This file records verified implementation status. Product rules remain in docume
 - Same-origin staff session sign-in/sign-out with CSRF protection, login throttling, session rotation, and installation-scoped permission checks.
 - Administrator branding settings screen with a transactionally recorded audit event for actual changes.
 - Staff location list, creation, edits, visibility and atomic primary-location switching, with audit events.
-- Module disabled/staff-preview control with a server-side block on public activation until release gates pass.
+- Module state control with centralized route gating across staff, member, public, and API paths; disabled modules are omitted from navigation and dashboard/report summaries, while staff preview is restricted to staff with settings access. The Modules administration page remains available for state changes. Verification of every module route family remains part of the phase gate.
 - Site-editor invitation creation, acceptance, and revocation, plus own-session listing, individual revocation, and sign-out-everywhere. tnvitation tokens are stored as hashes and shown once; session IDs are represented to the client by keyed handles.
 - Staff password recovery APt and web screens, with single-use hashed tokens, 30-minute expiry, account-neutral request responses, per-route throttling, session revocation after reset, and a guard against sending through the default log mail transport.
 - Authenticator-app multifactor enrollment for staff security actions: encrypted TOTP secret, one-time hashed recovery codes, a 12-hour server-session verification window, audit events, APt routes, and a staff security screen. Staff invitation management is now MFA-protected server-side.
@@ -112,7 +120,7 @@ This file records verified implementation status. Product rules remain in docume
 - Browser-level verification of current-session revocation against a configured installation; the test harness verifies stored-session ownership but does not retain a browser cookie across its simulated requests.
 - Shared-hosting transition SH-1 through SH-6: port the interface to Blade/Livewire/Alpine, establish server-rendered public/staff/member/worship shells, migrate workflows route by route, provide host-cron and deployment guides, then retire the Next.js production deployment after parity validation.
 
-## Next implementation slice
+## Recent implementation notes
 
 ### 2026-10-17 — Digital School core experience
 
@@ -142,9 +150,31 @@ The Laravel public homepage now renders a premium sidebar-first experience from 
 
 ## Interactive meetings design
 
-The complete proposed product and implementation plan for Zoom-style, ministry-branded meetings is in [16 — Interactive Meetings Design](16-interactive-meetings-design.md). It defines the Zoom Video SDK provider boundary, waiting room, shared stage, host controls, private prayer handoff, provider ownership, retention, failure handling, phased delivery, and acceptance gates. The first provider foundation is in source: ministry-owned encrypted Zoom credentials, Zoom-only meeting records, and Laravel-issued short-lived join grants after policy checks. A browser SDK room, lobby admission controls, stage controls, and webhook processing remain to be implemented and verified.
+The complete proposed product and implementation plan for Zoom-style, ministry-branded meetings is in [16 — Interactive Meetings Design](16-interactive-meetings-design.md). It defines the Zoom Video SDK provider boundary, waiting room, shared stage, host controls, private prayer handoff, provider ownership, retention, failure handling, phased delivery, and acceptance gates. Ministry-owned encrypted Zoom credentials, Zoom-only meeting records, Laravel-issued short-lived join grants, an initial browser SDK room, and application-side waiting-room admission are in source. The waiting-room slice now polls each participant's own admission state and lets verified, MFA-protected meeting hosts admit or decline requests with an audit event. The interactive_meetings feature is disabled by default and server-gated. Full device controls, participant moderation, shared stage, recording callbacks, provider-confirmed attendance, and browser/device validation remain release gates. Grant issuance no longer writes joined_at.
+
+### 2026-10-21 — AI model settings foundation
+
+### 2026-10-21 — Shared navigation payload reduction
+
+The Zoom Video SDK is now dynamically imported only after an admitted user presses Join, keeping the large meeting dependency out of normal public, member, and staff page loads. AI settings now loads only route-selected models with the page; its chooser fetches up to 50 matching models when opened or searched, instead of rendering hundreds of models into three selectors. About 170 KB of repeated inline layout CSS across shared, staff, member, and public shells now loads from a shared stylesheet with a modification-time cache key, reducing repeated HTML transfer and allowing browser caching without a Vite rebuild. The built asset manifest reports an 87,832-byte initial JavaScript bundle and a separate 1,062,347-byte Zoom SDK chunk; no application container or volume was recreated. Staff and member sidebar links now opt into hover-prefetched Livewire navigation, and app.js reinitializes route behavior while releasing old page listeners, pollers, and meeting clients. Syntax checks pass. The latest navigation lifecycle changes need an asset build and browser interaction review before their release gate passes.
+
+The bounded AI page-editor exception is recorded in D-029 and in the owning architecture, data, contract, system, interface, and operations documents. Source includes installation-owned encrypted Gemini/OpenRouter credentials, provider model-catalog refresh on demand and daily through Laravel's scheduler, structured-output primary/fallback route selection, live compatibility checks, redacted configuration audit events, a protected staff AI model settings page, and the `ai_page_editor` feature flag defaulted off. The page editor supports full-page plans with review before application, plus manual block insertion, editing, duplication, removal, and ordering. A selected-block revision endpoint sends the complete ordered public draft to the configured provider as context and constrains output to the selected block's existing fields; URL values are retained. Its inspector stages the response for staff review and explicit application. Both workflows remain unsaved until staff save through the regular draft form; publishing remains a separate permission-gated review. Generation audit events include provider/model, fallback use, and latency, never prompt or page content. Per D-030, provider and route configuration requires `ai.manage` and verified email with auditing, but does not require MFA. The feature test is present but could not run in the earlier verification environment because `services/api/vendor/autoload.php` was absent. Provider behavior, migration compatibility, full Blade/browser review, and applicable release checks remain pending.
+
+The AI model settings provider, catalog refresh, route save, and route compatibility-check forms now support in-place JSON submissions with pending, success, and error feedback. Validation is attached to relevant fields, catalog updates refresh the searchable model selectors, and non-JavaScript form submissions retain their redirect behavior. The existing Vite container built the updated assets without rebuilding the application image; browser interaction review remains pending.
+
+The shared application shell now provides a fixed viewport notification stack for completed flashes and in-place form feedback, with status-aware colors, dismissal, live announcements, safe-area-aware placement, and active light/dark theme colors. Existing staff and member flash notices are surfaced in the stack while inline field errors remain beside their fields. The latest notification changes are in source but not yet in the built preview bundle; the Docker API was unavailable during this update. Visual/accessibility review remains required.
+
+The first page-composition upgrade is in source: AI now plans a varied approved-block outline (story, image/text split, image placeholder with search hint and alt text, quote, list, FAQ, and optional call to action). The UI stages that outline and requires staff to apply it before replacing the current canvas; applying remains undoable, and provider/model attribution is retained. AI cannot choose media or destinations. This is a source implementation only: the canonical page schema/renderer consolidation, media upload and destination picker, real public-renderer preview, broader edit history, automated tests, provider response checks, production asset build, migration verification, and browser/accessibility review remain pending. No AI page-editor release gate has passed.
 
 Service operations now distinguish broadcast-only, Zoom-meeting-only, hybrid, and in-person experiences. Broadcast-only opens the configured public stream; Zoom-meeting-only opens the authenticated branded meeting room; hybrid opens broadcast first and offers a separate interactive-room action. The producer desk controls this choice and creates one linked Zoom room per service when enabled.
+
+### 2026-10-20 — Ministry-owned color palette
+
+Neutral light/dark defaults and installation-owned primary/accent, canvas, panel, and sidebar colors are in source. The appearance screen exposes the palette, the shared layout derives foreground text colors, setup and command defaults are neutral, and the public site contract returns the complete palette. The additive migration was applied, the production Vite asset build passes, and Laravel's Blade view cache compiles successfully. Focused regression coverage, contrast review, and route-by-route browser verification remain pending; this work is not a passed phase gate.
+
+Sidebar appearance controls now default to matching the content surface. Separate light/dark sidebar pickers collapse directly beneath the custom sidebar choice and slide open only when that choice is selected. Existing saved custom sidebar treatments remain selected. A migration changes the schema default for new settings rows without rewriting existing ministry choices.
+
+The appearance preview's Alpine label is now rendered client-side so Blade does not evaluate `previewDark` as PHP; the settings 500 in the API log traced to that template expression. Action buttons use the configured ministry accent and a foreground selected by comparing black/white contrast. A source audit found legacy green-tinted overrides remaining in member layouts, learning styles, and public homepage components; a final shared semantic-color layer now routes dashboard cards, forms, headings, and navigation surfaces through the light/dark tokens while retaining ministry branding on intentional brand areas. Blade view caching and the Vite production asset build pass. Route-by-route browser and contrast verification remain pending; the JS chunk-size warning remains.
 
 ## Current project backlog — 2026-10-19
 
@@ -168,10 +198,24 @@ This backlog records product work still required after the Laravel shared-hostin
 
 ### Distribution and maintenance work
 
-- Build the **self-hosted update channel** for ministries. GitHub release tags should produce versioned, signed release packages and a signed manifest. Every installation should check an update feed through host cron and offer Stable, Preview, or Manual-only channels.
+- Release packaging is in source: version tags build a shared-hosting package with production PHP dependencies and compiled assets, plus a SHA-256 manifest signed by a repository-managed RSA key. Configure the `RELEASE_SIGNING_PRIVATE_KEY_PEM` Actions secret and `RELEASE_SIGNING_KEY_ID` variable before publishing a tag. Still required: publish an update feed, let installations check it through host cron, and offer Stable, Preview, or Manual-only channels.
 - Build the installation update workflow: availability status in Staff Settings, compatibility checks, pre-update database/file backup, maintenance mode, checksum/signature verification, atomic release switch, migration execution, cache rebuild, health check, rollback, and an audit trail.
 - Ensure installations never require GitHub credentials or `git pull`; updates must use verified release packages so private ministry data and provider configuration remain local.
 - Document update-server hosting, release signing-key rotation, rollback rehearsal, supported-version policy, security patches, and deprecation notices.
+
+### 2026-10-21 — Ministry terminology
+
+The audited staff Terminology screen supports singular and plural overrides for service, meeting, group, location, volunteer, department, and member concepts. Display labels now feed the shared staff/member/public navigation, main directory headings, staff overview summaries, and system-owned public fallback links. Route names, permission keys, feature identifiers, and stored domain values remain stable. Broader page-copy coverage and the menu-management surfaces remain in progress. Runtime Blade compilation and browser verification are pending because this checkout has no local Composer vendor tree.
+
+### 2026-10-21 — Ministry navigation layouts
+
+Source now includes independently configurable staff/member sidebar and mobile-footer layouts. Administrators can select built-in destinations and published custom pages, choose approved icons and sidebar sections, and order entries; staff render choices are filtered through current permissions and module state. Mobile footers allow up to five destinations. The existing public navigation editor's desktop/mobile visibility, icons, custom destinations, and ordering drive the public sidebar and up to five public mobile-footer links. Migration `2026_10_21_000058_create_navigation_layouts` is applied in the local Compose database, and `/staff/navigation` rendered successfully in the browser on 2026-10-21. Automated tests and broader interaction checks remain pending.
+
+The navigation icon control now uses a searchable visual picker with 67 locally bundled SVG choices. Its floating panel follows the active light/dark foreground and surface colors, and the selected destination icon uses a neutral theme-aware foreground. The picker was checked in the local dark-mode preview, including filtered search. Automated accessibility coverage and full cross-browser review remain pending.
+
+### 2026-10-21 — PHP security patch
+
+The application image now uses the PHP 8.5.12 FPM Alpine 3.24 image, which includes fixes for CVE-2026-109618 and CVE-2026-109619. The local API, worker, and scheduler containers were rebuilt and each reports PHP 8.5.12; the local public endpoint returned HTTP 200. Each independently operated installation must rebuild and deploy this image to receive the patch.
 
 
 

@@ -28,6 +28,12 @@ class MeetingAccessService
             abort(403, 'An invitation is required for this meeting.');
         }
 
+        abort_if($participant?->expires_at && now()->greaterThan($participant->expires_at), 403, 'This meeting invitation has expired.');
+
+        if ($participant?->admission_status === 'declined') {
+            throw ValidationException::withMessages(['meeting' => 'The host declined this request. Contact the meeting host if you believe this was a mistake.']);
+        }
+
         if (! $participant) {
             $participantId = (string) Str::uuid();
             $admission = $meeting->entry_policy === 'open_room' ? 'admitted' : 'waiting';
@@ -39,6 +45,13 @@ class MeetingAccessService
                 'created_at' => now(), 'updated_at' => now(),
             ]);
             $participant = DB::table('meeting_participants')->where('id', $participantId)->first();
+        } elseif (! $isHost && $participant->admission_status === 'invited') {
+            $admitted = $meeting->entry_policy === 'open_room';
+            DB::table('meeting_participants')->where('id', $participant->id)->where('admission_status', 'invited')->update([
+                'admission_status' => $admitted ? 'admitted' : 'waiting', 'display_name' => $displayName,
+                'admitted_at' => $admitted ? now() : null, 'updated_at' => now(),
+            ]);
+            $participant = DB::table('meeting_participants')->where('id', $participant->id)->first();
         }
 
         if (! $isHost && $participant->admission_status !== 'admitted') {
@@ -46,7 +59,6 @@ class MeetingAccessService
         }
 
         $grant = $this->zoom->issueJoinGrant($meeting->session_name, $meeting->session_passcode_encrypted, $user, $displayName, $isHost);
-        DB::table('meeting_participants')->where('id', $participant->id)->update(['joined_at' => now(), 'updated_at' => now()]);
         DB::table('audit_events')->insert([
             'id' => (string) Str::uuid(), 'actor_user_id' => $user->id, 'action' => 'meeting.zoom_grant_issued',
             'subject_type' => 'meeting', 'subject_id' => $meeting->id,

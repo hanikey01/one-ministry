@@ -62,7 +62,8 @@ class PublicWorkspaceController extends Controller
         $this->enabled('digital_church');
         abort_unless(! $service->rehearsal_mode && in_array($service->state, ['live', 'interrupted'], true), 404);
 
-        $meeting = in_array($service->service_type, ['meeting', 'hybrid'], true)
+        $interactiveMeetingsEnabled = FeatureSetting::query()->where(['key' => 'interactive_meetings', 'state' => 'enabled'])->exists();
+        $meeting = $interactiveMeetingsEnabled && in_array($service->service_type, ['meeting', 'hybrid'], true)
             ? DB::table('meetings')->where('service_occurrence_id', $service->id)->whereIn('status', ['scheduled', 'live'])->first(['id', 'title', 'entry_policy'])
             : null;
         abort_if($service->service_type === 'meeting' && ! $meeting, 404);

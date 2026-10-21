@@ -1,0 +1,27 @@
+name: Feature request
+description: Suggest a product improvement.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: Describe the ministry workflow. Do not include personal or confidential ministry data.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Who needs this and what are they trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Privacy, permissions, and hosting considerations
+      description: Mention relevant scopes, data sensitivity, provider needs, or shared-hosting constraints.
+    validations:
+      required: false

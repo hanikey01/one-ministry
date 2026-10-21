@@ -80,9 +80,10 @@ class MemberController extends Controller
     public function dashboard(Request $request): JsonResponse
     {
         $person = $this->person($request);
+        $modules = app(\App\Services\ModuleAvailability::class);
 
         return response()->json(['data' => [
-            'groups' => DB::table('group_memberships')->join('groups', 'groups.id', '=', 'group_memberships.group_id')->where('person_id', $person->id)->get(['groups.id', 'groups.name', 'group_memberships.role']),
+            'groups' => $modules->enabled('groups') ? DB::table('group_memberships')->join('groups', 'groups.id', '=', 'group_memberships.group_id')->where('person_id', $person->id)->get(['groups.id', 'groups.name', 'group_memberships.role']) : collect(),
             'events' => DB::table('event_registrations')->join('events', 'events.id', '=', 'event_registrations.event_id')->where('person_id', $person->id)->where('event_registrations.status', 'registered')->orderBy('events.starts_at')->get(['events.id', 'events.title', 'events.starts_at', 'events.location']),
             'volunteer_assignments' => DB::table('volunteer_assignments')->join('volunteer_teams', 'volunteer_teams.id', '=', 'volunteer_assignments.team_id')->where('person_id', $person->id)->where('starts_at', '>=', now())->orderBy('starts_at')->get(['volunteer_assignments.id', 'volunteer_assignments.role', 'volunteer_assignments.starts_at', 'volunteer_assignments.status', 'volunteer_teams.name as team_name']),
             'attendance' => DB::table('attendance_records')->join('service_occurrences', 'service_occurrences.id', '=', 'attendance_records.service_occurrence_id')->where('person_id', $person->id)->latest('attendance_records.observed_at')->limit(10)->get(['service_occurrences.title', 'attendance_records.status', 'attendance_records.observed_at']),

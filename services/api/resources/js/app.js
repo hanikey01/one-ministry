@@ -1,15 +1,70 @@
 import './bootstrap';
-import ZoomVideo from '@zoom/videosdk';
+
+let closeOpenEnhancedSelect = null;
+let enhancedSelectIndex = 0;
+let pageCleanups = [];
+let initializedPageUrl = null;
+let livewireNavigationPending = false;
+
+const cleanupPage = () => {
+    closeOpenEnhancedSelect?.();
+    pageCleanups.splice(0).forEach((cleanup) => {
+        try { cleanup(); } catch (_) { /* A departed page may already have released this resource. */ }
+    });
+};
+
+const addPageListener = (target, eventName, listener, options) => {
+    if (!target) return;
+    target.addEventListener(eventName, listener, options);
+    pageCleanups.push(() => target.removeEventListener(eventName, listener, options));
+};
+
+const setPageInterval = (callback, delay) => {
+    const timer = window.setInterval(callback, delay);
+    pageCleanups.push(() => window.clearInterval(timer));
+    return timer;
+};
+
+const initializePage = (force = false) => {
+    const pageUrl = window.location.href;
+    if (!force && initializedPageUrl === pageUrl) return;
+    cleanupPage();
+    initializedPageUrl = pageUrl;
+
+
+document.querySelectorAll('[data-sidebar-colour-setting]').forEach((setting) => {
+    const panel = setting.parentElement.querySelector('[data-sidebar-colour-fields]');
+    if (!panel) return;
+
+    const syncSidebarFields = () => {
+        const isCustom = setting.querySelector('input[name="staff_sidebar"]:checked')?.value === 'deep';
+        panel.dataset.expanded = String(isCustom);
+        panel.setAttribute('aria-hidden', String(!isCustom));
+        panel.inert = !isCustom;
+    };
+
+    setting.addEventListener('change', syncSidebarFields);
+});
 
 document.querySelectorAll('[data-zoom-meeting]').forEach((room) => {
     const joinButton = room.querySelector('[data-zoom-join]');
     const status = room.querySelector('[data-zoom-status]');
     const stage = room.querySelector('[data-zoom-stage]');
     const help = room.querySelector('[data-zoom-help]');
+    const lobbyList = room.querySelector('[data-lobby-list]');
+    const lobbyEmpty = room.querySelector('[data-lobby-empty]');
     let client;
+    let waitingTimer;
+    let isJoining = false;
+    pageCleanups.push(() => {
+        if (waitingTimer) window.clearInterval(waitingTimer);
+        if (client) void Promise.resolve(client.leave?.(true)).catch(() => {});
+    });
 
     const setStatus = (message) => { if (status) status.textContent = message; };
-    joinButton?.addEventListener('click', async () => {
+    const join = async () => {
+        if (isJoining) return;
+        isJoining = true;
         joinButton.disabled = true;
         setStatus('Checking room access…');
         try {
@@ -26,32 +81,117 @@ document.querySelectorAll('[data-zoom-meeting]').forEach((room) => {
             if (body.data.status === 'waiting') {
                 setStatus('Waiting for host admission');
                 if (help) help.textContent = 'The host has been notified. This page does not count as attendance.';
+                joinButton.disabled = true;
+                waitingTimer = setPageInterval(async () => {
+                    try {
+                        const response = await fetch(room.dataset.waitingUrl, { headers: { Accept: 'application/json' } });
+                        if ([401, 403, 404].includes(response.status)) {
+                            window.clearInterval(waitingTimer);
+                            setStatus('Meeting access unavailable');
+                            if (help) help.textContent = response.status === 401 ? 'Your sign-in has expired. Sign in again to continue.' : 'This meeting or its access has changed. Contact the host if you still need to join.';
+                            return;
+                        }
+                        if (!response.ok) return;
+                        const { data } = await response.json();
+                        if (data.admission_status === 'admitted') {
+                            window.clearInterval(waitingTimer);
+                            isJoining = false;
+                            await join();
+                        } else if (data.admission_status === 'declined' || !['scheduled', 'live'].includes(data.meeting_status)) {
+                            window.clearInterval(waitingTimer);
+                            const declined = data.admission_status === 'declined';
+                            setStatus(declined ? 'Admission declined' : 'Meeting unavailable');
+                            if (help) help.textContent = declined ? 'The host declined this request. Contact the meeting host if you believe this was a mistake.' : 'This meeting is no longer open. Return to your member dashboard for other gatherings.';
+                        }
+                    } catch (_) {
+                        // Keep the waiting page open and retry after a brief connection interruption.
+                    }
+                }, 3000);
                 return;
             }
 
             setStatus('Connecting securely…');
+            // The Video SDK is large and this shared bundle loads on every route.
+            // Keep it out of ordinary page navigation and fetch it only after the
+            // server has issued a valid join grant.
+            const { default: ZoomVideo } = await import('@zoom/videosdk');
             client = ZoomVideo.createClient();
             await client.init('en-US', 'Global', { patchJsMedia: true });
             await client.join(body.data.grant.session_name, body.data.grant.token, room.dataset.displayName, body.data.grant.session_passcode);
-            const stream = client.getMediaStream();
             stage?.replaceChildren();
             const message = document.createElement('div');
             message.className = 'meeting-stage-empty';
-            message.innerHTML = '<strong>You are in the meeting</strong><p>Device controls, participant video, chat, screen sharing, and host controls are being added to this branded room.</p>';
+            const title = document.createElement('strong');
+            title.textContent = 'You are in the meeting';
+            const detail = document.createElement('p');
+            detail.textContent = 'Your camera and microphone are off until you turn them on.';
+            message.append(title, detail);
             stage?.append(message);
             setStatus('Connected');
             joinButton.textContent = 'Connected';
             joinButton.disabled = true;
-            window.addEventListener('beforeunload', () => client?.leave?.(true), { once: true });
-            // Retain the stream reference for the next room-control slice. The SDK has
-            // joined successfully before media controls are exposed to the participant.
-            room.zoomMediaStream = stream;
+            addPageListener(window, 'beforeunload', () => client?.leave?.(true), { once: true });
         } catch (error) {
+            if (client) {
+                try { await client.leave(true); } catch (_) { /* The provider session may not have opened. */ }
+            }
+            client = undefined;
             setStatus('Unable to join');
             if (help) help.textContent = error.message || 'Check the room configuration and try again.';
             joinButton.disabled = false;
+        } finally {
+            isJoining = false;
         }
-    });
+    };
+
+    joinButton?.addEventListener('click', join);
+
+    if (room.dataset.lobbyUrl && lobbyList) {
+        const refreshLobby = async () => {
+            try {
+                const response = await fetch(room.dataset.lobbyUrl, { headers: { Accept: 'application/json' } });
+                if (!response.ok) return;
+                const { data } = await response.json();
+                lobbyList.replaceChildren(...data.map((person) => {
+                    const item = document.createElement('li');
+                    const name = document.createElement('span');
+                    name.textContent = person.display_name;
+                    const actions = document.createElement('div');
+                    for (const [decision, label] of [['admit', 'Admit'], ['decline', 'Decline']]) {
+                        const button = document.createElement('button');
+                        button.type = 'button';
+                        button.className = 'button-secondary';
+                        button.textContent = label;
+                        button.addEventListener('click', async () => {
+                            button.disabled = true;
+                            try {
+                                await fetch(`${room.dataset.lobbyDecisionUrl}/${person.id}`, {
+                                    method: 'POST',
+                                    headers: {
+                                        Accept: 'application/json', 'Content-Type': 'application/json',
+                                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                                    },
+                                    body: JSON.stringify({ decision }),
+                                }).then(async (result) => { if (!result.ok) throw new Error('Could not update this lobby request. Refresh the list and try again.'); });
+                                await refreshLobby();
+                            } catch (error) {
+                                button.disabled = false;
+                                if (help) help.textContent = error.message;
+                            }
+                        });
+                        actions.append(button);
+                    }
+                    item.append(name, actions);
+                    return item;
+                }));
+                if (lobbyEmpty) lobbyEmpty.hidden = data.length > 0;
+            } catch (_) {
+                // The room itself remains usable while the lobby refresh retries.
+            }
+        };
+        refreshLobby();
+        setPageInterval(refreshLobby, 5000);
+    }
 });
 
 document.querySelectorAll('[data-public-shell]').forEach((shell) => {
@@ -70,7 +210,7 @@ document.querySelectorAll('[data-public-shell]').forEach((shell) => {
     menuButton?.addEventListener('click', () => setNavigation(!shell.classList.contains('navigation-open')));
     closers.forEach((button) => button.addEventListener('click', () => setNavigation(false)));
     publicNavigation?.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => setNavigation(false)));
-    window.addEventListener('keydown', (event) => { if (event.key === 'Escape') setNavigation(false); });
+    addPageListener(window, 'keydown', (event) => { if (event.key === 'Escape') setNavigation(false); });
 });
 
 const carousel = document.querySelector('[data-home-carousel]');
@@ -123,12 +263,13 @@ if (serviceRoom) {
     };
     serviceRoom.dataset.state = serviceRoom.querySelector('.worship-eyebrow')?.textContent?.includes('LIVE') ? 'live' : 'interrupted';
     serviceRoom.dataset.mediaState = serviceRoom.querySelector('.worship-player') ? 'available' : 'unavailable';
-    window.setInterval(poll, 10000);
+    setPageInterval(poll, 10000);
 }
 
 document.querySelectorAll('[data-workspace-shell]').forEach((shell) => {
     const sidebar = shell.querySelector('[data-workspace-sidebar]');
     const toggle = shell.querySelector('[data-workspace-toggle]');
+    const backdrop = shell.querySelector('.workspace-backdrop');
     const closers = shell.querySelectorAll('[data-workspace-close]');
     const themeToggle = shell.querySelector('[data-workspace-theme-toggle]');
     const storageKey = 'ministry-theme';
@@ -137,91 +278,47 @@ document.querySelectorAll('[data-workspace-shell]').forEach((shell) => {
     const setNavigation = (open) => {
         shell.classList.toggle('navigation-open', open);
         sidebar?.classList.toggle('is-open', open);
+        backdrop?.classList.toggle('is-open', open);
         toggle?.setAttribute('aria-expanded', String(open));
     };
 
     const setTheme = (theme) => {
         const dark = theme === 'dark';
         shell.classList.toggle('staff-theme-dark', dark);
+        if (shell.dataset.workspaceSurface === 'member') shell.classList.toggle('member-theme-dark', dark);
         themeToggle?.setAttribute('aria-pressed', String(dark));
         themeToggle?.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
         const label = themeToggle?.querySelector('.workspace-theme-label');
         if (label) label.textContent = dark ? 'Dark' : 'Light';
     };
 
-    const savedTheme = window.localStorage.getItem(storageKey) ?? window.localStorage.getItem(legacyStorageKey);
+    const memberLegacyTheme = shell.dataset.workspaceSurface === 'member' ? window.localStorage.getItem('ministry-member-theme') : null;
+    const savedTheme = window.localStorage.getItem(storageKey) ?? memberLegacyTheme ?? window.localStorage.getItem(legacyStorageKey);
     if (savedTheme) window.localStorage.setItem(storageKey, savedTheme);
     setTheme(savedTheme === 'dark' ? 'dark' : 'light');
     toggle?.addEventListener('click', () => setNavigation(!shell.classList.contains('navigation-open')));
     closers.forEach((button) => button.addEventListener('click', () => setNavigation(false)));
     sidebar?.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => setNavigation(false)));
-    window.addEventListener('keydown', (event) => { if (event.key === 'Escape') setNavigation(false); });
+    addPageListener(window, 'keydown', (event) => { if (event.key === 'Escape') setNavigation(false); });
     themeToggle?.addEventListener('click', () => {
         const theme = shell.classList.contains('staff-theme-dark') ? 'light' : 'dark';
         window.localStorage.setItem(storageKey, theme);
         setTheme(theme);
     });
-    window.addEventListener('storage', (event) => { if (event.key === storageKey) setTheme(event.newValue === 'dark' ? 'dark' : 'light'); });
+    addPageListener(window, 'storage', (event) => { if (event.key === storageKey) setTheme(event.newValue === 'dark' ? 'dark' : 'light'); });
 });
 
-document.querySelectorAll('[data-member-shell]').forEach((shell) => {
-    const sidebar = shell.querySelector('[data-member-sidebar]');
-    const toggles = shell.querySelectorAll('[data-member-toggle]');
-    const closers = shell.querySelectorAll('[data-member-close]');
-    const themeToggle = shell.querySelector('[data-member-theme-toggle]');
-    const storageKey = 'ministry-theme';
-    const legacyStorageKey = 'ministry-member-theme';
-    const setNavigation = (open) => {
-        shell.classList.toggle('member-navigation-open', open);
-        sidebar?.classList.toggle('is-open', open);
-        toggles.forEach((toggle) => toggle.setAttribute('aria-expanded', String(open)));
+document.querySelectorAll('[name="birthday_collection_consent"]').forEach((consent) => {
+    const form = consent.closest('form');
+    const birthdayControls = form?.querySelectorAll('[name="birthday_month"], [name="birthday_day"], [name="birthday_staff_reminder"], [name="birthday_public_recognition"]') ?? [];
+    const syncBirthdayControls = () => {
+        birthdayControls.forEach((control) => {
+            control.disabled = !consent.checked;
+            control.closest('.member-preference')?.classList.toggle('is-disabled', !consent.checked);
+        });
     };
-    const setTheme = (theme) => {
-        const dark = theme === 'dark';
-        shell.classList.toggle('member-theme-dark', dark);
-        themeToggle?.setAttribute('aria-pressed', String(dark));
-        themeToggle?.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
-        const label = themeToggle?.querySelector('.member-theme-label');
-        if (label) label.textContent = dark ? 'Dark' : 'Light';
-    };
-
-    const savedTheme = window.localStorage.getItem(storageKey) ?? window.localStorage.getItem(legacyStorageKey);
-    if (savedTheme) window.localStorage.setItem(storageKey, savedTheme);
-    setTheme(savedTheme === 'dark' ? 'dark' : 'light');
-    toggles.forEach((toggle) => toggle.addEventListener('click', () => setNavigation(!shell.classList.contains('member-navigation-open'))));
-    closers.forEach((button) => button.addEventListener('click', () => setNavigation(false)));
-    sidebar?.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => setNavigation(false)));
-    window.addEventListener('keydown', (event) => { if (event.key === 'Escape') setNavigation(false); });
-    themeToggle?.addEventListener('click', () => {
-        const theme = shell.classList.contains('member-theme-dark') ? 'light' : 'dark';
-        window.localStorage.setItem(storageKey, theme);
-        setTheme(theme);
-    });
-    window.addEventListener('storage', (event) => { if (event.key === storageKey) setTheme(event.newValue === 'dark' ? 'dark' : 'light'); });
-
-    const sectionLinks = [...shell.querySelectorAll('.member-navigation a[href^="#"]')];
-    const sections = sectionLinks.map((link) => document.querySelector(link.getAttribute('href'))).filter(Boolean);
-    if (sections.length && 'IntersectionObserver' in window) {
-        const observer = new IntersectionObserver((entries) => {
-            const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-            if (!visible) return;
-            sectionLinks.forEach((link) => link.toggleAttribute('aria-current', link.getAttribute('href') === `#${visible.target.id}`));
-        }, { rootMargin: '-22% 0px -64% 0px', threshold: [0.01, 0.3, 0.6] });
-        sections.forEach((section) => observer.observe(section));
-    }
-
-    shell.querySelectorAll('[name="birthday_collection_consent"]').forEach((consent) => {
-        const form = consent.closest('form');
-        const birthdayControls = form?.querySelectorAll('[name="birthday_month"], [name="birthday_day"], [name="birthday_staff_reminder"], [name="birthday_public_recognition"]') ?? [];
-        const syncBirthdayControls = () => {
-            birthdayControls.forEach((control) => {
-                control.disabled = !consent.checked;
-                control.closest('.member-preference')?.classList.toggle('is-disabled', !consent.checked);
-            });
-        };
-        syncBirthdayControls();
-        consent.addEventListener('change', syncBirthdayControls);
-    });
+    syncBirthdayControls();
+    consent.addEventListener('change', syncBirthdayControls);
 });
 
 const setupWizard = document.querySelector('[data-setup-wizard]');
@@ -238,8 +335,8 @@ if (setupWizard) {
 
     const updatePreview = () => {
         const name = form.querySelector('[name="name"]')?.value.trim();
-        const primary = form.querySelector('[data-setup-colour="primary"]')?.value ?? '#1F6B55';
-        const accent = form.querySelector('[data-setup-colour="accent"]')?.value ?? '#D8AB5D';
+        const primary = form.querySelector('[data-setup-colour="primary"]')?.value ?? '#343A40';
+        const accent = form.querySelector('[data-setup-colour="accent"]')?.value ?? '#697386';
         setupWizard.style.setProperty('--brand', primary);
         setupWizard.style.setProperty('--accent', accent);
         const previewName = setupWizard.querySelector('[data-setup-preview-name]');
@@ -318,13 +415,291 @@ document.querySelectorAll('[data-setup-timezone-picker]').forEach((picker) => {
         const term = search.value.trim().toLowerCase();
         choices.forEach((choice) => { choice.hidden = term !== '' && !choice.textContent.toLowerCase().includes(term); });
     });
-    document.addEventListener('click', (event) => { if (!picker.contains(event.target)) close(); });
+    addPageListener(document, 'click', (event) => { if (!picker.contains(event.target)) close(); });
     picker.addEventListener('keydown', (event) => { if (event.key === 'Escape') { close(); trigger.focus(); } });
 });
 
-const enhancedSelects = [...document.querySelectorAll('select:not([data-native-select])')];
-enhancedSelects.forEach((select, index) => {
+document.querySelectorAll('[data-ai-page-draft]').forEach((panel) => {
+    const button = panel.querySelector('[data-ai-generate]');
+    const status = panel.querySelector('[data-ai-status]');
+    const editor = panel.closest('[data-page-block-editor]');
+    if (!button || !status || !editor) return;
+
+    button.addEventListener('click', async () => {
+        const brief = panel.querySelector('[data-ai-brief]')?.value.trim() ?? '';
+        if (brief.length < 20) {
+            status.textContent = 'Add a brief of at least 20 characters.';
+            panel.querySelector('[data-ai-brief]')?.focus();
+            return;
+        }
+
+        button.disabled = true;
+            status.textContent = 'Planning your page…';
+        try {
+            const response = await fetch(panel.dataset.endpoint, {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                },
+                body: JSON.stringify({
+                    brief,
+                    title: editor.querySelector('[name="title"]')?.value.trim() ?? '',
+                    public_details: panel.querySelector('[data-ai-public-details]')?.value.trim() ?? '',
+                }),
+            });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload?.error?.message ?? payload?.message ?? 'The page draft could not be generated. Try again.');
+            const previousProposal = panel.querySelector('[data-ai-proposal]');
+            previousProposal?.remove();
+            const proposal = payload.data;
+            const preview = document.createElement('section');
+            preview.className = 'ai-page-proposal';
+            preview.dataset.aiProposal = '';
+            preview.tabIndex = -1;
+            const heading = document.createElement('h3');
+            heading.textContent = `Page plan ready: ${proposal.title}`;
+            const explanation = document.createElement('p');
+            explanation.textContent = 'Review the section plan below. Applying it replaces the current canvas; you can undo the change before saving.';
+            const outline = document.createElement('ol');
+            const labels = { hero: 'Welcome section', heading: 'Heading', paragraph: 'Text', media_text: 'Image and text', image: 'Image', quote: 'Quote', list: 'List', accordion: 'Questions and answers', call_to_action: 'Closing invitation' };
+            proposal.blocks.forEach((block) => {
+                const item = document.createElement('li');
+                const data = block.data ?? {};
+                const title = data.title || data.text || data.label || data.eyebrow || data.image_hint || data.alt || '';
+                item.textContent = [labels[block.type] ?? 'Section', title].filter(Boolean).join(' · ');
+                outline.append(item);
+            });
+            const actions = document.createElement('div');
+            actions.className = 'ai-page-proposal-actions';
+            const apply = document.createElement('button');
+            apply.className = 'button';
+            apply.type = 'button';
+            apply.textContent = 'Apply page plan';
+            const discard = document.createElement('button');
+            discard.className = 'button button-secondary';
+            discard.type = 'button';
+            discard.textContent = 'Discard';
+            apply.addEventListener('click', () => {
+                editor.dispatchEvent(new CustomEvent('ai-page-draft', { detail: proposal }));
+                preview.remove();
+                status.textContent = 'Page plan applied. Review the content, choose images and button destinations, then save as a draft.';
+                editor.querySelector('[data-canvas]')?.focus({ preventScroll: false });
+            });
+            discard.addEventListener('click', () => {
+                preview.remove();
+                status.textContent = 'Page plan discarded. Your current page is unchanged.';
+                button.focus();
+            });
+            actions.append(apply, discard);
+            preview.append(heading, explanation, outline, actions);
+            panel.append(preview);
+            preview.focus();
+            const route = `${payload.data.provider} · ${payload.data.model}`;
+            const contentSectionCount = proposal.blocks.filter((block) => !['hero', 'call_to_action'].includes(block.type)).length;
+            status.textContent = `Page plan prepared with ${contentSectionCount} content sections by ${route}${proposal.fallback_used ? ' (fallback model)' : ''}. Review it before applying.`;
+        } catch (error) {
+            status.textContent = error instanceof Error ? error.message : 'The page draft could not be generated. Try again.';
+        } finally {
+            button.disabled = false;
+        }
+    });
+});
+
+document.querySelectorAll('[data-page-block-editor][data-section-ai-endpoint]').forEach((form) => {
+    const inspector = form.querySelector('[data-inspector]');
+    const canvas = form.querySelector('[data-canvas]');
+    const blocksInput = form.querySelector('[data-page-block-input]');
+    const titleInput = form.querySelector('[name="title"]');
+    const aiPanel = form.querySelector('[data-ai-page-draft]');
+    if (!inspector || !canvas || !blocksInput || !titleInput || !aiPanel || aiPanel.querySelector('[data-ai-generate]')?.disabled) return;
+
+    const installSectionAssistant = () => {
+        if (inspector.querySelector('[data-section-ai-controls]')) return;
+        const actions = inspector.querySelector('.page-inspector-actions');
+        const selected = canvas.querySelector('.page-canvas-block.is-selected');
+        if (!actions || !selected) return;
+        const index = Number(selected.dataset.index);
+        let blocks;
+        try { blocks = JSON.parse(blocksInput.value || '[]'); } catch { return; }
+        const block = blocks[index];
+        if (!block?.data || typeof block.data !== 'object' || !Object.keys(block.data).length) return;
+        const originalBlock = JSON.stringify(block);
+
+        const section = document.createElement('section');
+        section.className = 'page-section-ai';
+        section.dataset.sectionAiControls = '';
+        const heading = document.createElement('strong');
+        heading.textContent = 'Edit this section with AI';
+        const description = document.createElement('p');
+        description.textContent = 'The ministry AI receives this full page draft for context. It can propose changes to this section only.';
+        const instruction = document.createElement('textarea');
+        instruction.dataset.sectionAiInstruction = '';
+        instruction.rows = 3;
+        instruction.maxLength = 1500;
+        instruction.minLength = 10;
+        instruction.placeholder = 'Describe what you want changed in this section…';
+        const ask = document.createElement('button');
+        ask.type = 'button';
+        ask.className = 'button';
+        ask.dataset.sectionAiAsk = '';
+        ask.textContent = 'Suggest changes';
+        const status = document.createElement('p');
+        status.className = 'page-section-ai-status';
+        status.dataset.sectionAiStatus = '';
+        status.setAttribute('role', 'status');
+        status.setAttribute('aria-live', 'polite');
+        section.append(heading, description, instruction, ask, status);
+        actions.after(section);
+
+        ask.addEventListener('click', async () => {
+            const brief = instruction.value.trim();
+            if (brief.length < 10) {
+                status.textContent = 'Describe the change in at least 10 characters.';
+                instruction.focus();
+                return;
+            }
+            ask.disabled = true;
+            status.textContent = 'Reviewing the full page context…';
+            try {
+                const response = await fetch(form.dataset.sectionAiEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                    },
+                    body: JSON.stringify({
+                        title: titleInput.value,
+                        instruction: brief,
+                        page_purpose: form.querySelector('[data-ai-brief]')?.value.trim() ?? '',
+                        selected_index: index,
+                        blocks: blocksInput.value,
+                    }),
+                });
+                const payload = await response.json();
+                if (!response.ok) throw new Error(payload?.error?.message ?? payload?.message ?? 'This section could not be revised. Try again.');
+                let latestBlocks;
+                try { latestBlocks = JSON.parse(blocksInput.value || '[]'); } catch { latestBlocks = []; }
+                if (canvas.querySelector('.page-canvas-block.is-selected')?.dataset.index !== String(index)
+                    || JSON.stringify(latestBlocks[index]) !== originalBlock) {
+                    status.textContent = 'This section changed while AI was working. Review the current version and request a fresh suggestion.';
+                    return;
+                }
+                const proposal = payload.data;
+                const preview = document.createElement('div');
+                preview.className = 'page-section-ai-proposal';
+                const title = document.createElement('strong');
+                title.textContent = 'Suggested section update';
+                const list = document.createElement('dl');
+                Object.entries(proposal.data ?? {}).forEach(([key, value]) => {
+                    const term = document.createElement('dt');
+                    term.textContent = key.replaceAll('_', ' ');
+                    const detail = document.createElement('dd');
+                    detail.textContent = value;
+                    list.append(term, detail);
+                });
+                const actions = document.createElement('div');
+                actions.className = 'ai-page-proposal-actions';
+                const apply = document.createElement('button');
+                apply.type = 'button';
+                apply.className = 'button';
+                apply.textContent = 'Apply to this section';
+                apply.addEventListener('click', () => {
+                    form.dispatchEvent(new CustomEvent('ai-section-revision', { detail: { index, data: proposal.data } }));
+                    status.textContent = 'Suggestion applied to this section. Review the page, then save it as a draft.';
+                    section.querySelector('.page-section-ai-proposal')?.remove();
+                });
+                const discard = document.createElement('button');
+                discard.type = 'button';
+                discard.className = 'button button-secondary';
+                discard.textContent = 'Discard';
+                discard.addEventListener('click', () => {
+                    preview.remove();
+                    status.textContent = 'Suggestion discarded. The section is unchanged.';
+                });
+                actions.append(apply, discard);
+                preview.append(title, list, actions);
+                section.querySelector('.page-section-ai-proposal')?.remove();
+                section.append(preview);
+                const route = `${proposal.provider} · ${proposal.model}`;
+                status.textContent = `Suggestion ready from ${route}${proposal.fallback_used ? ' (fallback model)' : ''}. Review it before applying.`;
+            } catch (error) {
+                status.textContent = error instanceof Error ? error.message : 'This section could not be revised. Try again.';
+            } finally {
+                ask.disabled = false;
+            }
+        });
+    };
+
+    new MutationObserver(installSectionAssistant).observe(inspector, { childList: true });
+    installSectionAssistant();
+});
+
+document.querySelectorAll('[data-page-block-editor]').forEach((form) => {
+    const frame = form.querySelector('[data-public-preview]');
+    const status = form.querySelector('[data-public-preview-status]');
+    const blocksInput = form.querySelector('[data-page-block-input]');
+    const titleInput = form.querySelector('[name="title"]');
+    if (!frame || !status || !blocksInput || !titleInput) return;
+
+    let timer;
+    let requestId = 0;
+    let activeRequest;
+    const renderPublicPreview = async () => {
+        const currentRequest = ++requestId;
+        activeRequest?.abort();
+        activeRequest = new AbortController();
+        status.textContent = 'Updating the public page preview…';
+        try {
+            const response = await fetch(form.dataset.previewEndpoint, {
+                method: 'POST',
+                headers: {
+                    Accept: 'text/html',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                },
+                body: JSON.stringify({ title: titleInput.value || 'Untitled page', blocks: blocksInput.value }),
+                signal: activeRequest.signal,
+            });
+            if (!response.ok) throw new Error('The public preview could not be updated. Your draft edits are still here.');
+            const html = await response.text();
+            if (currentRequest !== requestId) return;
+            const previewDocument = new DOMParser().parseFromString(html, 'text/html');
+            previewDocument.querySelectorAll('script').forEach((script) => script.remove());
+            frame.srcdoc = `<!doctype html>${previewDocument.documentElement.outerHTML}`;
+            status.textContent = 'Preview matches the public page design.';
+        } catch (error) {
+            if (error instanceof DOMException && error.name === 'AbortError') return;
+            status.textContent = error instanceof Error ? error.message : 'The public preview could not be updated.';
+        }
+    };
+    const schedulePreview = () => {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(renderPublicPreview, 450);
+    };
+
+    form.addEventListener('input', schedulePreview);
+    form.addEventListener('change', schedulePreview);
+    form.addEventListener('click', (event) => {
+        if (event.target.closest('[data-add], [data-remove], [data-duplicate], [data-move], [data-undo], [data-redo]')) {
+            window.setTimeout(schedulePreview, 0);
+        }
+    });
+    form.addEventListener('ai-page-draft', schedulePreview);
+    form.addEventListener('ai-section-revision', schedulePreview);
+    form.querySelectorAll('[data-preview]').forEach((button) => button.addEventListener('click', () => {
+        frame.dataset.preview = button.dataset.preview;
+    }));
+    schedulePreview();
+});
+
+const initializeEnhancedSelects = (root = document) => {
+const enhancedSelects = [...root.querySelectorAll('select:not([data-native-select])')];
+enhancedSelects.forEach((select) => {
     if (select.closest('.enhanced-select')) return;
+    const index = enhancedSelectIndex++;
     const wrapper = document.createElement('div');
     wrapper.className = 'enhanced-select';
     const trigger = document.createElement('button');
@@ -339,31 +714,398 @@ enhancedSelects.forEach((select, index) => {
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', 'm6 9 6 6 6-6'); path.setAttribute('stroke-linecap', 'round'); path.setAttribute('stroke-linejoin', 'round'); chevron.append(path);
     trigger.append(text, chevron);
     const options = document.createElement('div');
-    options.className = 'enhanced-select-options'; options.id = `enhanced-select-${index}`; options.setAttribute('role', 'listbox'); options.hidden = true;
+    options.className = 'enhanced-select-options'; options.hidden = true;
+    const optionList = document.createElement('div');
+    optionList.id = `enhanced-select-${index}`;
+    optionList.setAttribute('role', 'listbox');
+    const searchable = select.hasAttribute('data-searchable-select');
+    const remoteUrl = select.dataset.remoteOptions;
+    let searchInput = null;
+    let searchCount = null;
+    let noResults = null;
+    let remoteTimer;
+    let remoteRequestId = 0;
+    let remoteLoaded = false;
+    const choices = [];
+
+    if (searchable) {
+        options.classList.add('has-search');
+        const searchPanel = document.createElement('div');
+        searchPanel.className = 'enhanced-select-search';
+        searchInput = document.createElement('input');
+        searchInput.type = 'search';
+        searchInput.autocomplete = 'off';
+        searchInput.placeholder = 'Search by provider, model name, or ID';
+        searchInput.setAttribute('aria-label', `Search ${select.closest('label')?.childNodes[0]?.textContent?.trim() || 'models'}`);
+        searchInput.setAttribute('aria-controls', optionList.id);
+        searchCount = document.createElement('span');
+        searchCount.className = 'enhanced-select-search-count';
+        searchCount.setAttribute('aria-live', 'polite');
+        searchPanel.append(searchInput, searchCount);
+        noResults = document.createElement('p');
+        noResults.className = 'enhanced-select-no-results';
+        noResults.textContent = 'No models match. Try another search.';
+        noResults.setAttribute('role', 'status');
+        noResults.hidden = true;
+        options.append(searchPanel, noResults);
+    }
+    options.append(optionList);
+
     const sync = () => {
         const selected = select.options[select.selectedIndex];
         text.textContent = selected?.textContent ?? 'Choose an option';
-        [...options.children].forEach((option) => option.setAttribute('aria-selected', String(option.dataset.value === select.value)));
+        choices.forEach((option) => option.setAttribute('aria-selected', String(option.dataset.value === select.value)));
     };
-    [...select.options].forEach((option) => {
-        const choice = document.createElement('button'); choice.type = 'button'; choice.setAttribute('role', 'option'); choice.dataset.value = option.value; choice.textContent = option.textContent; choice.disabled = option.disabled;
-        choice.addEventListener('click', () => { select.value = option.value; select.dispatchEvent(new Event('change', { bubbles: true })); sync(); close(); trigger.focus(); }); options.append(choice);
-    });
-    const positionOptions = () => {
-        options.style.left = '50%'; options.style.right = 'auto'; options.style.transform = 'translateX(-50%)';
-        const edge = 12;
-        const bounds = options.getBoundingClientRect();
-        if (bounds.left < edge) {
-            options.style.left = '0'; options.style.transform = 'none';
-        } else if (bounds.right > window.innerWidth - edge) {
-            options.style.left = 'auto'; options.style.right = '0'; options.style.transform = 'none';
+    const addChoice = (option) => {
+        const choice = document.createElement('button'); choice.type = 'button'; choice.setAttribute('role', 'option'); choice.dataset.value = option.value; choice.dataset.searchText = option.dataset.searchText ?? option.textContent; choice.textContent = option.textContent; choice.disabled = option.disabled;
+        choice.addEventListener('click', () => { select.value = option.value; select.dispatchEvent(new Event('change', { bubbles: true })); sync(); close(); trigger.focus(); }); optionList.append(choice); choices.push(choice);
+    };
+    const filterChoices = () => {
+        if (!searchInput) return;
+        const query = searchInput.value.trim().toLocaleLowerCase();
+        const visibleCount = choices.reduce((count, choice) => {
+            const matches = !query || choice.dataset.searchText.toLocaleLowerCase().includes(query);
+            choice.hidden = !matches;
+            return count + Number(matches && !choice.disabled);
+        }, 0);
+        if (!remoteUrl) searchCount.textContent = `${visibleCount} ${visibleCount === 1 ? 'model' : 'models'}`;
+        noResults.hidden = visibleCount !== 0;
+    };
+    const renderChoices = () => {
+        choices.splice(0, choices.length);
+        optionList.replaceChildren();
+        [...select.options].forEach(addChoice);
+        filterChoices();
+        sync();
+    };
+    const loadRemoteChoices = async (query = '') => {
+        if (!remoteUrl) return;
+        const requestId = ++remoteRequestId;
+        if (searchCount) searchCount.textContent = query ? 'Searching…' : 'Loading models…';
+        if (noResults) noResults.hidden = true;
+        try {
+            const url = new URL(remoteUrl, window.location.href);
+            if (query) url.searchParams.set('q', query);
+            const response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+            if (!response.ok) throw new Error('Model choices could not be loaded. Try again.');
+            const result = await response.json();
+            if (requestId !== remoteRequestId) return;
+            const data = result.data ?? {};
+            const models = Array.isArray(data.models) ? data.models : [];
+            const currentValue = select.value;
+            const currentOption = [...select.options].find((option) => option.value === currentValue && currentValue);
+            const fragment = document.createDocumentFragment();
+            const placeholder = select.options[0]?.cloneNode(true);
+            const seen = new Set();
+            if (placeholder) { fragment.append(placeholder); seen.add(placeholder.value); }
+            if (currentOption && !seen.has(currentOption.value)) { fragment.append(currentOption.cloneNode(true)); seen.add(currentOption.value); }
+            models.forEach((model) => {
+                const value = `${model.provider_key}|${model.model_id}`;
+                if (seen.has(value)) return;
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = model.label;
+                option.dataset.searchText = model.search_text;
+                fragment.append(option);
+                seen.add(value);
+            });
+            select.replaceChildren(fragment);
+            if (currentValue && seen.has(currentValue)) select.value = currentValue;
+            renderChoices();
+            if (searchCount) searchCount.textContent = `${models.length}${data.has_more ? '+' : ''} ${models.length === 1 ? 'model' : 'models'}`;
+            if (noResults) noResults.hidden = models.length !== 0;
+            remoteLoaded = true;
+        } catch (error) {
+            if (requestId !== remoteRequestId) return;
+            if (searchCount) searchCount.textContent = '';
+            if (noResults) {
+                noResults.textContent = error instanceof Error ? error.message : 'Model choices could not be loaded. Try again.';
+                noResults.hidden = false;
+            }
         }
     };
-    const close = () => { wrapper.classList.remove('is-open'); options.hidden = true; trigger.setAttribute('aria-expanded', 'false'); options.style.removeProperty('left'); options.style.removeProperty('right'); options.style.removeProperty('transform'); };
-    const open = () => { wrapper.classList.add('is-open'); options.hidden = false; trigger.setAttribute('aria-expanded', 'true'); positionOptions(); options.querySelector('[aria-selected="true"]')?.focus(); };
+    searchInput?.addEventListener('input', () => {
+        if (!remoteUrl) { filterChoices(); return; }
+        remoteLoaded = false;
+        window.clearTimeout(remoteTimer);
+        ++remoteRequestId;
+        if (searchCount) searchCount.textContent = 'Searching…';
+        if (noResults) noResults.hidden = true;
+        remoteTimer = window.setTimeout(() => loadRemoteChoices(searchInput.value.trim()), 220);
+    });
+    // Render the menu at document level so any card, table, or scroll container can contain its own content without clipping the open menu.
+    const positionOptions = () => {
+        if (!wrapper.classList.contains('is-open')) return;
+        const viewport = window.visualViewport;
+        const viewportWidth = viewport?.width ?? window.innerWidth;
+        const viewportHeight = viewport?.height ?? window.innerHeight;
+        const edge = 12;
+        const gap = 7;
+        const triggerBounds = trigger.getBoundingClientRect();
+        const availableWidth = Math.max(120, viewportWidth - edge * 2);
+        const menuWidth = Math.min(triggerBounds.width, availableWidth);
+
+        options.style.position = 'fixed';
+        options.style.top = '0px';
+        options.style.bottom = 'auto';
+        options.style.left = `${Math.max(edge, Math.min(triggerBounds.left, viewportWidth - edge - Math.min(triggerBounds.width, availableWidth)))}px`;
+        options.style.right = 'auto';
+        // Searchable model catalogs should stay aligned with their field; long model names wrap inside it.
+        options.style.boxSizing = 'border-box';
+        options.style.width = searchInput ? `${menuWidth}px` : 'max-content';
+        options.style.minWidth = `${menuWidth}px`;
+        options.style.maxWidth = `${searchInput ? menuWidth : availableWidth}px`;
+        options.style.maxHeight = `${Math.min(260, Math.max(80, viewportHeight - edge * 2))}px`;
+        options.style.transform = 'none';
+
+        const renderedMenuWidth = options.getBoundingClientRect().width;
+        const left = Math.max(edge, Math.min(triggerBounds.left, viewportWidth - edge - renderedMenuWidth));
+        options.style.left = `${left}px`;
+
+        const spaceBelow = Math.max(0, viewportHeight - triggerBounds.bottom - edge - gap);
+        const spaceAbove = Math.max(0, triggerBounds.top - edge - gap);
+        const naturalHeight = options.scrollHeight;
+        const openAbove = spaceBelow < Math.min(naturalHeight, 160) && spaceAbove > spaceBelow;
+        const availableHeight = openAbove ? spaceAbove : spaceBelow;
+        options.style.maxHeight = `${Math.max(80, Math.min(260, availableHeight))}px`;
+        options.style.top = openAbove ? 'auto' : `${triggerBounds.bottom + gap}px`;
+        options.style.bottom = openAbove ? `${viewportHeight - triggerBounds.top + gap}px` : 'auto';
+    };
+    const close = () => {
+        wrapper.classList.remove('is-open');
+        options.hidden = true;
+        trigger.setAttribute('aria-expanded', 'false');
+        if (searchInput) {
+            searchInput.value = '';
+            if (remoteUrl) {
+                remoteLoaded = false;
+                window.clearTimeout(remoteTimer);
+                ++remoteRequestId;
+                if (noResults) { noResults.textContent = 'No models match. Try another search.'; noResults.hidden = true; }
+            }
+            filterChoices();
+        }
+        options.classList.remove('is-portaled');
+        delete options.dataset.themeMode;
+        if (options.parentElement !== wrapper) wrapper.append(options);
+        ['position', 'top', 'bottom', 'left', 'right', 'width', 'min-width', 'max-width', 'max-height', 'box-sizing', 'transform', 'background-color', 'color', 'border-color', 'font-family', '--surface', '--surface-ink', '--ink', '--muted', '--brand', '--line-strong'].forEach((property) => options.style.removeProperty(property));
+        document.removeEventListener('scroll', positionOptions, true);
+        window.removeEventListener('resize', positionOptions);
+        window.visualViewport?.removeEventListener('resize', positionOptions);
+        window.visualViewport?.removeEventListener('scroll', positionOptions);
+        if (closeOpenEnhancedSelect === close) closeOpenEnhancedSelect = null;
+    };
+    const open = () => {
+        if (wrapper.classList.contains('is-open')) return;
+        closeOpenEnhancedSelect?.();
+        const inheritedStyles = getComputedStyle(wrapper);
+        options.dataset.themeMode = wrapper.closest('.staff-theme-dark, .member-theme-dark, .public-theme-dark, .worship-theme-dark') ? 'dark' : 'light';
+        ['--surface', '--surface-ink', '--ink', '--muted', '--brand', '--line-strong'].forEach((property) => {
+            const value = inheritedStyles.getPropertyValue(property).trim();
+            if (value) options.style.setProperty(property, value);
+        });
+        const menuStyles = getComputedStyle(options);
+        options.style.backgroundColor = menuStyles.backgroundColor;
+        options.style.color = menuStyles.color;
+        options.style.borderColor = menuStyles.borderColor;
+        options.style.fontFamily = menuStyles.fontFamily;
+        document.body.append(options);
+        options.classList.add('is-portaled');
+        wrapper.classList.add('is-open');
+        options.hidden = false;
+        trigger.setAttribute('aria-expanded', 'true');
+        closeOpenEnhancedSelect = close;
+        positionOptions();
+        addPageListener(document, 'scroll', positionOptions, true);
+        addPageListener(window, 'resize', positionOptions);
+        addPageListener(window.visualViewport, 'resize', positionOptions);
+        addPageListener(window.visualViewport, 'scroll', positionOptions);
+        if (searchInput) {
+            searchInput.focus();
+            if (remoteUrl && !remoteLoaded) loadRemoteChoices(searchInput.value.trim());
+        }
+        else (options.querySelector('[aria-selected="true"]:not(:disabled)') ?? options.querySelector('button:not(:disabled)'))?.focus();
+    };
     trigger.addEventListener('click', () => wrapper.classList.contains('is-open') ? close() : open());
+    const handleMenuKeydown = (event) => {
+        const visibleChoices = [...options.querySelectorAll('button:not(:disabled):not([hidden])')];
+        const currentIndex = visibleChoices.indexOf(document.activeElement);
+        if (event.key === 'Escape') { event.preventDefault(); close(); trigger.focus(); return; }
+        if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        if (visibleChoices.length === 0) return;
+        const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? visibleChoices.length - 1 : currentIndex === -1 ? (event.key === 'ArrowDown' ? 0 : visibleChoices.length - 1) : (currentIndex + (event.key === 'ArrowDown' ? 1 : -1) + visibleChoices.length) % visibleChoices.length;
+        visibleChoices[nextIndex]?.focus();
+    };
+    options.addEventListener('keydown', handleMenuKeydown);
+    trigger.addEventListener('keydown', (event) => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); open(); } });
     wrapper.addEventListener('keydown', (event) => { if (event.key === 'Escape') { close(); trigger.focus(); } });
-    document.addEventListener('click', (event) => { if (!wrapper.contains(event.target)) close(); });
-    select.addEventListener('change', sync); select.before(wrapper); wrapper.append(select, trigger, options); sync();
-    window.addEventListener('resize', () => { if (wrapper.classList.contains('is-open')) positionOptions(); });
+    addPageListener(document, 'click', (event) => { if (!wrapper.contains(event.target) && !options.contains(event.target)) close(); });
+    select.addEventListener('change', sync); select.before(wrapper); wrapper.append(select, trigger, options); renderChoices();
 });
+};
+initializeEnhancedSelects();
+
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+
+const notificationStack = document.querySelector('[data-notification-stack]');
+const notificationTimers = new Map();
+const notificationRemovalTimers = new Map();
+let notificationSequence = 0;
+const notificationApi = {
+    show(message, state = 'info', options = {}) {
+        if (!notificationStack || !message) return;
+        const id = options.id ?? `notification-${++notificationSequence}`;
+        let toast = notificationStack.querySelector(`[data-notification-id="${CSS.escape(id)}"]`);
+        clearTimeout(notificationRemovalTimers.get(id));
+        notificationRemovalTimers.delete(id);
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.className = 'viewport-notification';
+            toast.dataset.notificationId = id;
+            const indicator = document.createElement('span');
+            indicator.className = 'viewport-notification-indicator';
+            indicator.setAttribute('aria-hidden', 'true');
+            const copy = document.createElement('p');
+            copy.className = 'viewport-notification-copy';
+            const dismiss = document.createElement('button');
+            dismiss.type = 'button';
+            dismiss.className = 'viewport-notification-dismiss';
+            dismiss.setAttribute('aria-label', 'Dismiss notification');
+            const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            icon.setAttribute('viewBox', '0 0 20 20');
+            icon.setAttribute('aria-hidden', 'true');
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', 'm5 5 10 10M15 5 5 15');
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke', 'currentColor');
+            path.setAttribute('stroke-width', '1.7');
+            path.setAttribute('stroke-linecap', 'round');
+            icon.append(path);
+            dismiss.append(icon);
+            dismiss.addEventListener('click', () => this.dismiss(id));
+            toast.append(indicator, copy, dismiss);
+            notificationStack.append(toast);
+        }
+        clearTimeout(notificationTimers.get(id));
+        toast.dataset.state = state;
+        toast.setAttribute('role', state === 'error' || state === 'warning' ? 'alert' : 'status');
+        toast.querySelector('.viewport-notification-copy').textContent = message;
+        toast.classList.add('is-visible');
+        if (state === 'pending' || options.duration === 0) {
+            notificationTimers.delete(id);
+        } else {
+            const duration = options.duration ?? (state === 'error' || state === 'warning' ? 9000 : 6500);
+            notificationTimers.set(id, window.setTimeout(() => this.dismiss(id), duration));
+        }
+        return id;
+    },
+    dismiss(id) {
+        const toast = notificationStack?.querySelector(`[data-notification-id="${CSS.escape(id)}"]`);
+        if (!toast) return;
+        clearTimeout(notificationTimers.get(id));
+        notificationTimers.delete(id);
+        toast.classList.remove('is-visible');
+        notificationRemovalTimers.set(id, window.setTimeout(() => {
+            toast.remove();
+            notificationRemovalTimers.delete(id);
+        }, 220));
+    },
+};
+window.MinistryNotifications = notificationApi;
+
+const showAsyncFeedback = (message, state = 'success') => notificationApi.show(message, state, { id: 'async-form-feedback' });
+
+document.querySelectorAll('.form-success, .form-errors, .workspace-notice, .member-notice').forEach((notice) => {
+    if (notice.dataset.notificationHandled) return;
+    notice.dataset.notificationHandled = 'true';
+    const message = notice.textContent.trim();
+    if (!message) return;
+    const state = notice.matches('.form-errors, .workspace-notice-error, .member-notice-error, .is-error') || notice.getAttribute('role') === 'alert' ? 'error' : 'success';
+    notificationApi.show(message, state);
+});
+
+const removeFieldErrors = (form) => {
+    form.querySelectorAll('[data-async-field-error]').forEach((node) => node.remove());
+    form.querySelectorAll('[aria-invalid="true"]').forEach((field) => field.removeAttribute('aria-invalid'));
+};
+
+const showFieldErrors = (form, errors = {}) => {
+    Object.entries(errors).forEach(([key, messages]) => {
+        const field = [...form.elements].find((element) => element.name === key || (key.startsWith('fallbacks.') && element.name === 'fallbacks[]'));
+        if (!field) return;
+        field.setAttribute('aria-invalid', 'true');
+        const error = document.createElement('small');
+        error.dataset.asyncFieldError = '';
+        error.className = 'field-error';
+        error.textContent = Array.isArray(messages) ? messages[0] : String(messages);
+        field.insertAdjacentElement('afterend', error);
+    });
+};
+
+const applyAiSettingsData = (data = {}) => {
+    if (data.provider_key && data.provider) {
+        const badge = document.querySelector(`[data-ai-provider-status="${CSS.escape(data.provider_key)}"]`);
+        const count = document.querySelector(`[data-ai-provider-count="${CSS.escape(data.provider_key)}"]`);
+        if (badge) badge.textContent = !data.provider.configured ? 'Not configured' : (!data.provider.enabled ? 'Disabled' : (data.provider.status === 'connected' ? 'Connected' : data.provider.status));
+        if (count) count.textContent = String(data.provider.model_count ?? 0);
+        const refresh = [...document.querySelectorAll('form[action*="catalog"]')].find((form) => form.action.includes(`/catalog/${data.provider_key}/refresh`))?.querySelector('button[type="submit"]');
+        if (refresh) refresh.disabled = !data.provider.enabled || !data.provider.configured;
+    }
+    if (data.route) {
+        const badge = document.querySelector('[data-ai-route-status]');
+        if (badge) badge.textContent = data.route.status[0].toLocaleUpperCase() + data.route.status.slice(1);
+        const help = document.querySelector('[data-ai-route-help]');
+        if (help) help.textContent = data.route.status === 'verified' ? 'The route passed its live compatibility check.' : 'The route cannot be used until it passes the live check.';
+        document.querySelectorAll('[data-ai-model-select]').forEach((select) => {
+            const value = select.name === 'primary_model' ? data.route.primary : (select.name === 'fallbacks[]' ? (data.route.fallbacks?.[Number(select.dataset.fallbackIndex ?? 0)] ?? '') : '');
+            if (value && [...select.options].some((option) => option.value === value)) select.value = value;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+    }
+};
+
+document.querySelectorAll('form[data-async-form]').forEach((form) => {
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (form.dataset.submitting === 'true') return;
+        form.dataset.submitting = 'true';
+        removeFieldErrors(form);
+        showAsyncFeedback(form.dataset.pendingLabel ?? 'Saving…', 'pending');
+        const submitter = event.submitter;
+        const originalLabel = submitter?.textContent;
+        if (submitter) { submitter.disabled = true; submitter.textContent = form.dataset.pendingLabel ?? 'Saving…'; }
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}) },
+                credentials: 'same-origin',
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                showFieldErrors(form, result.errors);
+                throw new Error(result.message ?? 'This change could not be saved. Check the highlighted fields.');
+            }
+            applyAiSettingsData(result.data ?? {});
+            showAsyncFeedback(result.message ?? 'Saved.', 'success');
+            form.querySelector('input[name="api_key"]')?.value && (form.querySelector('input[name="api_key"]').value = '');
+        } catch (error) {
+            showAsyncFeedback(error instanceof Error ? error.message : 'A network error prevented this change from being saved.', 'error');
+        } finally {
+            delete form.dataset.submitting;
+            if (submitter) { submitter.disabled = false; submitter.textContent = originalLabel ?? 'Save'; }
+        }
+    });
+});
+
+};
+
+document.addEventListener('livewire:navigating', () => { livewireNavigationPending = true; });
+document.addEventListener('livewire:navigated', () => {
+    if (!livewireNavigationPending) return;
+    livewireNavigationPending = false;
+    initializePage(true);
+});
+
+initializePage();

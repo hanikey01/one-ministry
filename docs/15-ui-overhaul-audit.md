@@ -36,9 +36,9 @@ This direction supersedes earlier visual examples wherever they feel dated or ge
 
 ### Staff workspace
 
-- **Desktop:** fixed 272 px dark or deeply tinted sidebar; logo/installation identity at the top; grouped navigation; visible active item; profile menu and support/settings at the bottom.
+- **Desktop:** fixed 272 px sidebar using the ministry's configured light/dark sidebar colors; neutral charcoal defaults; logo/installation identity at the top; grouped navigation; visible active item; profile menu and support/settings at the bottom.
 - **Top bar:** page breadcrumb, command/search entry, notification area, profile controls; no placeholder controls presented as finished functionality.
-- **Content:** pale neutral canvas with a maximum working width, page command header, metric cards, elevated content panels, and restrained accent colour.
+- **Content:** ministry-configurable light/dark neutral or branded canvas and panel colors with a maximum working width, page command header, metric cards, elevated content panels, and accessible brand accents.
 - **Navigation groups:** Workspace, Ministry, Content, Operations, Administration. Each item has an outline SVG icon and permission/feature-aware visibility.
 - **Mobile:** hamburger opens the same sidebar as a focus-managed overlay. There is no horizontal replacement menu.
 
@@ -67,6 +67,6 @@ This direction supersedes earlier visual examples wherever they feel dated or ge
 - Every staff and member page uses the same sidebar on desktop and the same drawer on mobile; horizontal menus are not substituted for either dashboard.
 - Navigation has one source of truth, with icons, grouping, active state, permissions, and feature gating.
 - Every important page has a clear title, context, primary action, usable empty state, and a narrow-screen layout.
-- Theme settings use semantic tokens across all surfaces without invalid contrast.
+- Theme settings use semantic tokens across all surfaces; ministries can choose primary/accent colors and light/dark canvas, panel, and sidebar colors, with readable foregrounds derived automatically.
 - Public homepage families look intentionally different while maintaining one trusted design language.
 - Existing routes, permissions, feature-disablement behavior, sensitive-data boundaries, and server rendering continue to work.

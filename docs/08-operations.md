@@ -22,11 +22,19 @@ Staff password recovery requires a configured delivery mail transport and a publ
 
 The staff Settings screen owns the installation’s active email delivery connection. It supports the hosting sendmail service and common SMTP providers; provider credentials are encrypted at rest and cannot be read back from the screen. Set a verified sender address, save the provider, activate it, and send a staff verification email before relying on invitations, recovery, or elevated staff actions. An inactive or incomplete connection causes delivery-dependent actions to return `503` without creating a usable token.
 
+### AI page editor provider setup
+
+AI drafting is optional and remains disabled until the installation administrator enables `ai_page_editor` (or exposes it to authorized staff in preview). Configure the ministry-owned Gemini API key, OpenRouter API key, or both from the protected AI settings page. Secrets are encrypted with the installation key, shown only as configured/unconfigured state, and replaced by submitting a new key. Refresh each enabled provider's model catalog, select a structured-output capable primary model and ordered fallbacks for page drafting, then run the compatibility test. The route remains inactive until all selected models pass. The scheduler refreshes enabled model catalogs daily at 04:10 installation time; confirm the Laravel scheduler cron is running. A removed or incompatible selected model invalidates the route and creates an audit entry; staff must choose and test a replacement. Rotate keys at the provider first, replace them in Ministry, refresh the catalog, and rerun validation. Provider requests use bounded timeouts and sanitized errors; logs and audit records must not include keys, prompts, or generated content. Staff enter a brief and confirmed public details, review the proposed section plan, and apply it before editing. When requesting a scoped section edit, the complete current page content is sent to the configured provider for context; the interface tells staff this before generation, and the returned change can affect only the selected section. Nothing is saved until staff submit the normal page draft form; publication still requires the usual publisher review.
+
 ## 3. Deployment and upgrade
 
 Maintain development, staging, and production environments. CI runs migrations against a clean database, tests, static checks, web build, and container build. Deploy to staging with representative configuration, run smoke tests, then perform explicit production promotion. Take a verified backup before migrations. Apply additive schema changes first; deploy code compatible with old and new fields during a transition; backfill; remove old fields only in a later release.
 
 Version all container images and configuration schemas. Release notes state migrations, new secrets, provider changes, breaking API changes, and required operator steps. Rolling back code is allowed only when database compatibility has been checked. A failed migration or media adapter change has a written recovery path.
+
+### PHP security updates
+
+The API, queue worker, and scheduler use the PHP-FPM application image built from `services/api/Dockerfile`. Keep its PHP patch release explicit and update it promptly when the PHP project publishes security fixes; the PHP version constraint in `composer.json` does not update the PHP runtime. For the October 2026 critical PHP fixes, the image uses PHP 8.5.12 on Alpine 3.24. Rebuild with `docker compose build --pull api`, recreate `api`, `worker`, and `scheduler` from the same image, and verify `php -v` in each service before reopening production traffic. Recreating these containers does not remove the database or Redis volumes. Do not treat restarting containers built from an older local image as patching PHP.
 
 ## 4. Capacity planning for any audience size
 
@@ -145,6 +153,10 @@ Regional playback monitoring always checks from the installation origin. Add ins
 The scheduler runs `php artisan ministry:probe-live-streams` every five minutes for ready, live, and interrupted services. A manual run is available in the producer workspace. All healthy regions produce healthy playback, mixed results produce degraded playback, and all regions failing produce offline playback. Offline health follows the existing interruption rule for a live service. Operate remote agents independently in the claimed region, protect their tokens, restrict outbound targets to public HTTP media resources, monitor their availability, and test them before relying on regional claims. The included application defines the agent contract but does not claim that an unconfigured region was tested.
 
 ## 8. Security maintenance
+
+### Release signing
+
+The repository tag workflow signs release manifests with an RSA private key held in the `RELEASE_SIGNING_PRIVATE_KEY_PEM` Actions secret. Its matching `RELEASE_SIGNING_KEY_ID` variable is included in the manifest. Generate and store the private key outside the repository, restrict access to release maintainers, and keep a separately protected recovery copy. Do not paste private keys into issues, logs, workflows, or application settings. Key rotation requires publishing the new public key to the installation trust store before signing with it; the installation-side update client and public-key trust store are not yet implemented.
 
 ### Zoom Video SDK operation
 

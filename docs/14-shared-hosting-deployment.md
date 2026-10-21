@@ -82,8 +82,10 @@ Finance, care, security, and future children's exports remain permission-separat
 - Anonymous video viewing remains separate from identified attendance.
 - Database and media restore has been proven in isolation.
 
-## Planned platform update channel
+## Release packages and planned update channel
 
-The platform will support an optional self-hosted update channel for installations. A maintainer release tag will produce a versioned application archive, checksum, signed release manifest, upgrade notes, and database migration compatibility metadata. Each ministry installation will use its own scheduled host cron job to check the selected Stable, Preview, or Manual-only channel.
+The tag-triggered workflow in `.github/workflows/release-package.yml` builds a versioned shared-hosting archive with production Composer dependencies and compiled Vite assets. It publishes `release-manifest.json` with the archive SHA-256 and signing-key ID, plus a detached RSA/SHA-256 signature. Tags with a prerelease suffix publish as Preview; other version tags publish as Stable. Before creating a release tag, maintainers must configure the `RELEASE_SIGNING_PRIVATE_KEY_PEM` Actions secret and `RELEASE_SIGNING_KEY_ID` Actions variable. Keep the private key outside Git and rotate it with a published trust-store overlap plan.
 
-An update must create a recoverable backup, enter maintenance mode, verify the package checksum and signature, switch releases atomically, run compatible migrations, rebuild application caches, run a health check, and record an audit event. Failed updates must restore the former release and report the failure to an authorized administrator. Installation servers must not need Git credentials or direct access to the maintainer GitHub repository.
+The installation-side update channel remains planned work: a hosted feed, cron polling, Stable/Preview/Manual-only selection, upgrade notes, and database migration compatibility metadata are not yet shipped. Each ministry installation should use its own scheduled host cron job to check the selected channel when that update client is implemented.
+
+An update client must create a recoverable backup, enter maintenance mode, verify the package checksum and signature, switch releases atomically, run compatible migrations, rebuild application caches, run a health check, and record an audit event. Failed updates must restore the former release and report the failure to an authorized administrator. Installation servers must not need Git credentials or direct access to the maintainer GitHub repository.

@@ -20,7 +20,7 @@ Within `services/api/app/Modules/<Module>/`, keep `Models`, `Data`, `Policies`, 
 
 | Module | Owns | Emits/consumes |
 | --- | --- | --- |
-| Installation | Settings, locations, terminology, feature switches, setup checks | Configuration changed |
+| Installation | Settings, locations, ministry-owned interface terminology, feature switches, setup checks | Configuration changed |
 | Identity | Accounts, sessions, invitations, role assignments | Login, role and session events |
 | People | Person, household, contacts, consent, merge | Person created/merged, consent changed |
 | Publishing | Pages, sermons, series, revisions, homepage theme, carousel, and section composition | Content published/unpublished |
@@ -38,6 +38,7 @@ Within `services/api/app/Modules/<Module>/`, keep `Models`, `Data`, `Policies`, 
 | Reporting | Defined read models and scoped exports | Consumes authorized domain events |
 | Audit | Sensitive action and access trail | Consumes security-relevant events |
 | Integrations | Provider adapter contracts and implementations | Verified provider callbacks |
+| AI page editor | Provider-neutral catalog, routing, structured-output checks, validated page plans, and context-aware selected-block revisions handed into the existing editor | Staff-reviewed page draft; never publication |
 
 ## 3. Interface areas
 
@@ -55,7 +56,7 @@ Do not put secret keys or policy authority in the web bundle. Public server-rend
 
 ## 4. Provider interfaces
 
-Define `MailProvider`, `SmsProvider`, `PaymentProvider`, `ObjectStore`, `BroadcastProvider`, `MeetingProvider`, and `RecordingProvider` contracts. Each adapter declares capabilities, required configuration, health checks, webhook verification, and failure mapping. A module may be disabled if no valid provider is configured. Provider-specific identifiers are stored alongside internal IDs and never replace them.
+Define `MailProvider`, `SmsProvider`, `PaymentProvider`, `ObjectStore`, `BroadcastProvider`, `MeetingProvider`, `RecordingProvider`, and `AiTextProvider` contracts. Each adapter declares capabilities, required configuration, health checks, and failure mapping. AI providers expose catalog discovery and structured text generation through the same internal request/response shape; provider model IDs stay in routing configuration and generated output is validated by Ministry before page persistence. A module may be disabled if no valid provider is configured. Provider-specific identifiers are stored alongside internal IDs and never replace them.
 
 At least one documented implementation or local simulator is required for each module's end-to-end test. Do not claim generic provider support until an adapter contract has been tested with a second implementation or a conformance suite.
 
@@ -74,4 +75,6 @@ A module is complete only when migration, model/data objects, policies, actions,
 # Digital school module
 
 `digital_school` is independently enabled per installation. Its staff navigation appears only to users with `school.manage`; its member navigation appears only while enabled. Disabling the module returns a server-side 404 for every staff and member school endpoint. The module contains catalog, curriculum, assessments, enrollment, progress, certificates, and live classes while reusing the platform meeting domain when an interactive class is hosted internally.
+
+`NavigationLayout` resolves stable destination keys to server-owned route definitions and persisted sidebar/mobile-footer ordering. The view is presentation only: it filters staff destinations through `PermissionChecker` and `ModuleAvailability`; member and public routes retain their own authorization and feature middleware. User configuration can choose destinations, ordering, and an approved icon, but cannot supply route names or bypass direct-route checks.
 

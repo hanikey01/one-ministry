@@ -72,6 +72,7 @@ An assignment records role, grantee, scope type (`installation`, `location`, `gr
 | Change role or scope | Granting authority separate from ordinary module administration; audit |
 | Correct attendance | Assigned scope, reason, appended correction |
 | Configure Zoom Video SDK credentials | Super or ministry administrator, MFA, audit; secret values never displayed after save |
+| Configure AI provider credentials and page-editor model routes | Ministry or super administrator with `ai.manage` and verified email; audited; MFA not required; secret values never displayed after save |
 | Issue meeting host grant | Assigned meeting host/owner and verified email + MFA; role is derived server-side |
 | Admit or remove meeting participant | Assigned moderator/host; audit each action |
 

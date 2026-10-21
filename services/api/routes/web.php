@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\AiPageDraftController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BrowserAuthController;
 use App\Http\Controllers\CapacityRehearsalController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\MemberPrayerController;
 use App\Http\Controllers\MemberSchoolController;
 use App\Http\Controllers\MemberWorkspaceController;
 use App\Http\Controllers\NavigationWorkspaceController;
+use App\Http\Controllers\MinistryTerminologyController;
 use App\Http\Controllers\MfaController;
 use App\Http\Controllers\NotificationPreferenceController;
 use App\Http\Controllers\PageController;
@@ -53,6 +55,7 @@ use App\Http\Controllers\StaffServiceNotesController;
 use App\Http\Controllers\StaffServiceResponseController;
 use App\Http\Controllers\StaffSchoolController;
 use App\Http\Controllers\StaffSettingsController;
+use App\Http\Controllers\StaffAiSettingsController;
 use App\Http\Controllers\StaffVolunteerController;
 use App\Http\Controllers\StaffWorkspaceController;
 use App\Http\Controllers\SetupWizardController;
@@ -217,6 +220,16 @@ Route::prefix('api/v1')->group(function (): void {
 Route::middleware(['auth', 'permission:settings.read'])->get('/staff', [StaffWorkspaceController::class, 'overview'])->name('staff.overview');
 Route::middleware(['auth', 'permission:settings.read'])->get('/staff/settings', [StaffWorkspaceController::class, 'settings'])->name('staff.settings');
 Route::middleware(['auth', 'permission:settings.update'])->put('/staff/settings', [StaffWorkspaceController::class, 'updateSettings'])->name('staff.settings.update');
+Route::middleware(['auth', 'permission:settings.update'])->get('/staff/terminology', [MinistryTerminologyController::class, 'index'])->name('staff.terminology');
+Route::middleware(['auth', 'permission:settings.update'])->put('/staff/terminology', [MinistryTerminologyController::class, 'update'])->name('staff.terminology.update');
+Route::middleware(['auth', 'permission:ai.manage'])->get('/staff/ai-settings', [StaffAiSettingsController::class, 'index'])->name('staff.ai-settings');
+Route::middleware(['auth', 'permission:ai.manage'])->get('/staff/ai-settings/models', [StaffAiSettingsController::class, 'searchModels'])->name('staff.ai-settings.models');
+Route::middleware(['auth', 'permission:ai.manage', 'verified_email', 'throttle:10,1'])->group(function (): void {
+    Route::put('/staff/ai-settings/providers/{provider}', [StaffAiSettingsController::class, 'updateProvider'])->name('staff.ai-settings.provider.update');
+    Route::post('/staff/ai-settings/catalog/{provider}/refresh', [StaffAiSettingsController::class, 'refreshCatalog'])->name('staff.ai-settings.catalog.refresh');
+    Route::put('/staff/ai-settings/page-editor-route', [StaffAiSettingsController::class, 'savePageEditorRoute'])->name('staff.ai-settings.route.save');
+    Route::post('/staff/ai-settings/page-editor-route/test', [StaffAiSettingsController::class, 'testPageEditorRoute'])->name('staff.ai-settings.route.test');
+});
 Route::middleware(['auth', 'permission:services.manage'])->get('/staff/people', [StaffWorkspaceController::class, 'people'])->name('staff.people');
 Route::middleware(['auth', 'permission:services.manage'])->post('/staff/people', [StaffWorkspaceController::class, 'storePerson'])->name('staff.people.store');
 Route::middleware(['auth', 'permission:services.manage'])->get('/staff/services', [StaffWorkspaceController::class, 'services'])->name('staff.services');
@@ -255,12 +268,16 @@ Route::middleware(['auth', 'permission:school.manage'])->group(function (): void
     Route::patch('/staff/school/{course}/enrolments/{enrollment}', [StaffSchoolController::class, 'enrollment'])->name('staff.school.enrollments.update');
 });
 Route::middleware(['auth', 'permission:content.manage'])->get('/staff/navigation', [NavigationWorkspaceController::class, 'index'])->name('staff.navigation');
+Route::middleware(['auth', 'permission:content.manage'])->put('/staff/navigation/layouts', [NavigationWorkspaceController::class, 'saveLayouts'])->name('staff.navigation.layouts.update');
 Route::middleware(['auth', 'permission:content.manage'])->post('/staff/navigation', [NavigationWorkspaceController::class, 'store'])->name('staff.navigation.store');
 Route::middleware(['auth', 'permission:content.manage'])->put('/staff/navigation/order', [NavigationWorkspaceController::class, 'reorder'])->name('staff.navigation.reorder');
 Route::middleware(['auth', 'permission:content.manage'])->put('/staff/navigation/{item}', [NavigationWorkspaceController::class, 'update'])->name('staff.navigation.update');
 Route::middleware(['auth', 'permission:content.manage'])->delete('/staff/navigation/{item}', [NavigationWorkspaceController::class, 'destroy'])->name('staff.navigation.destroy');
 Route::middleware(['auth', 'permission:content.manage'])->get('/staff/pages', [PageWorkspaceController::class, 'index'])->name('staff.pages');
 Route::middleware(['auth', 'permission:content.manage'])->get('/staff/pages/create', [PageWorkspaceController::class, 'create'])->name('staff.pages.create');
+Route::middleware(['auth', 'permission:content.manage', 'throttle:60,1'])->post('/staff/pages/preview', [PageWorkspaceController::class, 'preview'])->name('staff.pages.preview');
+Route::middleware(['auth', 'permission:content.manage', 'throttle:5,1'])->post('/staff/pages/ai-draft', AiPageDraftController::class)->name('staff.pages.ai-draft');
+Route::middleware(['auth', 'permission:content.manage', 'throttle:10,1'])->post('/staff/pages/ai-section-revision', [AiPageDraftController::class, 'reviseSection'])->name('staff.pages.ai-section-revision');
 Route::middleware(['auth', 'permission:content.manage'])->post('/staff/pages', [PageWorkspaceController::class, 'store'])->name('staff.pages.store');
 Route::middleware(['auth', 'permission:content.manage'])->get('/staff/pages/{page}/edit', [PageWorkspaceController::class, 'edit'])->name('staff.pages.edit');
 Route::middleware(['auth', 'permission:content.manage'])->put('/staff/pages/{page}', [PageWorkspaceController::class, 'update'])->name('staff.pages.update');
@@ -298,6 +315,9 @@ Route::middleware(['auth', 'permission:settings.update'])->put('/staff/settings/
 Route::middleware(['auth', 'permission:settings.update', 'verified_email', 'mfa'])->put('/staff/settings/zoom-video-sdk', [StaffWorkspaceController::class, 'updateZoomVideoSdk'])->name('staff.settings.zoom-video-sdk.update');
 Route::middleware(['auth'])->post('/meetings/{meeting}/join-grant', [StaffMeetingsMediaController::class, 'token'])->middleware('throttle:10,1')->name('meetings.join-grant');
 Route::middleware(['auth'])->get('/meetings/{meeting}', [InteractiveMeetingController::class, 'show'])->name('meetings.show');
+Route::middleware(['auth', 'throttle:30,1'])->get('/meetings/{meeting}/waiting-status', [InteractiveMeetingController::class, 'waitingStatus'])->name('meetings.waiting-status');
+Route::middleware(['auth', 'verified_email', 'mfa'])->get('/staff/meetings/{meeting}/lobby', [InteractiveMeetingController::class, 'lobby'])->name('staff.meetings.lobby');
+Route::middleware(['auth', 'verified_email', 'mfa', 'throttle:30,1'])->post('/staff/meetings/{meeting}/lobby/{participant}', [InteractiveMeetingController::class, 'decideLobby'])->name('staff.meetings.lobby.decide');
 Route::get('/verify-email', [EmailVerificationPageController::class, 'show'])->name('email.verify.show');
 Route::post('/verify-email', [EmailVerificationPageController::class, 'verify'])->middleware('throttle:5,1')->name('email.verify');
 Route::middleware('guest')->get('/setup', [SetupWizardController::class, 'create'])->name('setup.create');

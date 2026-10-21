@@ -1,0 +1,97 @@
+name: Signed release package
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Build and sign shared-hosting package
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require a commit already merged to main
+        run: |
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: intl, pcntl, posix, pdo_pgsql, zip
+          tools: composer:v2
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: services/api/package-lock.json
+      - name: Install production PHP dependencies
+        working-directory: services/api
+        run: composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
+      - name: Build production browser assets
+        working-directory: services/api
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+      - name: Package and sign release manifest
+        env:
+          RELEASE_SIGNING_PRIVATE_KEY_PEM: ${{ secrets.RELEASE_SIGNING_PRIVATE_KEY_PEM }}
+          RELEASE_SIGNING_KEY_ID: ${{ vars.RELEASE_SIGNING_KEY_ID }}
+        run: |
+          set -euo pipefail
+          : "${RELEASE_SIGNING_PRIVATE_KEY_PEM:?Configure the RELEASE_SIGNING_PRIVATE_KEY_PEM Actions secret}"
+          : "${RELEASE_SIGNING_KEY_ID:?Configure the RELEASE_SIGNING_KEY_ID Actions variable}"
+          version="${GITHUB_REF_NAME}"
+          channel="stable"
+          if [[ "$version" == *-* ]]; then channel="preview"; fi
+          package="one-ministry-${version}-shared-hosting.tar.gz"
+          mkdir -p dist
+          cp LICENSE services/api/LICENSE
+          tar -czf "dist/${package}" \
+            --exclude='.env' \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='tests' \
+            --exclude='storage/app/*' \
+            --exclude='storage/logs/*' \
+            --exclude='storage/framework/cache/*' \
+            --exclude='storage/framework/sessions/*' \
+            --exclude='storage/framework/views/*' \
+            --exclude='bootstrap/cache/*.php' \
+            --exclude='database/*.sqlite' \
+            --exclude='public/storage' \
+            -C services/api .
+          checksum="$(sha256sum "dist/${package}" | cut -d ' ' -f 1)"
+          jq -n \
+            --arg version "$version" \
+            --arg channel "$channel" \
+            --arg package "$package" \
+            --arg sha256 "$checksum" \
+            --arg key_id "$RELEASE_SIGNING_KEY_ID" \
+            --arg created_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{schema_version: 1, product: "one-ministry", version: $version, channel: $channel, package: $package, sha256: $sha256, signing_key_id: $key_id, created_at: $created_at}' \
+            > dist/release-manifest.json
+          key_file="$(mktemp)"
+          trap 'rm -f "$key_file"' EXIT
+          printf '%s' "$RELEASE_SIGNING_PRIVATE_KEY_PEM" > "$key_file"
+          chmod 600 "$key_file"
+          openssl dgst -sha256 -sign "$key_file" -out dist/release-manifest.sig dist/release-manifest.json
+          base64 -w 0 dist/release-manifest.sig > dist/release-manifest.sig.b64
+          rm dist/release-manifest.sig
+      - name: Publish GitHub release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          name: One Ministry ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            dist/one-ministry-*-shared-hosting.tar.gz
+            dist/release-manifest.json
+            dist/release-manifest.sig.b64

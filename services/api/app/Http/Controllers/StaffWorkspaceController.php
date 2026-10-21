@@ -30,15 +30,22 @@ class StaffWorkspaceController extends Controller
     public function overview(Request $request): View
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
+        $modules = app(\App\Services\ModuleAvailability::class);
+        $visibleModules = [
+            'people' => $modules->visibleToStaff('people', $request->user()),
+            'digital_church' => $modules->visibleToStaff('digital_church', $request->user()),
+            'groups' => $modules->visibleToStaff('groups', $request->user()),
+        ];
 
         return view('staff.overview', [
             'settings' => $settings,
             'user' => $request->user(),
+            'visibleModules' => $visibleModules,
             'metrics' => [
-                'people' => DB::table('people')->count(),
-                'activeGroups' => DB::table('groups')->where('status', 'active')->count(),
-                'openFollowUps' => DB::table('follow_up_tasks')->where('status', 'open')->count(),
-                'upcomingServices' => DB::table('service_occurrences')->whereIn('state', ['scheduled', 'rehearsing', 'live'])->count(),
+                'people' => $visibleModules['people'] ? DB::table('people')->count() : null,
+                'activeGroups' => $visibleModules['groups'] ? DB::table('groups')->where('status', 'active')->count() : null,
+                'openFollowUps' => $visibleModules['people'] ? DB::table('follow_up_tasks')->where('status', 'open')->count() : null,
+                'upcomingServices' => $visibleModules['digital_church'] ? DB::table('service_occurrences')->whereIn('state', ['scheduled', 'rehearsing', 'live'])->count() : null,
             ],
         ]);
     }
@@ -72,6 +79,7 @@ class StaffWorkspaceController extends Controller
     public function services(Request $request): View
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
+        $interactiveMeetingsEnabled = FeatureSetting::query()->where(['key' => 'interactive_meetings', 'state' => 'enabled'])->exists();
         $recurringServices = DB::table('service_schedules')
             ->leftJoin('locations', 'locations.id', '=', 'service_schedules.location_id')
             ->select('service_schedules.*', 'locations.name as location_name')
@@ -106,7 +114,7 @@ class StaffWorkspaceController extends Controller
 
         $locations = DB::table('locations')->where('is_public', true)->orderBy('name')->get(['id', 'name']);
 
-        return view('staff.services', compact('settings', 'recurringServices', 'oneTimeServices', 'locations') + ['user' => $request->user()]);
+        return view('staff.services', compact('settings', 'recurringServices', 'oneTimeServices', 'locations', 'interactiveMeetingsEnabled') + ['user' => $request->user()]);
     }
 
     public function serviceDesk(Request $request, ServiceOccurrence $service): View
@@ -115,6 +123,7 @@ class StaffWorkspaceController extends Controller
         $session = DB::table('live_sessions')->where('service_occurrence_id', $service->id)->first();
         $meeting = DB::table('meetings')->where('service_occurrence_id', $service->id)->first();
         $zoomReady = app(ZoomVideoSdkSettingsService::class)->ready();
+        $interactiveMeetingsEnabled = FeatureSetting::query()->where(['key' => 'interactive_meetings', 'state' => 'enabled'])->exists();
         $events = $session ? DB::table('live_stream_events')->where('live_session_id', $session->id)->latest('created_at')->limit(20)->get() : collect();
         $playbackConfigUrl = match ($session?->provider) {
             'youtube' => $session?->provider_stream_id ? 'https://www.youtube.com/watch?v='.$session->provider_stream_id : null,
@@ -131,11 +140,15 @@ class StaffWorkspaceController extends Controller
             default => [],
         };
 
-        return view('staff.service-desk', compact('settings', 'service', 'session', 'meeting', 'zoomReady', 'events', 'playbackConfigUrl', 'nextStates') + ['user' => $request->user()]);
+        return view('staff.service-desk', compact('settings', 'service', 'session', 'meeting', 'zoomReady', 'interactiveMeetingsEnabled', 'events', 'playbackConfigUrl', 'nextStates') + ['user' => $request->user()]);
     }
 
     public function createServiceMeeting(Request $request, ServiceOccurrence $service): RedirectResponse
     {
+        if (! FeatureSetting::query()->where(['key' => 'interactive_meetings', 'state' => 'enabled'])->exists()) {
+            return to_route('staff.services.show', $service)->with('status', 'Enable the Interactive Meetings module before creating a Zoom room.');
+        }
+
         if (! app(ZoomVideoSdkSettingsService::class)->ready()) {
             return to_route('staff.settings')->with('status', 'Configure and activate Zoom Video SDK before creating an interactive service room.');
         }
@@ -177,6 +190,9 @@ class StaffWorkspaceController extends Controller
     public function updateServiceExperience(Request $request, ServiceOccurrence $service): RedirectResponse
     {
         $data = $request->validate(['service_type' => ['required', Rule::in(['broadcast', 'meeting', 'hybrid', 'in_person'])]]);
+        if (in_array($data['service_type'], ['meeting', 'hybrid'], true) && ! FeatureSetting::query()->where(['key' => 'interactive_meetings', 'state' => 'enabled'])->exists()) {
+            return to_route('staff.services.show', $service)->with('status', 'Enable the Interactive Meetings module before selecting a Zoom room experience.');
+        }
         $before = $service->service_type;
         $service->update($data);
         DB::table('audit_events')->insert([
@@ -307,9 +323,13 @@ class StaffWorkspaceController extends Controller
 
     public function storeService(Request $request): RedirectResponse
     {
+        $serviceTypes = ['broadcast', 'in_person'];
+        if (FeatureSetting::query()->where(['key' => 'interactive_meetings', 'state' => 'enabled'])->exists()) {
+            $serviceTypes = ['broadcast', 'meeting', 'hybrid', 'in_person'];
+        }
         $data = $request->validate([
             'schedule_kind' => ['required', Rule::in(['one_time', 'weekly'])], 'title' => ['required', 'string', 'max:160'],
-            'service_type' => ['required', Rule::in(['broadcast', 'meeting', 'in_person', 'hybrid'])], 'timezone' => ['required', 'timezone'],
+            'service_type' => ['required', Rule::in($serviceTypes)], 'timezone' => ['required', 'timezone'],
             'location_id' => ['nullable', 'uuid', 'exists:locations,id'], 'starts_at' => ['required_if:schedule_kind,one_time', 'nullable', 'date'],
             'ends_at' => ['nullable', 'date', 'after:starts_at'], 'starts_on' => ['required_if:schedule_kind,weekly', 'nullable', 'date'],
             'weekday' => ['required_if:schedule_kind,weekly', 'nullable', 'integer', 'between:0,6'], 'starts_at_local' => ['required_if:schedule_kind,weekly', 'nullable', 'date_format:H:i'],
@@ -342,9 +362,13 @@ class StaffWorkspaceController extends Controller
         $existing = DB::table('service_schedules')->where('id', $schedule)->first();
         abort_unless($existing, 404);
 
+        $serviceTypes = ['broadcast', 'in_person'];
+        if (FeatureSetting::query()->where(['key' => 'interactive_meetings', 'state' => 'enabled'])->exists()) {
+            $serviceTypes = ['broadcast', 'meeting', 'hybrid', 'in_person'];
+        }
         $data = $request->validate([
             'title' => ['required', 'string', 'max:160'],
-            'service_type' => ['required', Rule::in(['broadcast', 'meeting', 'in_person', 'hybrid'])],
+            'service_type' => ['required', Rule::in($serviceTypes)],
             'timezone' => ['required', 'timezone'],
             'location_id' => ['nullable', 'uuid', 'exists:locations,id'],
             'starts_on' => ['required', 'date'],
@@ -395,7 +419,12 @@ class StaffWorkspaceController extends Controller
     public function content(Request $request): View
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
-        $assets = DB::table('media_assets')->orderByDesc('created_at')->paginate(15);
+        $modules = app(\App\Services\ModuleAvailability::class);
+        $availableLibraries = array_values(array_filter(
+            ['books_library', 'audio_sermons', 'video_sermons', 'sermon_series'],
+            fn (string $key): bool => $modules->visibleToStaff($key, $request->user())
+        ));
+        $assets = DB::table('media_assets')->whereIn('library', $availableLibraries)->orderByDesc('created_at')->paginate(15);
 
         return view('staff.content', compact('settings', 'assets') + ['user' => $request->user()]);
     }
@@ -422,12 +451,20 @@ class StaffWorkspaceController extends Controller
     public function reports(Request $request): View
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
-        $metrics = [
-            ['label' => 'Identified attendance', 'value' => DB::table('attendance_records')->where('status', 'present')->count(), 'detail' => 'Confirmed records only'],
-            ['label' => 'Anonymous viewer buckets', 'value' => DB::table('anonymous_viewer_aggregates')->sum('viewer_count'), 'detail' => 'Kept separate from attendance'],
-            ['label' => 'Open follow-ups', 'value' => DB::table('follow_up_tasks')->where('status', '!=', 'completed')->count(), 'detail' => 'Awaiting a response'],
-            ['label' => 'Active groups', 'value' => DB::table('groups')->where('status', 'active')->count(), 'detail' => 'Current community groups'],
-        ];
+        $modules = app(\App\Services\ModuleAvailability::class);
+        $metrics = [];
+        if ($modules->visibleToStaff('people', $request->user())) {
+            $metrics[] = ['label' => 'Open follow-ups', 'value' => DB::table('follow_up_tasks')->where('status', '!=', 'completed')->count(), 'detail' => 'Awaiting a response'];
+        }
+        if ($modules->visibleToStaff('digital_church', $request->user())) {
+            array_unshift($metrics,
+                ['label' => 'Identified attendance', 'value' => DB::table('attendance_records')->where('status', 'present')->count(), 'detail' => 'Confirmed records only'],
+                ['label' => 'Anonymous viewer buckets', 'value' => DB::table('anonymous_viewer_aggregates')->sum('viewer_count'), 'detail' => 'Kept separate from attendance']
+            );
+        }
+        if ($modules->visibleToStaff('groups', $request->user())) {
+            $metrics[] = ['label' => 'Active groups', 'value' => DB::table('groups')->where('status', 'active')->count(), 'detail' => 'Current community groups'];
+        }
 
         return view('staff.reports', compact('settings', 'metrics') + ['user' => $request->user()]);
     }
@@ -580,6 +617,12 @@ class StaffWorkspaceController extends Controller
             'favicon' => ['nullable', 'file', 'mimes:ico,png', 'max:512'],
             'primary_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'accent_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'light_canvas_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'light_surface_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'light_sidebar_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'dark_canvas_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'dark_surface_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'dark_sidebar_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'staff_font' => ['required', Rule::in(['modern', 'editorial', 'humanist'])],
             'staff_sidebar' => ['required', Rule::in(['deep', 'brand', 'light'])],
             'staff_density' => ['required', Rule::in(['comfortable', 'compact'])],

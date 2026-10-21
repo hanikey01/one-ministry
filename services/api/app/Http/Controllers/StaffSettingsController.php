@@ -23,6 +23,12 @@ class StaffSettingsController extends Controller
             'contact_email' => ['sometimes', 'nullable', 'email', 'max:254'],
             'primary_color' => ['sometimes', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'accent_color' => ['sometimes', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'light_canvas_color' => ['sometimes', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'light_surface_color' => ['sometimes', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'light_sidebar_color' => ['sometimes', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'dark_canvas_color' => ['sometimes', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'dark_surface_color' => ['sometimes', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'dark_sidebar_color' => ['sometimes', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'staff_font' => ['sometimes', Rule::in(['modern', 'editorial', 'humanist'])],
             'staff_sidebar' => ['sometimes', Rule::in(['deep', 'brand', 'light'])],
             'staff_density' => ['sometimes', Rule::in(['comfortable', 'compact'])],
@@ -35,6 +41,6 @@ class StaffSettingsController extends Controller
 
     private function publicFields(MinistrySetting $setting): array
     {
-        return $setting->only(['name', 'tagline', 'contact_email', 'primary_color', 'accent_color', 'staff_font', 'staff_sidebar', 'staff_density']);
+        return $setting->only(['name', 'tagline', 'contact_email', 'primary_color', 'accent_color', 'light_canvas_color', 'light_surface_color', 'light_sidebar_color', 'dark_canvas_color', 'dark_surface_color', 'dark_sidebar_color', 'staff_font', 'staff_sidebar', 'staff_density']);
     }
 }

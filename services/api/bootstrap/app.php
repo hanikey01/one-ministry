@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureMfa;
+use App\Http\Middleware\EnsureModuleAvailable;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsureVerifiedEmail;
 use Illuminate\Foundation\Application;
@@ -16,6 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias(['permission' => EnsurePermission::class, 'mfa' => EnsureMfa::class, 'verified_email' => EnsureVerifiedEmail::class]);
+        $middleware->appendToGroup('web', EnsureModuleAvailable::class);
+        $middleware->appendToGroup('api', EnsureModuleAvailable::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

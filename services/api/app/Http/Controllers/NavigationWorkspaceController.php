@@ -4,19 +4,31 @@ namespace App\Http\Controllers;
 
 use App\Models\FeatureSetting;
 use App\Models\MinistrySetting;
+use App\Services\NavigationLayout;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class NavigationWorkspaceController extends Controller
 {
-    private const ICONS = ['home', 'worship', 'calendar', 'groups', 'people', 'services', 'content', 'giving', 'location', 'message', 'volunteer', 'external'];
+    private const ICONS = NavigationLayout::ICONS;
 
-    public function index(Request $request): View
+    public function index(Request $request, NavigationLayout $layout): View
     {
+        $layouts = [];
+        foreach (NavigationLayout::SURFACES as $surface) {
+            $saved = DB::table('navigation_layouts')->where('surface', $surface)->first();
+            $layouts[$surface] = [
+                'sidebar' => $saved ? json_decode($saved->sidebar_items, true) : $layout->defaultsFor($surface, 'sidebar'),
+                'mobile' => $saved ? json_decode($saved->mobile_items, true) : $layout->defaultsFor($surface, 'mobile'),
+            ];
+        }
+
         return view('staff.navigation', [
             'settings' => MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID),
             'user' => $request->user(),
@@ -25,18 +37,131 @@ class NavigationWorkspaceController extends Controller
             'features' => FeatureSetting::query()->pluck('key')->all(),
             'icons' => self::ICONS,
             'destinations' => $this->destinations(),
+            'menuLayouts' => $layouts,
+            'menuOptions' => collect(NavigationLayout::SURFACES)->mapWithKeys(fn (string $surface): array => [$surface => $layout->options($surface)])->all(),
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function saveLayouts(Request $request, NavigationLayout $layout): RedirectResponse
+    {
+        $rules = ['menus' => ['required', 'array:staff,member']];
+        foreach (NavigationLayout::SURFACES as $surface) {
+            $rules["menus.{$surface}"] = ['required', 'array:sidebar,mobile'];
+            foreach (['sidebar', 'mobile'] as $slot) {
+                $rules["menus.{$surface}.{$slot}"] = ['required', 'array', 'min:1', 'max:24'];
+                $rules["menus.{$surface}.{$slot}.*"] = ['required', 'string', 'max:255'];
+            }
+        }
+        $rules['icons'] = ['nullable', 'array'];
+        $rules['positions'] = ['nullable', 'array'];
+        $rules['groups'] = ['sometimes', 'array'];
+        foreach (NavigationLayout::SURFACES as $surface) {
+            $rules["groups.{$surface}.sidebar"] = ['sometimes', 'array'];
+            $rules["groups.{$surface}.sidebar.*"] = ['sometimes', 'string', 'max:60'];
+        }
+        $validated = $request->validate($rules);
+        $menuData = [];
+
+        foreach (NavigationLayout::SURFACES as $surface) {
+            $options = $layout->options($surface);
+            foreach (['sidebar', 'mobile'] as $slot) {
+                $keys = array_values(array_unique($validated['menus'][$surface][$slot]));
+                $maxItems = $slot === 'mobile' ? 5 : 24;
+                if (count($keys) > $maxItems) {
+                    throw ValidationException::withMessages(['menus' => $slot === 'mobile' ? 'A mobile footer can contain up to five destinations.' : 'A sidebar can contain up to 24 destinations.']);
+                }
+                $items = [];
+                foreach ($keys as $key) {
+                    if (! isset($options[$key])) {
+                        throw ValidationException::withMessages(['menus' => 'Choose a valid destination for each menu.']);
+                    }
+                    $fieldKey = str_replace([':', '.'], '_', $key);
+                    $icon = data_get($request->input('icons', []), "{$surface}.{$slot}.{$fieldKey}", $options[$key]['icon']);
+                    if (! in_array($icon, self::ICONS, true)) {
+                        throw ValidationException::withMessages(['menus' => 'Choose an available menu icon.']);
+                    }
+                    $position = data_get($request->input('positions', []), "{$surface}.{$slot}.{$fieldKey}", count($items) + 1);
+                    if (! is_numeric($position) || (int) $position < 1 || (int) $position > $maxItems) {
+                        throw ValidationException::withMessages(['menus' => 'Menu order must be within the available range.']);
+                    }
+                    $section = $slot === 'sidebar'
+                        ? data_get($validated, "groups.{$surface}.sidebar.{$fieldKey}", $options[$key]['group'])
+                        : null;
+                    $allowedSections = array_values(array_unique(array_column($options, 'group')));
+                    if ($slot === 'sidebar' && ! in_array($section, $allowedSections, true)) {
+                        throw ValidationException::withMessages(['menus' => 'Choose an available sidebar section.']);
+                    }
+                    $items[] = [
+                        'key' => $key,
+                        'icon' => $icon,
+                        'position' => (int) $position,
+                        'group' => $section,
+                    ];
+                }
+                $positions = array_column($items, 'position');
+                if (count($positions) !== count(array_unique($positions))) {
+                    throw ValidationException::withMessages(['menus' => 'Each destination needs a different order number.']);
+                }
+                usort($items, fn (array $a, array $b): int => $a['position'] <=> $b['position']);
+                $menuData[$surface][$slot] = array_map(fn (array $item): array => array_filter([
+                    'key' => $item['key'],
+                    'icon' => $item['icon'],
+                    'group' => $item['group'],
+                ], fn ($value): bool => $value !== null), $items);
+            }
+        }
+
+        DB::transaction(function () use ($menuData, $request): void {
+            foreach ($menuData as $surface => $layout) {
+                $values = [
+                        'sidebar_items' => json_encode($layout['sidebar']),
+                        'mobile_items' => json_encode($layout['mobile']),
+                        'updated_by_user_id' => $request->user()->id,
+                        'updated_at' => now(),
+                    ];
+                if (! DB::table('navigation_layouts')->where('surface', $surface)->exists()) {
+                    $values['created_at'] = now();
+                }
+                DB::table('navigation_layouts')->updateOrInsert(['surface' => $surface], $values);
+                $this->audit($request, 'navigation.layout_updated', MinistrySetting::SINGLETON_ID, ['surface' => $surface, 'sidebar' => $layout['sidebar'], 'mobile' => $layout['mobile']], 'navigation_layouts');
+            }
+        });
+
+        return to_route('staff.navigation')->with('status', 'Sidebar and mobile menu choices saved.');
+    }
+
+    public function store(Request $request): RedirectResponse|JsonResponse
     {
         $data = $this->data($request);
         $id = (string) Str::uuid();
-        DB::transaction(function () use ($data, $id, $request): void {
-            $position = (int) DB::table('navigation_items')->where('parent_id', $data['parent_id'])->max('position') + 1;
+        $position = 0;
+        DB::transaction(function () use ($data, $id, $request, &$position): void {
+            $parentId = $data['parent_id'] ?? null;
+            $positionQuery = DB::table('navigation_items');
+            if ($parentId === null) {
+                $positionQuery->whereNull('parent_id');
+            } else {
+                $positionQuery->where('parent_id', $parentId);
+            }
+            $position = (int) $positionQuery->max('position') + 1;
             DB::table('navigation_items')->insert([...$data, 'id' => $id, 'position' => $position, 'created_at' => now(), 'updated_at' => now()]);
             $this->audit($request, 'navigation.item_created', $id, ['label' => $data['label']]);
         });
+
+        if ($request->expectsJson()) {
+            $item = (object) [...$data, 'id' => $id, 'position' => $position];
+
+            return response()->json([
+                'message' => 'Navigation link added.',
+                'html' => view('staff.navigation-item', [
+                    'item' => $item,
+                    'icons' => self::ICONS,
+                    'items' => DB::table('navigation_items')->orderBy('parent_id')->orderBy('position')->get(),
+                    'features' => FeatureSetting::query()->pluck('key')->all(),
+                ])->render(),
+            ], 201);
+        }
+
         return back()->with('status', 'Navigation link added.');
     }
 
@@ -71,22 +196,22 @@ class NavigationWorkspaceController extends Controller
         return back()->with('status', 'Navigation order saved.');
     }
 
-    /** @return array<int, array{label: string, url: string, icon: string, group: string}> */
+    /** @return array<int, array{label: string, url: string, icon: string, group: string, required_feature: ?string}> */
     private function destinations(): array
     {
         $core = [
-            ['label' => 'Home', 'url' => '/', 'icon' => 'home', 'group' => 'Public pages'],
-            ['label' => 'Events', 'url' => '/events', 'icon' => 'calendar', 'group' => 'Public pages'],
-            ['label' => 'Locations', 'url' => '/locations', 'icon' => 'location', 'group' => 'Public pages'],
-            ['label' => 'Groups', 'url' => '/groups', 'icon' => 'groups', 'group' => 'Public pages'],
-            ['label' => 'Member dashboard', 'url' => '/member', 'icon' => 'people', 'group' => 'Member area'],
-            ['label' => 'My events', 'url' => '/member/events', 'icon' => 'calendar', 'group' => 'Member area'],
-            ['label' => 'My groups', 'url' => '/member/groups', 'icon' => 'groups', 'group' => 'Member area'],
-            ['label' => 'My serving', 'url' => '/member/serving', 'icon' => 'volunteer', 'group' => 'Member area'],
-            ['label' => 'Prayer', 'url' => '/member/prayer', 'icon' => 'care', 'group' => 'Member area'],
-            ['label' => 'My profile', 'url' => '/member/profile', 'icon' => 'settings', 'group' => 'Member area'],
+            ['label' => 'Home', 'url' => '/', 'icon' => 'home', 'group' => 'Public pages', 'required_feature' => null],
+            ['label' => 'Events', 'url' => '/events', 'icon' => 'calendar', 'group' => 'Public pages', 'required_feature' => null],
+            ['label' => 'Locations', 'url' => '/locations', 'icon' => 'location', 'group' => 'Public pages', 'required_feature' => null],
+            ['label' => 'Groups', 'url' => '/groups', 'icon' => 'groups', 'group' => 'Public pages', 'required_feature' => 'groups'],
+            ['label' => 'Member dashboard', 'url' => '/member', 'icon' => 'people', 'group' => 'Member area', 'required_feature' => null],
+            ['label' => 'My events', 'url' => '/member/events', 'icon' => 'calendar', 'group' => 'Member area', 'required_feature' => null],
+            ['label' => 'My groups', 'url' => '/member/groups', 'icon' => 'groups', 'group' => 'Member area', 'required_feature' => 'groups'],
+            ['label' => 'My serving', 'url' => '/member/serving', 'icon' => 'volunteer', 'group' => 'Member area', 'required_feature' => null],
+            ['label' => 'Prayer', 'url' => '/member/prayer', 'icon' => 'care', 'group' => 'Member area', 'required_feature' => null],
+            ['label' => 'My profile', 'url' => '/member/profile', 'icon' => 'settings', 'group' => 'Member area', 'required_feature' => null],
         ];
-        $pages = DB::table('pages')->where('status', 'published')->orderBy('title')->get()->map(fn (object $page): array => ['label' => $page->title, 'url' => '/pages/'.$page->slug, 'icon' => 'content', 'group' => 'Published pages'])->all();
+        $pages = DB::table('pages')->where('status', 'published')->orderBy('title')->get()->map(fn (object $page): array => ['label' => $page->title, 'url' => '/pages/'.$page->slug, 'icon' => 'content', 'group' => 'Published pages', 'required_feature' => null])->all();
 
         return [...$core, ...$pages];
     }
@@ -96,11 +221,11 @@ class NavigationWorkspaceController extends Controller
         $data = $request->validate(['label' => ['required', 'string', 'max:80'], 'url' => ['required', 'string', 'max:1200'], 'icon' => ['nullable', Rule::in(self::ICONS)], 'parent_id' => ['nullable', 'uuid', Rule::exists('navigation_items', 'id')->where(fn ($query) => $item ? $query->where('id', '!=', $item) : $query)], 'required_feature' => ['nullable', 'string', 'max:80', Rule::exists('feature_settings', 'key')]]);
         $url = trim($data['url']);
         abort_unless(str_starts_with($url, '/') || filter_var($url, FILTER_VALIDATE_URL), 422, 'Enter an internal path beginning with / or a valid URL.');
-        return [...$data, 'url' => $url, 'visible_desktop' => $request->boolean('visible_desktop'), 'visible_mobile' => $request->boolean('visible_mobile'), 'open_new_tab' => $request->boolean('open_new_tab')];
+        return [...$data, 'url' => $url, 'parent_id' => $data['parent_id'] ?? null, 'visible_desktop' => $request->boolean('visible_desktop'), 'visible_mobile' => $request->boolean('visible_mobile'), 'open_new_tab' => $request->boolean('open_new_tab')];
     }
 
-    private function audit(Request $request, string $action, string $subject, array $changes): void
+    private function audit(Request $request, string $action, string $subject, array $changes, string $subjectType = 'navigation_items'): void
     {
-        DB::table('audit_events')->insert(['id' => (string) Str::uuid(), 'actor_user_id' => $request->user()->id, 'action' => $action, 'subject_type' => 'navigation_items', 'subject_id' => $subject, 'changes_json' => json_encode($changes), 'ip_address' => $request->ip(), 'created_at' => now()]);
+        DB::table('audit_events')->insert(['id' => (string) Str::uuid(), 'actor_user_id' => $request->user()->id, 'action' => $action, 'subject_type' => $subjectType, 'subject_id' => $subject, 'changes_json' => json_encode($changes), 'ip_address' => $request->ip(), 'created_at' => now()]);
     }
 }

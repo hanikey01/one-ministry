@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\FeatureSetting;
 use App\Models\Location;
 use App\Models\MinistrySetting;
+use App\Support\MinistryTheme;
 use Illuminate\Http\JsonResponse;
 
 class PublicSiteController extends Controller
@@ -40,10 +41,7 @@ class PublicSiteController extends Controller
             'public_domain' => $settings->public_domain,
             'contact_email' => $settings->contact_email,
             'timezone' => $settings->timezone,
-            'colors' => [
-                'primary' => $settings->primary_color,
-                'accent' => $settings->accent_color,
-            ],
+            'colors' => MinistryTheme::colors($settings),
             'locations' => $locations,
             'features' => $features,
         ]]);
