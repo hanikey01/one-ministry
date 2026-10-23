@@ -16,7 +16,7 @@
 
 | Method/path | Purpose | Access |
 | --- | --- | --- |
-| `GET /public/site` | Branding, primary/accent and light/dark canvas/surface/sidebar colors with derived readable foregrounds, navigation, enabled public modules, service time zone | Public |
+| `GET /public/site` | Branding, selected platform theme preset, resolved light/dark semantic tokens, the shared chrome treatment with derived readable foreground, navigation, enabled public modules, service time zone | Public |
 | `GET /public/home` | Resolved homepage sections and lead-state payload | Public |
 | `GET /public/pages/{slug}` | Published page | Public |
 | `GET /public/content` / `GET /public/content/{slug}` | Search/list and read published content | Public |
@@ -29,7 +29,7 @@
 
 Public library items expose an explicit `delivery` value (`download`, `youtube`, or `null`) and a `youtube_id` only for YouTube delivery. Uploaded assets are accessed only through the authorized download route. Public payloads never include storage disk names, storage paths, or raw provider keys.
 
-Authenticated staff settings accept controlled `staff_font`, `staff_sidebar`, and `staff_density` values alongside ministry colours. Invalid appearance keys return `422`; settings changes use the existing audited ministry-settings action. These staff presentation choices are never interpreted as permissions and do not alter public module availability.
+Authenticated staff settings accept controlled `theme_preset`, `chrome_mode`, optional `chrome_color`, `staff_font`, and `staff_density` values. Invalid appearance keys return `422`; settings changes use the existing audited ministry-settings action. The application resolves shared interface tokens from the selected preset; ministries cannot customize page, form, button, or dashboard colors. These presentation choices are never interpreted as permissions and do not alter public module availability.
 
 `GET /public/home` returns `lead_state` (`carousel`, `upcoming`, `live`, `interrupted`), `service_occurrence_id` when applicable, server time, optional countdown target, approved carousel items, and a public playback descriptor only when stream health permits. Clients do not invent the live state from schedule alone.
 
@@ -49,7 +49,7 @@ Response when configured:
     "public_domain": "example.org",
     "contact_email": "hello@example.org",
     "timezone": "Africa/Lagos",
-    "colors": { "primary": "#343A40", "accent": "#697386", "primary_foreground": "#FFFFFF", "accent_foreground": "#FFFFFF", "primary_text_light": "#343A40", "primary_text_dark": "#8B8E92", "light": { "canvas": "#F7F7F8", "surface": "#FFFFFF", "sidebar": "#24262A", "canvas_foreground": "#111111", "surface_foreground": "#111111", "sidebar_foreground": "#FFFFFF" }, "dark": { "canvas": "#121315", "surface": "#1C1D20", "sidebar": "#0B0C0E", "canvas_foreground": "#FFFFFF", "surface_foreground": "#FFFFFF", "sidebar_foreground": "#FFFFFF" } },
+    "theme": { "preset": "neutral", "chrome_mode": "preset", "chrome_color": "#24262A", "chrome_foreground": "#FFFFFF", "light": { "canvas": "#F7F7F8", "surface": "#FFFFFF", "ink": "#202124", "muted": "#656A73", "line": "#DFE1E5" }, "dark": { "canvas": "#121315", "surface": "#1B1C1F", "ink": "#F4F4F5", "muted": "#B1B4BC", "line": "#37393E" } },
     "locations": [
       { "id": "uuid", "name": "Main Campus", "slug": "main-campus", "timezone": "Africa/Lagos", "address": null, "is_primary": true }
     ],

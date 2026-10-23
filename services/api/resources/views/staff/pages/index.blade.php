@@ -1,4 +1,4 @@
-<x-layouts.workspace title="Pages" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color" :user-name="$user->name" user-role="Staff workspace">
+<x-layouts.workspace title="Pages" :ministry-name="$settings->name" :user-name="$user->name" user-role="Staff workspace">
     <x-slot:navigation></x-slot:navigation>
     <header class="workspace-page-heading staff-page-command"><div><p>PUBLIC SITE</p><h1>Pages</h1><span>Create clear, useful ministry information pages. Drafts stay private until a publisher reviews them.</span></div><div class="page-command-actions"><a class="button" href="{{ route('staff.pages.create') }}"><x-ui.icon name="add" :size="16"/> New page</a></div></header>
     @if(session('status'))<div class="workspace-notice workspace-notice-success" role="status">{{ session('status') }}</div>@endif

@@ -1,4 +1,4 @@
-<x-layouts.workspace :title="$department->name" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color" :user-name="$user->name" user-role="Staff workspace">
+<x-layouts.workspace :title="$department->name" :ministry-name="$settings->name" :user-name="$user->name" user-role="Staff workspace">
     <x-slot:navigation></x-slot:navigation>
     <header class="workspace-page-heading staff-page-command"><div><p>DEPARTMENT TEAM</p><h1>{{ $department->name }}</h1><span>{{ $department->description ?: 'Build and manage this ministry team.' }}</span></div><a class="button button-quiet" href="{{ route('staff.departments') }}">All departments</a></header>
     @if(session('status'))<div class="workspace-notice workspace-notice-success" role="status">{{ session('status') }}</div>@endif

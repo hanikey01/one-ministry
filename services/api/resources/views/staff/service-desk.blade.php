@@ -1,4 +1,4 @@
-<x-layouts.workspace :title="$service->title" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color" :user-name="$user->name" user-role="Service producer">
+<x-layouts.workspace :title="$service->title" :ministry-name="$settings->name" :user-name="$user->name" user-role="Service producer">
     <header class="workspace-page-heading producer-heading">
         <p>PRODUCER DESK</p>
         <h1>{{ $service->title }}</h1>

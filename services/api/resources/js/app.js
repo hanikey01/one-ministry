@@ -106,20 +106,6 @@ const initializePage = (force = false) => {
     }
 
 
-document.querySelectorAll('[data-sidebar-colour-setting]').forEach((setting) => {
-    const panel = setting.parentElement.querySelector('[data-sidebar-colour-fields]');
-    if (!panel) return;
-
-    const syncSidebarFields = () => {
-        const isCustom = setting.querySelector('input[name="staff_sidebar"]:checked')?.value === 'deep';
-        panel.dataset.expanded = String(isCustom);
-        panel.setAttribute('aria-hidden', String(!isCustom));
-        panel.inert = !isCustom;
-    };
-
-    setting.addEventListener('change', syncSidebarFields);
-});
-
 document.querySelectorAll('[data-zoom-meeting]').forEach((room) => {
     const joinButton = room.querySelector('[data-zoom-join]');
     const status = room.querySelector('[data-zoom-status]');
@@ -474,20 +460,23 @@ if (setupWizard) {
     const validation = setupWizard.querySelector('[data-setup-validation]');
     let current = 0;
 
+    const setupPresets = {
+        neutral: { action: '#343A40', chrome: '#24262A' },
+        slate: { action: '#315B96', chrome: '#1D2A3D' },
+        warm: { action: '#6B5140', chrome: '#332A23' },
+    };
+
     const updatePreview = () => {
         const name = form.querySelector('[name="name"]')?.value.trim();
-        const primary = form.querySelector('[data-setup-colour="primary"]')?.value ?? '#343A40';
-        const accent = form.querySelector('[data-setup-colour="accent"]')?.value ?? '#697386';
-        setupWizard.style.setProperty('--brand', primary);
-        setupWizard.style.setProperty('--accent', accent);
+        const presetKey = form.querySelector('[name="theme_preset"]:checked')?.value ?? 'neutral';
+        const preset = setupPresets[presetKey] ?? setupPresets.neutral;
+        setupWizard.style.setProperty('--brand', preset.action);
+        setupWizard.style.setProperty('--accent', preset.action);
+        setupWizard.style.setProperty('--sidebar', preset.chrome);
         const previewName = setupWizard.querySelector('[data-setup-preview-name]');
         const previewMark = setupWizard.querySelector('[data-setup-preview-mark]');
         if (previewName) previewName.textContent = name || 'Your ministry';
         if (previewMark) previewMark.textContent = (name || 'M').slice(0, 1).toUpperCase();
-        const primaryValue = setupWizard.querySelector('[data-setup-primary-value]');
-        const accentValue = setupWizard.querySelector('[data-setup-accent-value]');
-        if (primaryValue) primaryValue.textContent = primary.toUpperCase();
-        if (accentValue) accentValue.textContent = accent.toUpperCase();
     };
 
     const showStep = (index) => {
@@ -522,7 +511,7 @@ if (setupWizard) {
     next?.addEventListener('click', () => { if (validateStep()) showStep(current + 1); });
     back?.addEventListener('click', () => showStep(current - 1));
     form?.addEventListener('submit', (event) => { if (!validateStep()) event.preventDefault(); });
-    form?.querySelectorAll('[name="name"], [data-setup-colour]').forEach((field) => field.addEventListener('input', updatePreview));
+    form?.querySelectorAll('[name="name"], [name="theme_preset"]').forEach((field) => field.addEventListener('input', updatePreview));
     updatePreview();
 }
 

@@ -1,4 +1,4 @@
-<x-layouts.member :title="$title" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color" :features="$features">
+<x-layouts.member :title="$title" :ministry-name="$settings->name" :features="$features">
     @include('member.school._styles')
     <div class="learning-shell"><section class="learning-hero"><div><p class="learning-kicker">Digital school</p><h1>Grow in faith, knowledge, and service.</h1><p>Learn at your pace, join live classes, complete practical assessments, and follow a clear pathway from enrolment to completion.</p></div><div class="learning-hero-visual"><x-ui.icon name="school"/></div></section>
     @if(session('status'))<div class="member-notice is-success">{{ session('status') }}</div>@endif @if($errors->any())<div class="member-notice is-error">{{ $errors->first() }}</div>@endif

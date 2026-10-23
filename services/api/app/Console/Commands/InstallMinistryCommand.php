@@ -15,8 +15,6 @@ class InstallMinistryCommand extends Command
         {--location=Main Campus : First location name}
         {--tagline= : Public tagline}
         {--contact-email= : Public contact email}
-        {--primary-color=#343A40 : Primary brand color in hex}
-        {--accent-color=#697386 : Accent brand color in hex}
         {--admin-name= : Initial administrator name}
         {--admin-email= : Initial administrator email}';
 
@@ -37,8 +35,6 @@ class InstallMinistryCommand extends Command
             'location' => $this->option('location'),
             'tagline' => $this->option('tagline'),
             'contact_email' => $this->option('contact-email'),
-            'primary_color' => $this->option('primary-color'),
-            'accent_color' => $this->option('accent-color'),
             'admin_name' => $this->option('admin-name') ?: $this->ask('Administrator name'),
             'admin_email' => $this->option('admin-email') ?: $this->ask('Administrator email'),
             'password' => $this->secret('Administrator password (at least 12 characters)'),

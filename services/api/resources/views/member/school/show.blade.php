@@ -1,4 +1,4 @@
-<x-layouts.member :title="$course->title" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color" :features="$features">
+<x-layouts.member :title="$course->title" :ministry-name="$settings->name" :features="$features">
     @include('member.school._styles')
     <div class="learning-shell">
         <section class="learning-hero"><div><p class="learning-kicker">{{ $course->category ?: 'Digital school' }}</p><h1>{{ $course->title }}</h1><p>{{ $course->summary ?: $course->description }}</p><div class="learning-meta" style="margin-top:16px"><span class="learning-pill">{{ str($course->level)->replace('_',' ')->headline() }}</span>@if($course->instructor_name)<span class="learning-pill">With {{ $course->instructor_name }}</span>@endif @if($course->certificate_enabled)<span class="learning-pill">Certificate available</span>@endif</div></div><div class="learning-hero-visual"><x-ui.icon name="school"/></div></section>

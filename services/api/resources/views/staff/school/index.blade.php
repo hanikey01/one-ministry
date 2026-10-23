@@ -1,4 +1,4 @@
-<x-layouts.workspace :title="$title" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color" :user-name="$user->name" user-role="School manager">
+<x-layouts.workspace :title="$title" :ministry-name="$settings->name" :user-name="$user->name" user-role="School manager">
     @include('staff.school._styles')
     <div class="school-shell">
         <section class="school-hero">

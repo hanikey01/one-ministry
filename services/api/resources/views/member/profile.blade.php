@@ -1,4 +1,4 @@
-<x-layouts.member :title="$title" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color" :features="$features">
+<x-layouts.member :title="$title" :ministry-name="$settings->name" :features="$features">
     @php($birthday = $person->birthday ? \Illuminate\Support\Carbon::parse($person->birthday) : null)
     <section class="member-page-heading"><p>MY ACCOUNT</p><h1>Profile & preferences</h1><span>Manage the information and communications choices that belong to you.</span></section>
     @if(session('status'))<div class="member-notice member-notice-success" role="status"><x-ui.icon name="followup"/><span>{{ session('status') }}</span></div>@endif

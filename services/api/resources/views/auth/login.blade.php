@@ -1,4 +1,4 @@
-<x-layouts.app title="Sign in" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color">
+<x-layouts.app title="Sign in" :ministry-name="$settings->name">
     <main class="auth-shell">
         <section class="auth-intro"><a href="{{ route('public.home') }}" class="auth-brand"><span class="auth-mark">{{ mb_strtoupper(mb_substr($settings->name, 0, 1)) }}</span><strong>{{ $settings->name }}</strong></a><div class="auth-story"><p>WELCOME HOME</p><h1>A meaningful place to belong, grow, and serve.</h1><span>{{ $settings->tagline ?: 'One secure account for your ministry community and team.' }}</span></div><small>Private access · Protected by your ministry</small></section>
         <section class="auth-panel"><div class="auth-panel-inner"><a href="{{ route('public.home') }}" class="auth-mobile-brand"><span class="auth-mark">{{ mb_strtoupper(mb_substr($settings->name, 0, 1)) }}</span><strong>{{ $settings->name }}</strong></a><div><p class="auth-eyebrow">WELCOME BACK</p><h2>Sign in to your account</h2><span>Use the email address and password connected to your ministry profile.</span></div>

@@ -1,4 +1,4 @@
-<x-layouts.workspace title="AI model settings" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color" :user-name="$user->name" :user-initials="str($user->name)->explode(' ')->map(fn ($part) => str($part)->substr(0, 1))->take(2)->implode('')" user-role="Administrator">
+<x-layouts.workspace title="AI model settings" :ministry-name="$settings->name" :user-name="$user->name" :user-initials="str($user->name)->explode(' ')->map(fn ($part) => str($part)->substr(0, 1))->take(2)->implode('')" user-role="Administrator">
     <header class="workspace-page-heading staff-page-command"><div><p>ADMINISTRATION</p><h1>AI model settings</h1><span>Connect models owned by your ministry and choose the tested route for page drafting.</span></div><a class="button button-secondary" href="{{ route('staff.pages') }}">Open Pages</a></header>
     @if(session('status'))<div class="form-success" role="status">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="form-errors" role="alert">{{ $errors->first() }}</div>@endif

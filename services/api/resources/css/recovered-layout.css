@@ -1,3 +1,18 @@
+/*
+ * Recovered layout rules
+ * ----------------------
+ * This file contains styles recovered from the deleted layout override bundle.
+ * It is intentionally isolated in a named layer while each section is merged
+ * into the current semantic system. The current app.css rules remain the
+ * authority for theme tokens, buttons, fields, and ministry-owned colors.
+ *
+ * Sections: shell/theme, homepage, page renderer, staff workspace, member
+ * workspace, public site, navigation, page editor, media picker, and responsive
+ * fallbacks. Add migrated rules to app.css and remove them here once verified.
+ */
+@layer recovered-layout {
+
+/* 01 · Shared shell and theme head */
 /* Shared layout head: extracted for shared browser caching. */
 /* Final theme layer: kept with the shared shell so every rendered route gets
                the same contrast rules while the source-mounted development app is running. */
@@ -2209,3 +2224,6 @@ html body.staff-theme-dark.ministry-app .workspace-shell .workspace-content .pag
 .workspace-content .page-block-inspector .page-inspector-tabs { display: none !important; }
 .workspace-content .page-block-inspector [data-section-ai-controls] { display: grid; gap: 9px; margin-top: 12px; border-top: 1px solid var(--line); padding: 12px 0 2px; }
 .workspace-content .page-block-inspector [data-section-ai-controls][hidden] { display: grid !important; }
+
+/* End recovered layout layer. */
+}

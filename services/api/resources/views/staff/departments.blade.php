@@ -1,4 +1,4 @@
-<x-layouts.workspace :title="app(\App\Support\MinistryTerminology::class)->label('department', 'plural')" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color" :user-name="$user->name" user-role="Staff workspace">
+<x-layouts.workspace :title="app(\App\Support\MinistryTerminology::class)->label('department', 'plural')" :ministry-name="$settings->name" :user-name="$user->name" user-role="Staff workspace">
     <x-slot:navigation></x-slot:navigation>
     <header class="workspace-page-heading staff-page-command">
         <div><p>MINISTRY TEAMS</p><h1>{{ app(\App\Support\MinistryTerminology::class)->label('department', 'plural') }}</h1><span>Organize people into teams. A person may serve in more than one department.</span></div>

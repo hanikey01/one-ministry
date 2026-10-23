@@ -1,3 +1,17 @@
+/*
+ * One-Ministry style map
+ * ----------------------
+ * 1. recovered-layout.css  Restored layout rules grouped by product surface.
+ * 2. framework sources     Tailwind scan and design tokens.
+ * 3. base                  Theme variables, typography, and browser defaults.
+ * 4. components            Shared controls, cards, navigation, and notices.
+ * 5. feature sections      Staff, member, public, editor, media, and settings.
+ * 6. final semantic layer  Neutral theme and ministry-controlled chrome rules.
+ *
+ * Keep new rules in the owning section. Do not add page-specific overrides to
+ * layout templates or recreate the deleted layout-overrides.css entry point.
+ */
+@import './recovered-layout.css';
 @import 'tailwindcss';
 
 @source '../../vendor/livewire/livewire/dist/*.js';
@@ -18,6 +32,145 @@
     button, input { font: inherit; }
     button { cursor: pointer; }
     :focus-visible { outline: 3px solid color-mix(in srgb, var(--brand, #343a40) 55%, white); outline-offset: 3px; }
+}
+
+/* Shared semantic theme contract. Layouts provide these variables once through
+   MinistryTheme; pages and reusable controls consume the semantic names only. */
+@layer base {
+    .ministry-app {
+        --canvas: var(--theme-light-canvas-color);
+        --surface: var(--theme-light-surface-color);
+        --surface-raised: var(--theme-light-raised-color);
+        --ink: var(--theme-light-ink);
+        --muted: var(--theme-light-muted);
+        --line: var(--theme-light-line);
+        --line-strong: color-mix(in srgb, var(--theme-light-ink) 22%, var(--theme-light-surface-color));
+        --brand: var(--theme-action-color);
+        --accent: var(--theme-action-color);
+        --action: var(--theme-action-color);
+        --action-foreground: var(--accent-foreground);
+        --sidebar: var(--theme-chrome-color);
+        --sidebar-ink: var(--theme-chrome-foreground);
+    }
+
+    .ministry-app :is(.staff-theme-dark, .member-theme-dark, .public-theme-dark, .worship-theme-dark) {
+        --canvas: var(--theme-dark-canvas-color);
+        --surface: var(--theme-dark-surface-color);
+        --surface-raised: var(--theme-dark-raised-color);
+        --ink: var(--theme-dark-ink);
+        --muted: var(--theme-dark-muted);
+        --line: var(--theme-dark-line);
+        --line-strong: color-mix(in srgb, var(--theme-dark-ink) 26%, var(--theme-dark-surface-color));
+    }
+}
+
+@layer components {
+    /* Reusable control primitives. Feature screens can set layout only; visual
+       states stay consistent across staff, member, public, and editor views. */
+    .ministry-app :is(input:not([type='checkbox'], [type='radio'], [type='color'], [type='file'], [type='range']), select, textarea) {
+        min-height: 42px;
+        box-sizing: border-box;
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        padding: 9px 11px;
+        background: var(--surface);
+        color: var(--ink);
+        font: inherit;
+        line-height: 1.35;
+    }
+    .ministry-app textarea { min-height: 96px; resize: vertical; }
+    .ministry-app :is(input, select, textarea):focus-visible {
+        border-color: var(--action);
+        outline: 3px solid color-mix(in srgb, var(--action) 28%, transparent);
+        outline-offset: 1px;
+    }
+    .ministry-app .button {
+        display: inline-flex;
+        min-height: 42px;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        box-sizing: border-box;
+        border: 1px solid var(--action);
+        border-radius: 10px;
+        padding: 9px 14px;
+        background: var(--action);
+        color: var(--action-foreground);
+        font: inherit;
+        font-size: .76rem;
+        font-weight: 760;
+        line-height: 1;
+        text-decoration: none;
+        transition: background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+    }
+    .ministry-app .button:hover { filter: brightness(.96); }
+    .ministry-app .button:active { transform: translateY(1px); }
+    .ministry-app .button:disabled { cursor: not-allowed; opacity: .56; transform: none; }
+    .ministry-app .button-secondary, .ministry-app .button-quiet {
+        border-color: var(--line-strong);
+        background: var(--surface);
+        color: var(--ink);
+    }
+    .ministry-app .button-danger {
+        border-color: #B54742;
+        background: #B54742;
+        color: #FFFFFF;
+    }
+    .ministry-app .enhanced-select-trigger,
+    .ministry-app .enhanced-select-options {
+        border-color: var(--line-strong);
+        background: var(--surface);
+        color: var(--ink);
+    }
+    .ministry-app .enhanced-select-trigger {
+        min-height: 42px;
+        border-radius: 10px;
+        padding: 9px 11px;
+    }
+    .ministry-app .enhanced-select-options {
+        overflow: auto;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        box-shadow: 0 16px 40px rgb(0 0 0 / 16%);
+    }
+    .ministry-app .enhanced-select-options button {
+        background: transparent;
+        color: var(--ink);
+    }
+    .ministry-app .enhanced-select-options button:is(:hover, [aria-selected='true']) {
+        background: color-mix(in srgb, var(--action) 11%, var(--surface));
+        color: var(--ink);
+    }
+    .ministry-app :is(.appearance-panel, .data-panel, .workspace-dialog-card) {
+        border-color: var(--line);
+        background: var(--surface);
+        color: var(--ink);
+    }
+
+    .ministry-app :is(.workspace-topbar, .member-topbar, .worship-header) {
+        background: var(--sidebar);
+        border-color: color-mix(in srgb, var(--sidebar-ink) 16%, transparent);
+        color: var(--sidebar-ink);
+    }
+
+    .ministry-app :is(.workspace-topbar, .member-topbar, .worship-header) :is(strong, span, a, button) {
+        color: inherit;
+    }
+
+    .ministry-app :is(.workspace-mobile-nav, .member-mobile-nav) {
+        background: var(--sidebar);
+        border-color: color-mix(in srgb, var(--sidebar-ink) 20%, transparent);
+        color: var(--sidebar-ink);
+    }
+
+    .ministry-app :is(.workspace-mobile-nav, .member-mobile-nav) a {
+        color: color-mix(in srgb, var(--sidebar-ink) 74%, transparent);
+    }
+
+    .ministry-app :is(.workspace-mobile-nav, .member-mobile-nav) a[aria-current='page'] {
+        background: color-mix(in srgb, var(--sidebar-ink) 14%, transparent);
+        color: var(--sidebar-ink);
+    }
 }
 
 @layer components {
@@ -54,7 +207,7 @@
     .table-toolbar { display: flex; gap: 10px; margin-top: 28px; }.table-toolbar input { width: min(360px, 100%); min-height: 42px; border: 1px solid #dbe2dd; border-radius: 9px; padding: 0 12px; background: white; }.data-panel { margin-top: 14px; overflow: auto; border: 1px solid var(--line); border-radius: 14px; background: white; }.data-panel table { width: 100%; min-width: 640px; border-collapse: collapse; text-align: left; }.data-panel th { padding: 13px 18px; border-bottom: 1px solid var(--line); color: #77837c; font-size: .62rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }.data-panel td { padding: 17px 18px; border-bottom: 1px solid #edf0ee; color: #627068; font-size: .75rem; }.data-panel tr:last-child td { border-bottom: 0; }.data-panel td strong { color: #26352d; }.table-status { border-radius: 999px; padding: 5px 8px; background: #e8f1ec; color: #2d755e; font-size: .62rem; font-weight: 750; }.empty-cell { padding: 42px !important; text-align: center; color: #87928c !important; }.pagination-wrap { margin-top: 18px; }
     .inline-form { display: flex; align-items: center; gap: 7px; }.inline-form select { min-height: 34px; border: 1px solid #dbe2dd; border-radius: 7px; padding: 0 7px; background: white; font-size: .68rem; }.inline-form .button { padding: 7px 10px; }
     .workspace-welcome-card h2 { max-width: 650px; margin: 0; font-family: Georgia, serif; font-size: clamp(1.5rem, 3vw, 2.3rem); font-weight: 500; line-height: 1.1; }.workspace-welcome-card span { display: block; max-width: 600px; margin-top: 13px; color: #c4d0c9; font-size: .78rem; }.workspace-welcome-card .button { flex: 0 0 auto; background: var(--accent); color: #17211d; text-decoration: none; }
-    .workspace-menu, .workspace-close, .workspace-backdrop { display: none; }
+    .workspace-menu, .workspace-close, .workspace-backdrop, .workspace-mobile-nav { display: none; }
     .member-shell, .worship-shell { min-height: 100dvh; background: var(--canvas, #f7f7f8); }
     .member-header, .worship-header { display: flex; min-height: 72px; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid #e4e9e5; padding: 0 clamp(20px, 5vw, 80px); background: white; }
     .member-brand, .worship-header a { color: #1d2924; font-family: Georgia, serif; font-size: 1.1rem; font-weight: 700; text-decoration: none; }
@@ -285,7 +438,45 @@
     .workspace-close,.member-close { display: grid; width: 34px; height: 34px; margin-left: auto; place-items: center; border: 0; border-radius: 9px; background: rgb(255 255 255 / 7%); color: white; }
     .workspace-topbar,.member-topbar { min-height: 68px; padding: 0 18px; }.workspace-context span { display: none; }.workspace-top-actions { margin-left: auto; }.workspace-top-actions a:first-child span { display: none; }.workspace-top-actions a:first-child { width: 38px; box-sizing: border-box; justify-content: center; padding: 0; }
     .member-menu,.workspace-menu { display: grid; flex: 0 0 auto; place-items: center; }.member-menu { width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 11px; background: white; color: var(--ink); }
-    .workspace-content,.member-content { padding: 28px 18px 92px; }.workspace-page-heading h1 { font-size: clamp(2rem,10vw,3rem); }.metric-grid { grid-template-columns: 1fr 1fr; gap: 11px; }.metric-grid article { padding: 18px; }.metric-grid strong { font-size: 1.85rem; }
+    .workspace-content,.member-content { padding: 28px 18px calc(86px + env(safe-area-inset-bottom)); }.workspace-page-heading h1 { font-size: clamp(2rem,10vw,3rem); }.metric-grid { grid-template-columns: 1fr 1fr; gap: 11px; }.metric-grid article { padding: 18px; }.metric-grid strong { font-size: 1.85rem; }
+    .workspace-mobile-nav {
+        position: fixed;
+        z-index: 22;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        min-height: 64px;
+        box-sizing: border-box;
+        border: 0;
+        border-top: 1px solid color-mix(in srgb, var(--sidebar-ink) 20%, transparent);
+        border-radius: 0;
+        padding: 7px 6px calc(7px + env(safe-area-inset-bottom));
+        background: var(--sidebar);
+        box-shadow: 0 -10px 28px rgb(0 0 0 / 14%);
+        color: var(--sidebar-ink);
+    }
+    .workspace-mobile-nav a {
+        display: grid;
+        min-width: 0;
+        min-height: 48px;
+        align-content: center;
+        justify-items: center;
+        gap: 4px;
+        border-radius: 8px;
+        color: color-mix(in srgb, var(--sidebar-ink) 72%, transparent);
+        font-size: .54rem;
+        font-weight: 720;
+        line-height: 1.15;
+        text-align: center;
+        text-decoration: none;
+    }
+    .workspace-mobile-nav a .ui-icon { width: 18px; height: 18px; }
+    .workspace-mobile-nav a[aria-current='page'] {
+        background: color-mix(in srgb, var(--sidebar-ink) 14%, transparent);
+        color: var(--sidebar-ink);
+    }
     .member-mobile-nav { position: fixed; z-index: 22; right: 10px; bottom: 10px; left: 10px; display: grid; grid-template-columns: repeat(auto-fit,minmax(0,1fr)); border: 1px solid rgb(218 226 220 / 80%); border-radius: 18px; padding: 8px 6px calc(7px + env(safe-area-inset-bottom)); background: rgb(255 255 255 / 93%); box-shadow: 0 16px 44px rgb(17 36 26 / 18%); backdrop-filter: blur(18px); }.member-mobile-nav a { display: grid; min-width: 0; justify-items: center; gap: 3px; border: 0; background: transparent; color: #728079; font-size: .54rem; font-weight: 700; text-decoration: none; }.member-mobile-nav .ui-icon { width: 18px; height: 18px; }.member-mobile-nav a:first-child { color: var(--brand); }
     .member-grid { grid-template-columns: 1fr; }.member-welcome { min-height: 0; padding: 34px 24px; }.member-welcome h1 { font-size: 2.45rem; }
     .public-footer { grid-template-columns: 1fr 1fr; }.public-footer-brand { grid-column: 1/-1; }.public-header nav { position: absolute; top: calc(100% + 1px); right: 12px; left: 12px; width: auto; border: 1px solid var(--line); border-radius: 16px; padding: 10px 15px 16px; background: rgb(255 255 255 / 97%); box-shadow: var(--shadow-md); }.public-header nav a { padding: 12px 4px; }.public-header nav a::after { display: none; }.public-account-link { margin-top: 5px; text-align: center; }.public-menu { display: flex; }.public-brand small { display: none; }

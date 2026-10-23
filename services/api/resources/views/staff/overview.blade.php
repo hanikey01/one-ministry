@@ -1,4 +1,4 @@
-<x-layouts.workspace :title="'Overview'" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color" :user-name="$user->name" :user-initials="str($user->name)->explode(' ')->map(fn ($part) => str($part)->substr(0, 1))->take(2)->implode('')" user-role="Staff workspace">
+<x-layouts.workspace :title="'Overview'" :ministry-name="$settings->name" :user-name="$user->name" :user-initials="str($user->name)->explode(' ')->map(fn ($part) => str($part)->substr(0, 1))->take(2)->implode('')" user-role="Staff workspace">
     <x-slot:navigation>
         <a href="{{ url('/staff') }}" aria-current="page">Overview</a>
         @if($visibleModules['people'])<a href="{{ route('staff.people') }}">People</a>@endif @if($visibleModules['digital_church'])<a href="{{ route('staff.services') }}">{{ app(\App\Support\MinistryTerminology::class)->label('service', 'plural') }}</a>@endif<a href="{{ route('staff.settings') }}">Settings</a>

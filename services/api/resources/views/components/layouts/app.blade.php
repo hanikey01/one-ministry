@@ -8,8 +8,6 @@
         @php($themeSettings = \App\Models\MinistrySetting::find(\App\Models\MinistrySetting::SINGLETON_ID))
         @if($themeSettings?->favicon_path)<link rel="icon" href="{{ asset('storage/'.$themeSettings->favicon_path) }}">@endif
         @vite(['resources/css/app.css', 'resources/js/app.js'])
-        <link rel="stylesheet" href="{{ asset('css/layout-overrides.css') }}?v={{ filemtime(public_path('css/layout-overrides.css')) }}">
-        
     </head>
     <body class="ministry-app" style="{{ \App\Support\MinistryTheme::cssVariables($themeSettings) }}">
         {{ $slot }}

@@ -1,11 +1,11 @@
-<x-layouts.app :title="$title ?? null" :ministry-name="$ministryName ?? null" :primary-color="$primaryColor ?? null" :accent-color="$accentColor ?? null">
+<x-layouts.app :title="$title ?? null" :ministry-name="$ministryName ?? null">
     @php($staffAppearance = \App\Models\MinistrySetting::find(\App\Models\MinistrySetting::SINGLETON_ID))
     @php($staffPermissions = auth()->check() ? app(\App\Services\PermissionChecker::class) : null)
     @php($canManagePeople = auth()->check() && $staffPermissions?->allows(auth()->user(), 'services.manage'))
     @php($canManageCommunity = auth()->check() && $staffPermissions?->allows(auth()->user(), 'community.manage'))
     @php($surface = $surface ?? 'staff')
     @php($surfaceFeatures = $features ?? [])
-    <div class="workspace-shell staff-font-{{ $staffAppearance?->staff_font ?? 'modern' }} staff-sidebar-{{ $staffAppearance?->staff_sidebar ?? 'light' }} staff-density-{{ $staffAppearance?->staff_density ?? 'comfortable' }}" data-workspace-shell data-workspace-surface="{{ $surface }}">
+    <div class="workspace-shell staff-font-{{ $staffAppearance?->staff_font ?? 'modern' }} staff-density-{{ $staffAppearance?->staff_density ?? 'comfortable' }}" data-workspace-shell data-workspace-surface="{{ $surface }}">
         <button class="workspace-backdrop" type="button" data-workspace-close aria-label="Close navigation"></button>
         <aside class="workspace-sidebar app-sidebar" data-workspace-sidebar>
             <div class="workspace-brand">

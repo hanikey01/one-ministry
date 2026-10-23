@@ -1,4 +1,4 @@
-<x-layouts.member :title="$title" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color" :features="$features">
+<x-layouts.member :title="$title" :ministry-name="$settings->name" :features="$features">
     <header class="workspace-page-heading staff-page-command">
         <div><p>MY MINISTRY</p><h1>Welcome back, {{ $person->preferred_name ?: $person->first_name }}.</h1><span>Your upcoming moments, community, and private requests are gathered here.</span></div>
         <a class="button button-secondary" href="{{ route('member.events') }}"><x-ui.icon name="calendar" :size="16"/> View my events</a>

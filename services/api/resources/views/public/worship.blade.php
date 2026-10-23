@@ -1,4 +1,4 @@
-<x-layouts.worship :title="$service->title" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color">
+<x-layouts.worship :title="$service->title" :ministry-name="$settings->name">
     <section class="worship-room" data-service-room data-api-base="{{ url('/api/v1/public/services/'.$service->id) }}" data-live="{{ $service->state === 'live' ? 'true' : 'false' }}">
         <div class="worship-main">
             @php($interactiveOnly = $service->service_type === 'meeting')

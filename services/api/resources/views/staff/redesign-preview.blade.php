@@ -23,15 +23,15 @@
     </style>
     <style>
         body{background:var(--theme-light-canvas-color);color:var(--theme-light-ink)}
-        .sidebar{background:var(--theme-light-sidebar-color);color:var(--theme-light-sidebar-ink)}
+        .sidebar{background:var(--theme-chrome-color);color:var(--theme-chrome-foreground)}
         .brand-mark,.nav .badge{background:var(--accent);color:var(--accent-foreground)}
-        .brand strong,.nav a.active,.nav a:hover{color:var(--theme-light-sidebar-ink)}
-        .nav a.active{background:color-mix(in srgb,var(--brand) 30%,var(--theme-light-sidebar-color));box-shadow:inset 2px 0 var(--accent)}
+        .brand strong,.nav a.active,.nav a:hover{color:var(--theme-chrome-foreground)}
+        .nav a.active{background:color-mix(in srgb,var(--brand) 30%,var(--theme-chrome-color));box-shadow:inset 2px 0 var(--accent)}
         .topbar,.metric,.panel,.section-card{background:var(--theme-light-surface-color);color:var(--theme-light-surface-ink)}
         .add,.primary-action{background:var(--brand);color:var(--brand-foreground)}
     </style>
 </head>
-<body style="{{ \App\Support\MinistryTheme::cssVariables($themeSettings) }};--brand:var(--theme-primary-color);--accent:var(--theme-accent-color);--brand-foreground:{{ \App\Support\MinistryTheme::colors($themeSettings)['primary_foreground'] }};--accent-foreground:{{ \App\Support\MinistryTheme::colors($themeSettings)['accent_foreground'] }}">
+<body style="{{ \App\Support\MinistryTheme::cssVariables($themeSettings) }};--brand:var(--theme-action-color);--accent:var(--theme-action-color);--brand-foreground:var(--action-foreground);--accent-foreground:var(--action-foreground)">
 <div class="app" id="app">
     <aside class="sidebar" id="sidebar">
         <div class="brand"><span class="brand-mark">L</span><span><strong>Light Of The World</strong><small>Ministry workspace</small></span></div>

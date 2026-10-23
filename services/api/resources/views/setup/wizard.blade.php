@@ -6,7 +6,7 @@
             <ol class="setup-progress" aria-label="Setup progress">
                 <li class="is-active" data-setup-progress="0"><span>01</span><div><strong>Ministry</strong><small>Your identity</small></div></li>
                 <li data-setup-progress="1"><span>02</span><div><strong>Home base</strong><small>Time and location</small></div></li>
-                <li data-setup-progress="2"><span>03</span><div><strong>Appearance</strong><small>Starting colours</small></div></li>
+                <li data-setup-progress="2"><span>03</span><div><strong>Theme</strong><small>Starting preset</small></div></li>
                 <li data-setup-progress="3"><span>04</span><div><strong>Administrator</strong><small>Secure access</small></div></li>
             </ol>
             <p class="setup-aside-foot">Your choices remain editable after launch.</p>
@@ -26,9 +26,8 @@
                     <aside class="setup-tip"><span>✦</span><div><strong>You can add campuses later.</strong><p>Start with one primary location. Additional campuses, service schedules, and online locations are managed in the workspace.</p></div></aside>
                 </section>
                 <section class="setup-step" data-setup-step="2" aria-labelledby="setup-brand-title" hidden>
-                    <p class="setup-eyebrow">MAKE IT YOURS</p><h2 id="setup-brand-title">Choose a confident starting palette.</h2><span class="setup-intro">These colours shape calls to action and highlights. You can refine the full brand system later.</span>
-                    <div class="setup-colour-preview"><div class="setup-preview-mark" data-setup-preview-mark>M</div><div><strong data-setup-preview-name>Your ministry</strong><span>Faith · Community · Purpose</span></div><button type="button" class="setup-preview-action" data-setup-preview-action>Welcome home</button></div>
-                    <div class="setup-colours"><label><span>Primary colour</span><input type="color" name="primary_color" value="{{ old('primary_color','#343A40') }}" data-setup-colour="primary"><b data-setup-primary-value>#343A40</b></label><label><span>Accent colour</span><input type="color" name="accent_color" value="{{ old('accent_color','#697386') }}" data-setup-colour="accent"><b data-setup-accent-value>#697386</b></label></div>
+                    <p class="setup-eyebrow">YOUR APPLICATION THEME</p><h2 id="setup-brand-title">Choose a platform theme.</h2><span class="setup-intro">Every workspace uses the same responsive light and dark system. You can later choose one ministry chrome colour for the header, sidebar, and mobile footer.</span>
+                    <div class="setup-colours"><label><span>Neutral</span><input type="radio" name="theme_preset" value="neutral" @checked(old('theme_preset', 'neutral') === 'neutral')><b>White, charcoal, and balanced gray.</b></label><label><span>Slate</span><input type="radio" name="theme_preset" value="slate" @checked(old('theme_preset') === 'slate')><b>Cool gray with restrained blue actions.</b></label><label><span>Warm</span><input type="radio" name="theme_preset" value="warm" @checked(old('theme_preset') === 'warm')><b>Soft stone with grounded contrast.</b></label></div>
                 </section>
                 <section class="setup-step" data-setup-step="3" aria-labelledby="setup-admin-title" hidden>
                     <p class="setup-eyebrow">YOUR SECURE WORKSPACE</p><h2 id="setup-admin-title">Create the first administrator account.</h2><span class="setup-intro">This account manages ministry settings, staff access, and launch configuration.</span>

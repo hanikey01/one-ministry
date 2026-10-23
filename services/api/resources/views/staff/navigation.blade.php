@@ -1,4 +1,4 @@
-<x-layouts.workspace title="Navigation" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color" :user-name="$user->name" user-role="Staff workspace">
+<x-layouts.workspace title="Navigation" :ministry-name="$settings->name" :user-name="$user->name" user-role="Staff workspace">
     <x-slot:navigation></x-slot:navigation>
 
     <div class="navigation-page-theme">

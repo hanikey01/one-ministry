@@ -174,7 +174,7 @@ The AI model settings provider, catalog refresh, route save, and route compatibi
 
 The shared async-form protocol now also supports terminology and page-draft saves. Existing page drafts remain in place after save; newly created drafts navigate into their editor from a JSON response. Normal browser submissions remain the no-JavaScript fallback. Shared public, workspace, and worship shell behavior has moved from inline Blade scripts into the route lifecycle, and public sidebar/mobile links now opt into enhanced navigation. The local checkout has no Node dependencies, so an asset build and browser interaction review remain pending.
 
-The canonical semantic palette now explicitly separates ministry `brand` identity from the `action` token used by primary controls. `action` currently resolves to the ministry-configured accent color and uses its calculated readable foreground, so all primary controls follow one accessible rule without adding a duplicate button-color setting. The legacy override stylesheet remains loaded during the staged visual-system consolidation; moving it into the Vite source remains a dedicated follow-up to avoid unreviewed regressions across the existing staff, member, and public surfaces.
+The canonical semantic palette now uses platform-owned light and dark presets for all application surfaces. A ministry chooses a preset and can optionally set one shared chrome colour for its header, sidebar, and sticky mobile footer; readable chrome foreground is calculated automatically. Primary controls use the preset action token and its calculated foreground. `layout-overrides.css` has been removed: the application has one Vite-managed stylesheet entry point, `resources/css/app.css`.
 
 Member workspace routes now fetch only the records required by the current screen; the member home retains its combined dashboard queries. A pending migration adds indexes for public event chronology and member event-registration listings. Migration execution, asset build, and browser review remain pending until the consolidated rebuild.
 
@@ -186,11 +186,15 @@ The first page-composition upgrade is in source: AI now plans a varied approved-
 
 Service operations now distinguish broadcast-only, Zoom-meeting-only, hybrid, and in-person experiences. Broadcast-only opens the configured public stream; Zoom-meeting-only opens the authenticated branded meeting room; hybrid opens broadcast first and offers a separate interactive-room action. The producer desk controls this choice and creates one linked Zoom room per service when enabled.
 
-### 2026-10-20 — Ministry-owned color palette
+### 2026-10-20 — Superseded ministry-owned color palette
 
 Neutral light/dark defaults and installation-owned primary/accent, canvas, panel, and sidebar colors are in source. The appearance screen exposes the palette, the shared layout derives foreground text colors, setup and command defaults are neutral, and the public site contract returns the complete palette. The additive migration was applied, the production Vite asset build passes, and Laravel's Blade view cache compiles successfully. Focused regression coverage, contrast review, and route-by-route browser verification remain pending; this work is not a passed phase gate.
 
 Sidebar appearance controls now default to matching the content surface. Separate light/dark sidebar pickers collapse directly beneath the custom sidebar choice and slide open only when that choice is selected. Existing saved custom sidebar treatments remain selected. A migration changes the schema default for new settings rows without rewriting existing ministry choices.
+
+### 2026-10-23 — Platform preset theme direction
+
+The previous ministry-owned page palette is superseded before launch. Source now defines three platform-owned theme presets, Neutral, Slate, and Warm, each with fixed light/dark surface, text, border, status, and action tokens. Appearance settings now expose the preset plus an optional single custom chrome colour shared by the header, sidebar, and sticky mobile footer. The settings API, installation workflow, shared layout token resolver, and build/design/experience documents follow this contract. Existing legacy CSS remains under staged consolidation; route-level browser, accessibility, asset-build, and migration execution review remain pending.
 
 The appearance preview's Alpine label is now rendered client-side so Blade does not evaluate `previewDark` as PHP; the settings 500 in the API log traced to that template expression. Action buttons use the configured ministry accent and a foreground selected by comparing black/white contrast. A source audit found legacy green-tinted overrides remaining in member layouts, learning styles, and public homepage components; a final shared semantic-color layer now routes dashboard cards, forms, headings, and navigation surfaces through the light/dark tokens while retaining ministry branding on intentional brand areas. Blade view caching and the Vite production asset build pass. Route-by-route browser and contrast verification remain pending; the JS chunk-size warning remains.
 

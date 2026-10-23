@@ -85,13 +85,13 @@ When a question is resolved, record date, decision maker, evidence, alternatives
 
 **Status:** Accepted for release packaging. The self-hosted update feed and installation update/rollback workflow remain pending.
 
-### D-028 — Neutral defaults and ministry-owned interface palette
+### D-028 — Platform presets and ministry-owned chrome
 
-**Decision:** New installations start with neutral light surfaces (white and gray) and neutral dark surfaces (charcoal and near-black). Each ministry controls primary/accent colors plus light/dark canvas, panel, and sidebar colors. The default sidebar treatment matches the content surface, and separate custom sidebar fields appear directly under the custom sidebar choice only when selected. The application derives foreground text colors for contrast; status colors retain their semantic meaning. These palette values apply consistently across staff, member, public, worship, and meeting surfaces.
+**Decision:** The application ships with three fixed platform-owned theme presets: Neutral, Slate, and Warm. Each preset defines all light/dark page surfaces, text, borders, focus treatment, status colours, and primary actions across staff, member, public, worship, and meeting interfaces. Ministries select one preset and cannot alter individual page, panel, canvas, or action colours. They may either use the preset navigation treatment or provide one custom chrome colour shared by the header, sidebar, and sticky mobile footer. The application derives readable text and icon colour for custom chrome.
 
-**Reason:** The product serves ministries across cultures and denominations. A fixed green or gold identity should not be imposed by the platform, and ministries need control of their navigation sidebar as well as their primary accents.
+**Reason:** Ministries need recognisable navigation branding without being able to fragment the application into inconsistent or inaccessible page-level colour systems.
 
-**Status:** Accepted by user direction, 2026-10-20. Existing stored primary/accent choices are preserved as ministry-owned settings; new neutral surface defaults are supplied through an additive migration.
+**Status:** Replaced by user direction, 2026-10-23. The previous per-surface colour controls are removed before launch.
 
 ### D-030 — Structured responsive page documents
 

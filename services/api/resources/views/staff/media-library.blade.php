@@ -64,7 +64,7 @@
         .media-search button { min-height:38px; }
     }
 </style>
-<x-layouts.workspace title="Media library" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color" :user-name="$user->name" :user-initials="str($user->name)->substr(0, 2)" user-role="Staff workspace">
+<x-layouts.workspace title="Media library" :ministry-name="$settings->name" :user-name="$user->name" :user-initials="str($user->name)->substr(0, 2)" user-role="Staff workspace">
     <header class="workspace-page-heading staff-page-command"><div><p>MEDIA LIBRARY</p><h1>Media library</h1><span>Keep reusable images, videos, and documents in one ministry-owned place.</span></div></header>
     @if(session('status'))<div class="viewport-notification is-success" role="status">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="viewport-notification is-error" role="alert">{{ $errors->first() }}</div>@endif

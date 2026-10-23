@@ -1,4 +1,4 @@
-<x-layouts.workspace title="Security" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color" :user-name="$user->name" user-role="Administrator">
+<x-layouts.workspace title="Security" :ministry-name="$settings->name" :user-name="$user->name" user-role="Administrator">
     <x-slot:navigation></x-slot:navigation>
     <header class="workspace-page-heading"><p>SECURITY</p><h1>Your account security</h1><span>Protect elevated ministry actions and review the sessions connected to your account.</span></header>
     @if(session('security_notice'))<div class="workspace-notice workspace-notice-error" role="alert">{{ session('security_notice') }}</div>@endif

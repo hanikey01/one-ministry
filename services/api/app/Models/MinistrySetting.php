@@ -12,10 +12,8 @@ class MinistrySetting extends Model
 
     protected $fillable = [
         'id', 'name', 'tagline', 'logo_path', 'dark_logo_path', 'favicon_path', 'public_domain', 'contact_email', 'contact_phone', 'public_address', 'website_label', 'social_links',
-        'timezone', 'homepage_page_id', 'primary_color', 'accent_color',
-        'light_canvas_color', 'light_surface_color', 'light_sidebar_color',
-        'dark_canvas_color', 'dark_surface_color', 'dark_sidebar_color',
-        'staff_font', 'staff_sidebar', 'staff_density',
+        'timezone', 'homepage_page_id', 'theme_preset', 'chrome_mode', 'chrome_color',
+        'staff_font', 'staff_density',
         'terminology',
     ];
 

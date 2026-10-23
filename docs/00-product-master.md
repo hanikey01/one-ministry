@@ -58,8 +58,8 @@ Roles are permission bundles, not a rigid hierarchy. A person may hold more than
 
 ### 4.1 Installation and branding
 
-- First-run setup collects ministry name, domain, logo, colors, time zone, primary location, service schedule, initial administrator, and contact details. New installations begin with neutral light surfaces (white and gray) and neutral dark surfaces (charcoal and near-black); every later interface palette choice belongs to that installation.
-- Administrators control the ministry's primary and accent colors, light/dark canvas, panels, and sidebar. Shared theme tokens apply these choices consistently to staff, member, public, worship, and meeting interfaces; readable foregrounds are derived for ministry-selected surfaces.
+- First-run setup collects ministry name, domain, platform theme preset, time zone, primary location, service schedule, initial administrator, and contact details. New installations begin with the Neutral preset; all presets provide fixed light and dark application surfaces.
+- Administrators select a platform theme preset and may optionally choose one custom chrome colour for the header, sidebar, and sticky mobile footer. Shared theme tokens apply the fixed preset surfaces consistently to staff, member, public, worship, and meeting interfaces; readable foregrounds are derived for custom chrome.
 - Administrators can configure terminology such as *campus* versus *branch*, and can enable or hide modules. Core interface terms use installation-owned singular/plural display overrides; these never change internal route names, permission keys, or stored domain values.
 - Site navigation, homepage sections, footer, social links, and public contact methods are editable.
 - Administrators select a feature-aware homepage preset and arrange approved sections. The available section set is derived from activated modules, while branding, content, and section order remain ministry-owned.

@@ -27,8 +27,8 @@ class SetupWizardController extends Controller
         }
 
         $admin = $installer->execute($request->only([
-            'name', 'domain', 'timezone', 'location', 'tagline', 'contact_email',
-            'primary_color', 'accent_color', 'admin_name', 'admin_email', 'password',
+            'name', 'domain', 'timezone', 'location', 'tagline', 'contact_email', 'theme_preset',
+            'admin_name', 'admin_email', 'password',
         ]));
 
         Auth::login($admin);

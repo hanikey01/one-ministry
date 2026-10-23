@@ -1,4 +1,4 @@
-<x-layouts.workspace title="Modules" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color" :user-name="$user->name" user-role="Administrator">
+<x-layouts.workspace title="Modules" :ministry-name="$settings->name" :user-name="$user->name" user-role="Administrator">
     <x-slot:navigation></x-slot:navigation>
     <header class="workspace-page-heading"><p>ADMINISTRATION</p><h1>Modules</h1><span>Release modules in staff preview before enabling them publicly.</span></header>
     @if(session('status'))<div class="form-success" role="status">{{ session('status') }}</div>@endif

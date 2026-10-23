@@ -1,4 +1,4 @@
-<x-layouts.workspace :title="$course->title" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color" :user-name="$user->name" user-role="School manager">
+<x-layouts.workspace :title="$course->title" :ministry-name="$settings->name" :user-name="$user->name" user-role="School manager">
     @include('staff.school._styles')
     <div class="school-shell">
         <section class="school-hero"><div><p class="school-kicker">{{ str($course->status)->headline() }} course</p><h1>{{ $course->title }}</h1><p>{{ $course->summary ?: 'Build the course outline, assessments, and live-class schedule.' }}</p><div class="school-meta" style="margin-top:16px"><span class="school-pill">{{ $enrollments->count() }} learners</span><span class="school-pill">{{ $modules->count() }} modules</span><span class="school-pill">{{ $classes->count() }} live classes</span></div></div><div class="school-hero-actions"><a class="school-button is-quiet" href="{{ route('staff.school.index') }}">Back to school</a></div></section>

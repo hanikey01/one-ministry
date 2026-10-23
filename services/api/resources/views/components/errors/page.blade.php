@@ -11,15 +11,15 @@
     $lightLogoPath = $themeSettings?->logo_path;
     $darkLogoPath = $themeSettings?->dark_logo_path;
     $faviconPath = $themeSettings?->favicon_path;
-    $themeColors = \App\Support\MinistryTheme::colors($themeSettings);
+    $theme = \App\Support\MinistryTheme::publicTheme($themeSettings);
 @endphp
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="{{ $themeColors['light']['canvas'] }}">
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="{{ $themeColors['dark']['canvas'] }}">
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="{{ $theme['light']['canvas'] }}">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="{{ $theme['dark']['canvas'] }}">
     @if($faviconPath)<link rel="icon" href="{{ asset('storage/'.$faviconPath) }}">@endif
     <title>{{ $code }} · {{ $ministryName }}</title>
     <style>
@@ -53,7 +53,7 @@
         @media(prefers-reduced-motion:reduce){.error-actions a{transition:none}}
     </style>
 </head>
-<body @if($darkLogoPath) class="error-has-dark-logo" @endif style="{{ \App\Support\MinistryTheme::cssVariables($themeSettings) }};--brand:var(--theme-primary-color);--accent:var(--theme-accent-color);--brand-foreground:{{ $themeColors['primary_foreground'] }};--accent-foreground:{{ $themeColors['accent_foreground'] }};--muted:color-mix(in srgb,var(--ink) 62%,var(--canvas))">
+<body @if($darkLogoPath) class="error-has-dark-logo" @endif style="{{ \App\Support\MinistryTheme::cssVariables($themeSettings) }};--brand:var(--theme-action-color);--accent:var(--theme-action-color);--brand-foreground:var(--action-foreground);--accent-foreground:var(--action-foreground);--muted:color-mix(in srgb,var(--ink) 62%,var(--canvas))">
     <main class="error-shell">
         <section class="error-card" aria-labelledby="error-title">
             <div class="error-brand">

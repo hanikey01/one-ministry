@@ -14,7 +14,7 @@ use Illuminate\Validation\ValidationException;
 class InstallMinistry
 {
     /**
-     * @param  array{name: string, domain: string, timezone: string, location: string, admin_name: string, admin_email: string, password: string, tagline?: ?string, contact_email?: ?string, primary_color?: string, accent_color?: string}  $input
+     * @param  array{name: string, domain: string, timezone: string, location: string, admin_name: string, admin_email: string, password: string, tagline?: ?string, contact_email?: ?string, theme_preset?: string}  $input
      */
     public function execute(array $input): User
     {
@@ -28,8 +28,7 @@ class InstallMinistry
             'password' => ['required', 'string', 'min:12'],
             'tagline' => ['nullable', 'string', 'max:240'],
             'contact_email' => ['nullable', 'email', 'max:254'],
-            'primary_color' => ['sometimes', 'regex:/^#[0-9A-Fa-f]{6}$/'],
-            'accent_color' => ['sometimes', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'theme_preset' => ['nullable', 'in:neutral,slate,warm'],
         ])->validate();
 
         if (MinistrySetting::query()->exists()) {
@@ -44,14 +43,8 @@ class InstallMinistry
                 'public_domain' => strtolower($input['domain']),
                 'contact_email' => $input['contact_email'] ?? null,
                 'timezone' => $input['timezone'],
-                'primary_color' => $input['primary_color'] ?? '#343A40',
-                'accent_color' => $input['accent_color'] ?? '#697386',
-                'light_canvas_color' => \App\Support\MinistryTheme::DEFAULTS['light_canvas_color'],
-                'light_surface_color' => \App\Support\MinistryTheme::DEFAULTS['light_surface_color'],
-                'light_sidebar_color' => \App\Support\MinistryTheme::DEFAULTS['light_sidebar_color'],
-                'dark_canvas_color' => \App\Support\MinistryTheme::DEFAULTS['dark_canvas_color'],
-                'dark_surface_color' => \App\Support\MinistryTheme::DEFAULTS['dark_surface_color'],
-                'dark_sidebar_color' => \App\Support\MinistryTheme::DEFAULTS['dark_sidebar_color'],
+                'theme_preset' => $input['theme_preset'] ?? 'neutral',
+                'chrome_mode' => 'preset',
             ]);
 
             Location::create([

@@ -41,7 +41,7 @@ class PublicSiteController extends Controller
             'public_domain' => $settings->public_domain,
             'contact_email' => $settings->contact_email,
             'timezone' => $settings->timezone,
-            'colors' => MinistryTheme::colors($settings),
+            'theme' => MinistryTheme::publicTheme($settings),
             'locations' => $locations,
             'features' => $features,
         ]]);

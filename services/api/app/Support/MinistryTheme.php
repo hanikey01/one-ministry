@@ -6,15 +6,34 @@ use App\Models\MinistrySetting;
 
 class MinistryTheme
 {
-    public const DEFAULTS = [
-        'primary_color' => '#343A40',
-        'accent_color' => '#697386',
-        'light_canvas_color' => '#F7F7F8',
-        'light_surface_color' => '#FFFFFF',
-        'light_sidebar_color' => '#24262A',
-        'dark_canvas_color' => '#121315',
-        'dark_surface_color' => '#1C1D20',
-        'dark_sidebar_color' => '#0B0C0E',
+    /**
+     * Platform-owned palettes. A ministry can select a family but cannot
+     * alter page, panel, text, border, or action colours independently.
+     *
+     * @var array<string, array<string, string>>
+     */
+    public const PRESETS = [
+        'neutral' => [
+            'light_canvas' => '#F7F7F8', 'light_surface' => '#FFFFFF', 'light_raised' => '#FFFFFF',
+            'light_ink' => '#17181A', 'light_muted' => '#61646B', 'light_line' => '#D9DCE1',
+            'dark_canvas' => '#111214', 'dark_surface' => '#1A1C20', 'dark_raised' => '#22252A',
+            'dark_ink' => '#F4F5F7', 'dark_muted' => '#AAADB5', 'dark_line' => '#383C44',
+            'action' => '#343A40', 'chrome' => '#24262A',
+        ],
+        'slate' => [
+            'light_canvas' => '#F5F7FA', 'light_surface' => '#FFFFFF', 'light_raised' => '#FFFFFF',
+            'light_ink' => '#172033', 'light_muted' => '#5F6B7C', 'light_line' => '#D9E0EA',
+            'dark_canvas' => '#0E1420', 'dark_surface' => '#161F2E', 'dark_raised' => '#202B3C',
+            'dark_ink' => '#F3F6FB', 'dark_muted' => '#A8B3C4', 'dark_line' => '#344155',
+            'action' => '#315B96', 'chrome' => '#1D2A3D',
+        ],
+        'warm' => [
+            'light_canvas' => '#FAF8F5', 'light_surface' => '#FFFFFF', 'light_raised' => '#FFFEFC',
+            'light_ink' => '#27221E', 'light_muted' => '#706860', 'light_line' => '#E3DCD4',
+            'dark_canvas' => '#171411', 'dark_surface' => '#211D19', 'dark_raised' => '#2B2621',
+            'dark_ink' => '#FAF6F1', 'dark_muted' => '#B7ACA3', 'dark_line' => '#443C35',
+            'action' => '#6B5140', 'chrome' => '#332A23',
+        ],
     ];
 
     public static function cssVariables(?MinistrySetting $settings): string
@@ -27,32 +46,30 @@ class MinistryTheme
     }
 
     /** @return array<string, mixed> */
-    public static function colors(?MinistrySetting $settings): array
+    public static function publicTheme(?MinistrySetting $settings): array
     {
         $tokens = self::tokens($settings);
 
         return [
-            'primary' => $tokens['--theme-primary-color'],
-            'accent' => $tokens['--theme-accent-color'],
-            'primary_foreground' => $tokens['--brand-foreground'],
-            'accent_foreground' => $tokens['--accent-foreground'],
-            'primary_text_light' => $tokens['--theme-brand-text-light'],
-            'primary_text_dark' => $tokens['--theme-brand-text-dark'],
+            'preset' => $settings?->theme_preset ?? 'neutral',
+            'chrome_mode' => $settings?->chrome_mode ?? 'preset',
+            'chrome_color' => $tokens['--theme-chrome-color'],
+            'chrome_foreground' => $tokens['--theme-chrome-foreground'],
             'light' => [
                 'canvas' => $tokens['--theme-light-canvas-color'],
                 'surface' => $tokens['--theme-light-surface-color'],
-                'sidebar' => $tokens['--theme-light-sidebar-color'],
-                'canvas_foreground' => $tokens['--theme-light-ink'],
-                'surface_foreground' => $tokens['--theme-light-surface-ink'],
-                'sidebar_foreground' => $tokens['--theme-light-sidebar-ink'],
+                'raised' => $tokens['--theme-light-raised-color'],
+                'ink' => $tokens['--theme-light-ink'],
+                'muted' => $tokens['--theme-light-muted'],
+                'line' => $tokens['--theme-light-line'],
             ],
             'dark' => [
                 'canvas' => $tokens['--theme-dark-canvas-color'],
                 'surface' => $tokens['--theme-dark-surface-color'],
-                'sidebar' => $tokens['--theme-dark-sidebar-color'],
-                'canvas_foreground' => $tokens['--theme-dark-ink'],
-                'surface_foreground' => $tokens['--theme-dark-surface-ink'],
-                'sidebar_foreground' => $tokens['--theme-dark-sidebar-ink'],
+                'raised' => $tokens['--theme-dark-raised-color'],
+                'ink' => $tokens['--theme-dark-ink'],
+                'muted' => $tokens['--theme-dark-muted'],
+                'line' => $tokens['--theme-dark-line'],
             ],
         ];
     }
@@ -60,22 +77,47 @@ class MinistryTheme
     /** @return array<string, string> */
     private static function tokens(?MinistrySetting $settings): array
     {
-        $values = [];
+        $preset = self::PRESETS[$settings?->theme_preset ?? 'neutral'] ?? self::PRESETS['neutral'];
+        $chrome = $settings?->chrome_mode === 'custom' && $settings?->chrome_color
+            ? strtoupper($settings->chrome_color)
+            : $preset['chrome'];
 
-        foreach (self::DEFAULTS as $key => $default) {
-            $values['--theme-'.str_replace('_', '-', $key)] = strtoupper((string) ($settings?->{$key} ?: $default));
-        }
+        $values = [
+            '--theme-preset' => $settings?->theme_preset ?? 'neutral',
+            '--theme-light-canvas-color' => $preset['light_canvas'],
+            '--theme-light-surface-color' => $preset['light_surface'],
+            '--theme-light-raised-color' => $preset['light_raised'],
+            '--theme-light-ink' => $preset['light_ink'],
+            '--theme-light-surface-ink' => $preset['light_ink'],
+            '--theme-light-muted' => $preset['light_muted'],
+            '--theme-light-line' => $preset['light_line'],
+            '--theme-dark-canvas-color' => $preset['dark_canvas'],
+            '--theme-dark-surface-color' => $preset['dark_surface'],
+            '--theme-dark-raised-color' => $preset['dark_raised'],
+            '--theme-dark-ink' => $preset['dark_ink'],
+            '--theme-dark-surface-ink' => $preset['dark_ink'],
+            '--theme-dark-muted' => $preset['dark_muted'],
+            '--theme-dark-line' => $preset['dark_line'],
+            '--theme-action-color' => $preset['action'],
+            '--theme-chrome-color' => $chrome,
+            '--theme-chrome-foreground' => self::bestTextColor($chrome),
+        ];
 
-        $values['--brand-foreground'] = self::bestTextColor($values['--theme-primary-color']);
-        $values['--accent-foreground'] = self::bestTextColor($values['--theme-accent-color']);
-        $values['--theme-brand-text-light'] = self::accessibleBrandText($values['--theme-primary-color'], $values['--theme-light-surface-color']);
-        $values['--theme-brand-text-dark'] = self::accessibleBrandText($values['--theme-primary-color'], $values['--theme-dark-surface-color']);
-        $values['--theme-light-ink'] = self::bestTextColor($values['--theme-light-canvas-color']);
-        $values['--theme-light-surface-ink'] = self::bestTextColor($values['--theme-light-surface-color']);
-        $values['--theme-light-sidebar-ink'] = self::bestTextColor($values['--theme-light-sidebar-color']);
-        $values['--theme-dark-ink'] = self::bestTextColor($values['--theme-dark-canvas-color']);
-        $values['--theme-dark-surface-ink'] = self::bestTextColor($values['--theme-dark-surface-color']);
-        $values['--theme-dark-sidebar-ink'] = self::bestTextColor($values['--theme-dark-sidebar-color']);
+        // Legacy aliases keep existing components on the shared token path while
+        // their page-specific styles are consolidated.
+        $values['--theme-primary-color'] = $values['--theme-action-color'];
+        $values['--theme-accent-color'] = $values['--theme-action-color'];
+        $values['--theme-light-sidebar-color'] = $chrome;
+        $values['--theme-dark-sidebar-color'] = $chrome;
+        $values['--theme-light-sidebar-ink'] = $values['--theme-chrome-foreground'];
+        $values['--theme-dark-sidebar-ink'] = $values['--theme-chrome-foreground'];
+        $values['--brand-foreground'] = self::bestTextColor($values['--theme-action-color']);
+        $values['--accent-foreground'] = $values['--brand-foreground'];
+        $values['--action-foreground'] = $values['--brand-foreground'];
+        $values['--theme-brand-text-light'] = self::accessibleBrandText($values['--theme-action-color'], $values['--theme-light-surface-color']);
+        $values['--theme-brand-text-dark'] = self::accessibleBrandText($values['--theme-action-color'], $values['--theme-dark-surface-color']);
+        $values['--theme-action-text-light'] = $values['--theme-brand-text-light'];
+        $values['--theme-action-text-dark'] = $values['--theme-brand-text-dark'];
 
         return $values;
     }

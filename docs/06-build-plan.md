@@ -15,8 +15,8 @@ For each slice: read the Product Master and the applicable owners in the source-
 **Gate:**
 
 - A fresh installation can be configured without editing source code.
-- Administrator can configure ministry-owned branding and light/dark canvas, panel, and sidebar colors, create two locations, invite staff, revoke a session, and switch a module into staff preview.
-- A theme change keeps neutral light/dark defaults unless the ministry chooses its own palette; the shared shell resolves the saved palette consistently across staff, member, public, and worship surfaces.
+- Administrator can select a platform light/dark theme preset, optionally configure one shared header/sidebar/sticky-footer chrome colour, create two locations, invite staff, revoke a session, and switch a module into staff preview.
+- The shared shell resolves a fixed preset palette consistently across staff, member, public, and worship surfaces; ministry customisation is limited to the shared navigation chrome.
 - An administrator can set singular and plural ministry-facing labels for supported concepts; shared UI surfaces use the override while route names, permission keys, data values, and public/API identifiers remain stable.
 - A representative enhanced settings save shows pending and completion/failure feedback in the current viewport without a page reload, while its server-rendered fallback still works.
 - Unauthorized location/group access is denied through direct API calls.

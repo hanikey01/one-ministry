@@ -1,9 +1,9 @@
-<x-layouts.app :title="$title ?? null" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color">
+<x-layouts.app :title="$title ?? null" :ministry-name="$settings->name">
     @php($liveWorship = \App\Models\ServiceOccurrence::query()->where('rehearsal_mode', false)->where('state', 'live')->orderBy('starts_at')->first())
     @php($terminology = app(\App\Support\MinistryTerminology::class))
     @php($worshipUrl = $liveWorship ? route('public.worship', $liveWorship) : route('public.home').'#service-times')
     @php($worshipLabel = $liveWorship ? 'Join worship' : $terminology->label('service', 'singular').' times')
-    <div class="workspace-shell public-workspace staff-sidebar-{{ $settings->staff_sidebar ?? 'light' }}" data-public-shell>
+    <div class="workspace-shell public-workspace" data-public-shell>
         <button class="workspace-backdrop" type="button" data-public-close aria-label="Close navigation"></button>
         <aside class="workspace-sidebar app-sidebar" data-public-sidebar>
             <div class="workspace-brand">

@@ -712,18 +712,15 @@ class StaffWorkspaceController extends Controller
             'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048', 'dimensions:max_width=2400,max_height=2400'],
             'dark_logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048', 'dimensions:max_width=2400,max_height=2400'],
             'favicon' => ['nullable', 'file', 'mimes:ico,png', 'max:512'],
-            'primary_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
-            'accent_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
-            'light_canvas_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
-            'light_surface_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
-            'light_sidebar_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
-            'dark_canvas_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
-            'dark_surface_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
-            'dark_sidebar_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'theme_preset' => ['required', Rule::in(['neutral', 'slate', 'warm'])],
+            'chrome_mode' => ['required', Rule::in(['preset', 'custom'])],
+            'chrome_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'staff_font' => ['required', Rule::in(['modern', 'editorial', 'humanist'])],
-            'staff_sidebar' => ['required', Rule::in(['deep', 'brand', 'light'])],
             'staff_density' => ['required', Rule::in(['comfortable', 'compact'])],
         ]);
+        if ($validated['chrome_mode'] !== 'custom') {
+            $validated['chrome_color'] = null;
+        }
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
         foreach (['logo' => 'logo_path', 'dark_logo' => 'dark_logo_path', 'favicon' => 'favicon_path'] as $input => $attribute) {
             if ($request->hasFile($input)) {

@@ -14,9 +14,9 @@ The Laravel server-rendered baseline is mandatory. Enhanced navigation and in-pl
 ## 2. Product experience principles
 
 1. **One application, three audience workspaces.** Public, member, and staff experiences share the same visual language and theme tokens while preserving their own information architecture and permissions.
-2. **Ministry-owned presentation.** A ministry controls its name, logo, terminology, navigation selection, sidebar treatment, primary/accent colours, and supported light/dark surfaces. Configuration changes presentation only; routes, permission keys, stored values, and server authorization remain stable.
+2. **Ministry-owned presentation.** A ministry controls its name, logo, terminology, navigation selection, selected platform theme preset, and an optional shared navigation chrome colour. The product controls page and component surfaces. Configuration changes presentation only; routes, permission keys, stored values, and server authorization remain stable.
 3. **Neutral by default.** New installations use white/neutral-gray light surfaces and charcoal/near-black dark surfaces. Green or any other brand tint is never a platform default.
-4. **One primary action rule.** A primary action uses the ministry accent and its calculated readable foreground. There is no separate default button-colour setting. Secondary, quiet, destructive, and status actions use semantic tokens with accessible contrast.
+4. **One primary action rule.** A primary action uses the selected platform preset action token. Secondary, quiet, destructive, and status actions use semantic tokens with accessible contrast.
 5. **Direct, scoped editing.** A user edits the item or section they selected. AI assistance receives enough approved page context to make a coherent suggestion, but can change only the selected section unless a staff member explicitly applies a reviewed full-page plan.
 6. **Visible system feedback.** Every save, background request, warning, and failure has a pending, success, error, or recovery state in the current viewport. Field validation stays beside the field; completed notices use the shared notification stack.
 7. **No false affordances.** A visible action must work, explain why it is unavailable, or be absent. Placeholder controls, hidden global click targets, and links that lead to a known module/permission error are defects.

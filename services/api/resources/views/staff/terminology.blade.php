@@ -1,4 +1,4 @@
-<x-layouts.workspace title="Ministry terminology" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color" :user-name="$user->name" user-role="Administrator">
+<x-layouts.workspace title="Ministry terminology" :ministry-name="$settings->name" :user-name="$user->name" user-role="Administrator">
     <header class="workspace-page-heading staff-page-command">
         <div><p>ADMINISTRATION</p><h1>Ministry terminology</h1><span>Use the words your community recognizes across the platform.</span></div>
     </header>

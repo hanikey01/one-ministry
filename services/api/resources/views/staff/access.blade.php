@@ -1,4 +1,4 @@
-<x-layouts.workspace title="Staff access" :ministry-name="$settings->name" :primary-color="$settings->primary_color" :accent-color="$settings->accent_color" :user-name="$user->name" user-role="Administrator">
+<x-layouts.workspace title="Staff access" :ministry-name="$settings->name" :user-name="$user->name" user-role="Administrator">
     <x-slot:navigation></x-slot:navigation>
     <header class="workspace-page-heading staff-page-command"><div><p>ADMINISTRATION</p><h1>Staff access</h1><span>Invite the right people with a role that matches their ministry responsibility.</span></div></header>
     @if(session('status'))<div class="workspace-notice workspace-notice-success" role="status">{{ session('status') }}</div>@endif
