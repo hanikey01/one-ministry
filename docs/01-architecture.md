@@ -92,7 +92,17 @@ These are profiles, not product editions or hard attendance tiers. The same code
 
 Minimum configuration: public URL, database DSN, encryption/session keys, writable application storage, mail provider, host cron, and a media profile. SMS, payment, object storage, Redis, realtime, and meeting providers are optional until their modules are enabled. Secrets are read from the environment or a secret manager, not stored in Git or exposed to the browser. Setup checks validate TLS, storage permissions, cron/scheduler activity, callback reachability where configured, queue health, and backup destination before declaring the installation production-ready.
 
-## 10. Validation before architecture freeze
+## 10. Experience and performance architecture
+
+The shared behavior contract is [18 — Application Experience and Performance Contract](18-experience-performance-contract.md). Laravel server rendering is the required baseline. Livewire navigation, Alpine behavior, browser prefetching, and in-place JSON/Livewire mutations are progressive enhancements that retain ordinary links and form posts as fallbacks.
+
+Route-specific scripts register through one lifecycle layer and clean up listeners, timers, polling, overlays, and media clients when navigation completes. Shared layouts do not duplicate global browser listeners. Optional SDKs, especially media SDKs, load only when an authorized user reaches the relevant action.
+
+Performance work follows this sequence: measure a route and its query count; remove unnecessary data and N+1 queries; add an index for a proven listing/filter path; cache stable installation configuration with explicit write invalidation; then consider an optional managed cache or worker. Do not use a shared cache for private data without a scope-safe key and invalidation plan.
+
+The portable baseline uses Laravel's file or database cache and scheduled work. Redis, queues, CDN/edge cache, and long-lived workers are optional managed-profile improvements. The release process compiles assets once and builds Laravel runtime caches in the deployed environment. OPcache assumptions must match the host and release strategy.
+
+## 11. Validation before architecture freeze
 
 Proof of concept must demonstrate: a broadcast with dynamic homepage switching; a small interactive meeting; a signed private room join; recording review; authenticated chat moderation; reconnect after Redis or browser interruption; and a load test against a declared audience target. Decide exact media components and provider adapters only after this proof. Record outcomes in `09-decisions.md`.
 

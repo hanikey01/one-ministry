@@ -98,6 +98,15 @@ Run `docker compose -f compose.yaml -f compose.dev.yaml exec api php artisan opt
 
 Build cache is operational storage, not application data. Each installation should cap BuildKit cache and inspect Docker disk use on a routine schedule. The supplied Windows operator script runs `docker buildx prune --max-used-space 2GB` and removes only dangling images; it does not remove running containers, named volumes, database data, backup archives, or source files.
 
+After rebuilding an application image, run the maintenance script (or its equivalent) before starting another rebuild. This removes superseded image layers and caps BuildKit cache while preserving images referenced by running containers and all named application volumes:
+
+```powershell
+docker image prune --all --force
+./infra/maintenance/Invoke-DockerMaintenance.ps1
+```
+
+Do not delete the current image before its replacement container is running. Do not use `docker system prune --volumes` for routine rebuild cleanup because named database and Redis volumes contain application data.
+
 Run it manually from the repository root:
 
 ```powershell

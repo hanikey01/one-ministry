@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MinistrySetting;
+use App\Models\FeatureSetting;
 use App\Models\HomepageSection;
 use App\Models\HomepageSlide;
 use App\Services\HomepageService;
@@ -11,6 +12,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class HomepageController extends Controller
@@ -21,7 +23,15 @@ class HomepageController extends Controller
             return to_route('setup.create');
         }
 
-        return view('public.home', ['ministry' => MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID), ...$homepage->publicConfiguration($streams)]);
+        $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
+        $central = $settings->homepage_page_id
+            ? DB::table('pages')->where('id', $settings->homepage_page_id)->where('status', 'published')->first()
+            : null;
+        if ($central) {
+            return view('public.page', ['page' => $central, 'settings' => $settings, 'features' => FeatureSetting::query()->where('state', 'enabled')->pluck('key')->all()]);
+        }
+
+        return view('public.home', ['ministry' => $settings, ...$homepage->publicConfiguration($streams)]);
     }
 
     public function editor(Request $request, HomepageService $homepage): View

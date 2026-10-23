@@ -220,6 +220,7 @@ Route::prefix('api/v1')->group(function (): void {
 Route::middleware(['auth', 'permission:settings.read'])->get('/staff', [StaffWorkspaceController::class, 'overview'])->name('staff.overview');
 Route::middleware(['auth', 'permission:settings.read'])->get('/staff/settings', [StaffWorkspaceController::class, 'settings'])->name('staff.settings');
 Route::middleware(['auth', 'permission:settings.update'])->put('/staff/settings', [StaffWorkspaceController::class, 'updateSettings'])->name('staff.settings.update');
+Route::middleware(['auth', 'permission:settings.update'])->put('/staff/settings/homepage', [StaffWorkspaceController::class, 'updateHomepage'])->name('staff.settings.homepage.update');
 Route::middleware(['auth', 'permission:settings.update'])->get('/staff/terminology', [MinistryTerminologyController::class, 'index'])->name('staff.terminology');
 Route::middleware(['auth', 'permission:settings.update'])->put('/staff/terminology', [MinistryTerminologyController::class, 'update'])->name('staff.terminology.update');
 Route::middleware(['auth', 'permission:ai.manage'])->get('/staff/ai-settings', [StaffAiSettingsController::class, 'index'])->name('staff.ai-settings');
@@ -248,6 +249,11 @@ Route::middleware(['auth', 'permission:community.manage'])->post('/staff/groups'
 Route::middleware(['auth', 'permission:community.manage'])->get('/staff/events', [StaffWorkspaceController::class, 'events'])->name('staff.events');
 Route::middleware(['auth', 'permission:community.manage'])->post('/staff/events', [StaffWorkspaceController::class, 'storeEvent'])->name('staff.events.store');
 Route::middleware(['auth', 'permission:content.manage'])->get('/staff/content', [StaffWorkspaceController::class, 'content'])->name('staff.content');
+Route::middleware(['auth', 'permission:content.manage'])->get('/staff/media-library', [StaffWorkspaceController::class, 'mediaLibrary'])->name('staff.media-library');
+Route::middleware(['auth', 'permission:content.manage'])->get('/staff/media-library/{asset}/file', [StaffWorkspaceController::class, 'mediaLibraryFile'])->name('staff.media-library.file');
+Route::middleware(['auth', 'permission:content.manage'])->post('/staff/media-library', [StaffWorkspaceController::class, 'uploadMediaLibrary'])->name('staff.media-library.upload');
+Route::middleware(['auth', 'permission:content.manage'])->patch('/staff/media-library/{asset}', [StaffWorkspaceController::class, 'updateMediaLibrary'])->name('staff.media-library.update');
+Route::middleware(['auth', 'permission:content.manage'])->delete('/staff/media-library/{asset}', [StaffWorkspaceController::class, 'deleteMediaLibrary'])->name('staff.media-library.delete');
 Route::middleware(['auth', 'permission:school.manage'])->group(function (): void {
     Route::get('/staff/school', [StaffSchoolController::class, 'index'])->name('staff.school.index');
     Route::post('/staff/school', [StaffSchoolController::class, 'store'])->name('staff.school.store');
@@ -282,15 +288,6 @@ Route::middleware(['auth', 'permission:content.manage'])->post('/staff/pages', [
 Route::middleware(['auth', 'permission:content.manage'])->get('/staff/pages/{page}/edit', [PageWorkspaceController::class, 'edit'])->name('staff.pages.edit');
 Route::middleware(['auth', 'permission:content.manage'])->put('/staff/pages/{page}', [PageWorkspaceController::class, 'update'])->name('staff.pages.update');
 Route::middleware(['auth', 'permission:content.publish', 'verified_email', 'mfa'])->post('/staff/pages/{page}/publish', [PageWorkspaceController::class, 'publish'])->name('staff.pages.publish');
-Route::middleware(['auth', 'permission:content.manage'])->get('/staff/homepage', [HomepageController::class, 'editor'])->name('staff.homepage');
-Route::middleware(['auth', 'permission:content.manage'])->put('/staff/homepage/appearance', [HomepageController::class, 'updateAppearance'])->name('staff.homepage.appearance');
-Route::middleware(['auth', 'permission:content.manage'])->post('/staff/homepage/themes/{theme}/apply', [HomepageController::class, 'applyStarterTheme'])->name('staff.homepage.themes.apply');
-Route::middleware(['auth', 'permission:content.manage'])->post('/staff/homepage/slides', [HomepageController::class, 'saveSlide'])->name('staff.homepage.slides');
-Route::middleware(['auth', 'permission:content.manage'])->put('/staff/homepage/slides/order', [HomepageController::class, 'reorderSlides'])->name('staff.homepage.slides.order');
-Route::middleware(['auth', 'permission:content.manage'])->delete('/staff/homepage/slides/{slide}', [HomepageController::class, 'destroySlide'])->name('staff.homepage.slides.destroy');
-Route::middleware(['auth', 'permission:content.manage'])->post('/staff/homepage/sections', [HomepageController::class, 'saveSection'])->name('staff.homepage.sections');
-Route::middleware(['auth', 'permission:content.manage'])->put('/staff/homepage/sections/order', [HomepageController::class, 'reorderSections'])->name('staff.homepage.sections.order');
-Route::middleware(['auth', 'permission:content.manage'])->delete('/staff/homepage/sections/{section}', [HomepageController::class, 'destroySection'])->name('staff.homepage.sections.destroy');
 Route::middleware(['auth', 'permission:services.manage'])->get('/staff/follow-up', [StaffWorkspaceController::class, 'followUp'])->name('staff.follow-up');
 Route::middleware(['auth', 'permission:care.manage', 'verified_email', 'mfa'])->get('/staff/care', [StaffWorkspaceController::class, 'care'])->name('staff.care');
 Route::middleware(['auth', 'permission:reports.view', 'verified_email'])->get('/staff/reports', [StaffWorkspaceController::class, 'reports'])->name('staff.reports');

@@ -19,6 +19,10 @@ const addPageListener = (target, eventName, listener, options) => {
     pageCleanups.push(() => target.removeEventListener(eventName, listener, options));
 };
 
+// Blade pages can register document/window listeners through this bridge. They
+// are removed before Livewire replaces the page, preventing stale handlers.
+window.MinistryPage = { addListener: addPageListener };
+
 const setPageInterval = (callback, delay) => {
     const timer = window.setInterval(callback, delay);
     pageCleanups.push(() => window.clearInterval(timer));
@@ -30,6 +34,76 @@ const initializePage = (force = false) => {
     if (!force && initializedPageUrl === pageUrl) return;
     cleanupPage();
     initializedPageUrl = pageUrl;
+
+    const library = document.querySelector('.page-block-library');
+    const libraryOpens = document.querySelectorAll('[data-block-library-open]');
+    const libraryClosers = document.querySelectorAll('[data-block-library-close]');
+    if (library && !library.querySelector('[data-block-library-close]')) {
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'page-block-library-close';
+        close.dataset.blockLibraryClose = '';
+        close.setAttribute('aria-label', 'Close elements and sections');
+        close.title = 'Close elements and sections';
+        close.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg>';
+        library.querySelector('header')?.append(close);
+        addPageListener(close, 'click', () => setLibraryOpen(false));
+    }
+    const setLibraryOpen = (open) => {
+        if (!library) return;
+        library.classList.toggle('is-open', open);
+        document.body.classList.toggle('page-library-is-open', open);
+        if (open) library.querySelector('[data-add]')?.focus();
+    };
+    libraryOpens.forEach((opener) => addPageListener(opener, 'click', () => setLibraryOpen(true)));
+    libraryClosers.forEach((closer) => addPageListener(closer, 'click', () => setLibraryOpen(false)));
+    addPageListener(document, 'keydown', (event) => { if (event.key === 'Escape') setLibraryOpen(false); });
+    addPageListener(library, 'click', (event) => { if (event.target.closest('[data-add]')) setLibraryOpen(false); });
+    const canvasWrap = document.querySelector('.page-block-canvas-wrap');
+    const canvas = canvasWrap?.querySelector('[data-canvas]');
+    const floatingLibraryOpen = document.querySelector('.page-block-library-trigger');
+    if (canvasWrap && floatingLibraryOpen && floatingLibraryOpen.parentElement !== canvasWrap) canvasWrap.prepend(floatingLibraryOpen);
+    if (canvasWrap && canvas && !canvasWrap.querySelector('[data-canvas-toolbar]')) {
+        const toolbar = document.createElement('header');
+        toolbar.className = 'page-canvas-header';
+        toolbar.dataset.canvasToolbar = '';
+        toolbar.innerHTML = '<div><p>PAGE CANVAS</p><strong>Responsive layout</strong></div><div class="page-canvas-toolbar" role="group" aria-label="Canvas preview size"><button type="button" data-canvas-size="desktop" class="is-active" aria-label="Desktop canvas" title="Desktop canvas"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="1.5"></rect><path d="M8 20h8M12 17v3"></path></svg></button><button type="button" data-canvas-size="tablet" aria-label="Tablet canvas" title="Tablet canvas"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="2"></rect><path d="M10 18h4"></path></svg></button><button type="button" data-canvas-size="mobile" aria-label="Mobile canvas" title="Mobile canvas"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3" width="8" height="18" rx="2"></rect><path d="M11 18h2"></path></svg></button></div>';
+        canvasWrap.prepend(toolbar);
+        toolbar.querySelectorAll('[data-canvas-size]').forEach((button) => addPageListener(button, 'click', () => {
+            toolbar.querySelectorAll('[data-canvas-size]').forEach((item) => item.classList.toggle('is-active', item === button));
+            canvas.dataset.preview = button.dataset.canvasSize;
+        }));
+    }
+    const inspector = document.querySelector('.page-block-inspector');
+    if (inspector) {
+        const inspectorBackdrop = document.createElement('div');
+        inspectorBackdrop.className = 'page-block-inspector-backdrop';
+        inspectorBackdrop.dataset.inspectorClose = '';
+        inspector.parentElement?.append(inspectorBackdrop);
+        inspector.setAttribute('aria-hidden', 'true');
+        const closeInspector = () => { inspector.classList.remove('is-open'); inspectorBackdrop.classList.remove('is-open'); inspector.setAttribute('aria-hidden', 'true'); };
+        const normalizeInspectorButtons = () => {
+            const dark = document.querySelector('.staff-theme-dark');
+            inspector.querySelectorAll('button[data-inspector-tab], .page-inspector-actions button').forEach((button) => {
+                button.style.setProperty('background-color', dark ? '#18181b' : '#fafafa', 'important');
+                button.style.setProperty('border-color', dark ? '#3f3f46' : '#d4d4d8', 'important');
+                button.style.setProperty('color', dark ? '#f4f4f5' : '#27272a', 'important');
+                button.style.setProperty('box-shadow', 'none', 'important');
+            });
+        };
+        const openInspector = () => { normalizeInspectorButtons(); inspector.classList.add('is-open'); inspectorBackdrop.classList.add('is-open'); inspector.setAttribute('aria-hidden', 'false'); };
+        const closeButton = document.createElement('button');
+        closeButton.type = 'button'; closeButton.className = 'page-block-inspector-close'; closeButton.dataset.inspectorClose = '';
+        closeButton.setAttribute('aria-label', 'Close block settings'); closeButton.title = 'Close block settings';
+        closeButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg>';
+        inspector.querySelector('header')?.append(closeButton);
+        addPageListener(canvas, 'click', (event) => { if (event.target.closest('[data-index]')) openInspector(); });
+        addPageListener(inspector.querySelector('[data-inspector]'), 'click', (event) => { if (event.target.closest('[data-remove]')) closeInspector(); });
+        inspector.querySelectorAll('[data-inspector-close]').forEach((node) => addPageListener(node, 'click', closeInspector));
+        addPageListener(closeButton, 'click', closeInspector);
+        addPageListener(inspectorBackdrop, 'click', closeInspector);
+        addPageListener(document, 'keydown', (event) => { if (event.key === 'Escape') closeInspector(); });
+    }
 
 
 document.querySelectorAll('[data-sidebar-colour-setting]').forEach((setting) => {
@@ -200,6 +274,9 @@ document.querySelectorAll('[data-public-shell]').forEach((shell) => {
     const publicSidebar = shell.querySelector('[data-public-sidebar]');
     const backdrop = shell.querySelector('.workspace-backdrop');
     const closers = shell.querySelectorAll('[data-public-close]');
+    const themeToggle = shell.querySelector('[data-public-theme-toggle]');
+    const storageKey = 'ministry-theme';
+    const legacyStorageKey = 'ministry-public-theme';
     const setNavigation = (open) => {
         shell.classList.toggle('navigation-open', open);
         publicSidebar?.classList.toggle('is-open', open);
@@ -211,6 +288,50 @@ document.querySelectorAll('[data-public-shell]').forEach((shell) => {
     closers.forEach((button) => button.addEventListener('click', () => setNavigation(false)));
     publicNavigation?.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => setNavigation(false)));
     addPageListener(window, 'keydown', (event) => { if (event.key === 'Escape') setNavigation(false); });
+
+    const setTheme = (theme) => {
+        const dark = theme === 'dark';
+        window.applyMinistryTheme?.(dark ? 'dark' : 'light');
+        shell.classList.toggle('public-theme-dark', dark);
+        themeToggle?.setAttribute('aria-pressed', String(dark));
+        themeToggle?.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+        const label = themeToggle?.querySelector('.workspace-theme-label');
+        if (label) label.textContent = dark ? 'Dark' : 'Light';
+    };
+
+    const savedTheme = window.localStorage.getItem(storageKey) ?? window.localStorage.getItem(legacyStorageKey);
+    if (savedTheme) window.localStorage.setItem(storageKey, savedTheme);
+    setTheme(savedTheme === 'dark' ? 'dark' : 'light');
+    themeToggle?.addEventListener('click', () => {
+        const theme = shell.classList.contains('public-theme-dark') ? 'light' : 'dark';
+        window.localStorage.setItem(storageKey, theme);
+        setTheme(theme);
+    });
+    addPageListener(window, 'storage', (event) => { if (event.key === storageKey) setTheme(event.newValue === 'dark' ? 'dark' : 'light'); });
+});
+
+document.querySelectorAll('[data-worship-shell]').forEach((shell) => {
+    const toggle = shell.querySelector('[data-worship-theme-toggle]');
+    if (!toggle) return;
+    const storageKey = 'ministry-theme';
+    const legacyStorageKey = 'ministry-public-theme';
+    const setTheme = (theme) => {
+        const dark = theme === 'dark';
+        shell.classList.toggle('worship-theme-dark', dark);
+        toggle.setAttribute('aria-pressed', String(dark));
+        toggle.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+        const label = toggle.querySelector('.workspace-theme-label');
+        if (label) label.textContent = dark ? 'Dark' : 'Light';
+    };
+    const savedTheme = window.localStorage.getItem(storageKey) ?? window.localStorage.getItem(legacyStorageKey);
+    if (savedTheme) window.localStorage.setItem(storageKey, savedTheme);
+    setTheme(savedTheme === 'dark' ? 'dark' : 'light');
+    toggle.addEventListener('click', () => {
+        const theme = shell.classList.contains('worship-theme-dark') ? 'light' : 'dark';
+        window.localStorage.setItem(storageKey, theme);
+        setTheme(theme);
+    });
+    addPageListener(window, 'storage', (event) => { if (event.key === storageKey) setTheme(event.newValue === 'dark' ? 'dark' : 'light'); });
 });
 
 const carousel = document.querySelector('[data-home-carousel]');
@@ -306,6 +427,26 @@ document.querySelectorAll('[data-workspace-shell]').forEach((shell) => {
         setTheme(theme);
     });
     addPageListener(window, 'storage', (event) => { if (event.key === storageKey) setTheme(event.newValue === 'dark' ? 'dark' : 'light'); });
+
+    shell.querySelectorAll('[data-service-edit-open]').forEach((trigger) => {
+        trigger.addEventListener('click', () => document.getElementById(trigger.dataset.serviceEditOpen)?.showModal());
+    });
+    shell.querySelectorAll('[data-service-edit-dialog]').forEach((dialog) => {
+        dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+        dialog.querySelectorAll('[data-service-edit-close]').forEach((button) => button.addEventListener('click', () => dialog.close()));
+    });
+    shell.querySelectorAll('.workspace-content .data-panel').forEach((panel) => {
+        if (panel.matches('.module-panel, .service-schedule-panel, .security-sessions-panel, .responsive-records')) return;
+        const table = panel.querySelector('table');
+        const labels = [...(table?.querySelectorAll('thead th') ?? [])].map((header, index) => header.textContent.trim() || `Details ${index + 1}`);
+        if (!table || labels.length === 0) return;
+        panel.classList.add('mobile-record-table');
+        table.querySelectorAll('tbody tr').forEach((row) => {
+            const cells = [...row.querySelectorAll(':scope > td')];
+            if (cells.length === 1 && cells[0].colSpan > 1) return;
+            cells.forEach((cell, index) => cell.dataset.label = labels[index] || `Details ${index + 1}`);
+        });
+    });
 });
 
 document.querySelectorAll('[name="birthday_collection_consent"]').forEach((consent) => {
@@ -419,6 +560,27 @@ document.querySelectorAll('[data-setup-timezone-picker]').forEach((picker) => {
     picker.addEventListener('keydown', (event) => { if (event.key === 'Escape') { close(); trigger.focus(); } });
 });
 
+document.querySelectorAll('[data-page-editor-tabs]').forEach((tabs) => {
+    const editor = tabs.closest('[data-page-block-editor]');
+    const buttons = [...tabs.querySelectorAll('[data-page-editor-mode]')];
+    const panels = [...editor?.querySelectorAll('[data-page-editor-panel]') ?? []];
+    if (!editor || !buttons.length || !panels.length) return;
+
+    const selectMode = (mode) => {
+        buttons.forEach((button) => {
+            const selected = button.dataset.pageEditorMode === mode;
+            button.classList.toggle('is-active', selected);
+            button.setAttribute('aria-selected', String(selected));
+            button.tabIndex = selected ? 0 : -1;
+        });
+        panels.forEach((panel) => { panel.hidden = panel.dataset.pageEditorPanel !== mode; });
+        editor.dataset.pageEditorMode = mode;
+    };
+
+    buttons.forEach((button) => button.addEventListener('click', () => selectMode(button.dataset.pageEditorMode)));
+    selectMode('manual');
+});
+
 document.querySelectorAll('[data-ai-page-draft]').forEach((panel) => {
     const button = panel.querySelector('[data-ai-generate]');
     const status = panel.querySelector('[data-ai-status]');
@@ -513,13 +675,40 @@ document.querySelectorAll('[data-page-block-editor][data-section-ai-endpoint]').
     const blocksInput = form.querySelector('[data-page-block-input]');
     const titleInput = form.querySelector('[name="title"]');
     const aiPanel = form.querySelector('[data-ai-page-draft]');
-    if (!inspector || !canvas || !blocksInput || !titleInput || !aiPanel || aiPanel.querySelector('[data-ai-generate]')?.disabled) return;
+    if (!inspector || !canvas || !blocksInput || !titleInput || !aiPanel) return;
+
+    const inspectorTabs = inspector.closest('.page-block-inspector')?.querySelector('[data-inspector-tabs]');
+    const manualTab = inspectorTabs?.querySelector('[data-inspector-tab="manual"]');
+    const aiTab = inspectorTabs?.querySelector('[data-inspector-tab="ai"]');
+    const setInspectorMode = (mode) => {
+        const aiControls = inspector.querySelector('[data-section-ai-controls]');
+        const hasSelection = Boolean(canvas.querySelector('.page-canvas-block.is-selected'));
+        if (inspectorTabs) inspectorTabs.hidden = !hasSelection;
+        inspector.closest('.page-block-inspector')?.classList.toggle('is-ai-mode', mode === 'ai' && hasSelection);
+        if (manualTab) { manualTab.classList.toggle('is-active', mode === 'manual'); manualTab.setAttribute('aria-selected', mode === 'manual' ? 'true' : 'false'); }
+        if (aiTab) { aiTab.classList.toggle('is-active', mode === 'ai'); aiTab.setAttribute('aria-selected', mode === 'ai' ? 'true' : 'false'); }
+        if (inspector) {
+            const inspectorActions = inspector.querySelector('.page-inspector-actions');
+            [...inspector.children].forEach((child) => {
+                child.hidden = mode === 'ai' && child !== aiControls && child !== inspectorActions;
+            });
+        }
+        if (aiControls) aiControls.hidden = mode !== 'ai';
+    };
+    if (manualTab && !manualTab.dataset.bound) {
+        manualTab.dataset.bound = 'true';
+        manualTab.addEventListener('click', () => setInspectorMode('manual'));
+    }
+    if (aiTab && !aiTab.dataset.bound) {
+        aiTab.dataset.bound = 'true';
+        aiTab.addEventListener('click', () => setInspectorMode('ai'));
+    }
 
     const installSectionAssistant = () => {
         if (inspector.querySelector('[data-section-ai-controls]')) return;
         const actions = inspector.querySelector('.page-inspector-actions');
         const selected = canvas.querySelector('.page-canvas-block.is-selected');
-        if (!actions || !selected) return;
+        if (!actions || !selected) { setInspectorMode('manual'); return; }
         const index = Number(selected.dataset.index);
         let blocks;
         try { blocks = JSON.parse(blocksInput.value || '[]'); } catch { return; }
@@ -545,13 +734,17 @@ document.querySelectorAll('[data-page-block-editor][data-section-ai-endpoint]').
         ask.className = 'button';
         ask.dataset.sectionAiAsk = '';
         ask.textContent = 'Suggest changes';
+        const aiUnavailable = aiPanel.querySelector('[data-ai-generate]')?.disabled;
+        if (aiUnavailable) ask.disabled = true;
         const status = document.createElement('p');
         status.className = 'page-section-ai-status';
         status.dataset.sectionAiStatus = '';
         status.setAttribute('role', 'status');
         status.setAttribute('aria-live', 'polite');
+        if (aiUnavailable) status.textContent = 'AI editing is unavailable until an administrator verifies a model route in AI model settings.';
         section.append(heading, description, instruction, ask, status);
         actions.after(section);
+        setInspectorMode('manual');
 
         ask.addEventListener('click', async () => {
             const brief = instruction.value.trim();
@@ -945,6 +1138,12 @@ enhancedSelects.forEach((select) => {
 });
 };
 initializeEnhancedSelects();
+// Pages that replace fragments in place (for example the media library filters)
+// can re-run the same select enhancement without a full navigation.
+window.initializeEnhancedSelects = initializeEnhancedSelects;
+document.addEventListener('ministry:enhance-selects', (event) => {
+    initializeEnhancedSelects(event.detail instanceof Element ? event.detail : document);
+});
 
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 
@@ -1065,16 +1264,28 @@ const applyAiSettingsData = (data = {}) => {
     }
 };
 
+const applyAsyncFormData = (form, data = {}) => {
+    if (form.dataset.asyncHandler === 'ai-settings') applyAiSettingsData(data);
+    form.dispatchEvent(new CustomEvent('ministry:async-success', { bubbles: true, detail: data }));
+    if (!data.redirect) return;
+    if (window.Livewire?.navigate) {
+        window.Livewire.navigate(data.redirect);
+    } else {
+        window.location.assign(data.redirect);
+    }
+};
+
 document.querySelectorAll('form[data-async-form]').forEach((form) => {
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
         if (form.dataset.submitting === 'true') return;
         form.dataset.submitting = 'true';
         removeFieldErrors(form);
-        showAsyncFeedback(form.dataset.pendingLabel ?? 'Saving…', 'pending');
+        const pendingLabel = form.dataset.asyncPendingLabel ?? form.dataset.pendingLabel ?? 'Saving…';
+        showAsyncFeedback(pendingLabel, 'pending');
         const submitter = event.submitter;
         const originalLabel = submitter?.textContent;
-        if (submitter) { submitter.disabled = true; submitter.textContent = form.dataset.pendingLabel ?? 'Saving…'; }
+        if (submitter) { submitter.disabled = true; submitter.textContent = pendingLabel; }
         try {
             const response = await fetch(form.action, {
                 method: 'POST',
@@ -1087,7 +1298,7 @@ document.querySelectorAll('form[data-async-form]').forEach((form) => {
                 showFieldErrors(form, result.errors);
                 throw new Error(result.message ?? 'This change could not be saved. Check the highlighted fields.');
             }
-            applyAiSettingsData(result.data ?? {});
+            applyAsyncFormData(form, result.data ?? {});
             showAsyncFeedback(result.message ?? 'Saved.', 'success');
             form.querySelector('input[name="api_key"]')?.value && (form.querySelector('input[name="api_key"]').value = '');
         } catch (error) {

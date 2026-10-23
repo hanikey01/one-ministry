@@ -274,17 +274,17 @@
                     if (event.key === 'Escape') { event.preventDefault(); closeIconPicker(picker, true); }
                 });
             });
-            document.addEventListener('pointerdown', (event) => {
+            window.MinistryPage?.addListener(document, 'pointerdown', (event) => {
                 document.querySelectorAll('[data-icon-picker-panel]:not([hidden])').forEach((panel) => {
                     const owner = document.querySelector(`[aria-controls="${CSS.escape(panel.id)}"]`)?.closest('[data-icon-picker]');
                     if (owner && !owner.contains(event.target) && !panel.contains(event.target)) closeIconPicker(owner);
                 });
             });
-            window.addEventListener('resize', () => document.querySelectorAll('[data-icon-picker-panel]:not([hidden])').forEach((panel) => {
+            window.MinistryPage?.addListener(window, 'resize', () => document.querySelectorAll('[data-icon-picker-panel]:not([hidden])').forEach((panel) => {
                 const owner = document.querySelector(`[aria-controls="${CSS.escape(panel.id)}"]`)?.closest('[data-icon-picker]');
                 if (owner) positionIconPicker(owner);
             }));
-            window.addEventListener('scroll', () => document.querySelectorAll('[data-icon-picker-panel]:not([hidden])').forEach((panel) => {
+            window.MinistryPage?.addListener(window, 'scroll', () => document.querySelectorAll('[data-icon-picker-panel]:not([hidden])').forEach((panel) => {
                 const owner = document.querySelector(`[aria-controls="${CSS.escape(panel.id)}"]`)?.closest('[data-icon-picker]');
                 if (owner) positionIconPicker(owner);
             }), true);

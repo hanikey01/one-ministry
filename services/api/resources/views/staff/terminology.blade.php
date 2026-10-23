@@ -4,7 +4,7 @@
     </header>
     @if(session('status'))<div class="form-success" role="status">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="form-errors" role="alert">{{ $errors->first() }}</div>@endif
-    <form class="appearance-stack" method="POST" action="{{ route('staff.terminology.update') }}" x-data="{ preview: @js(old('terminology', $values)) }">
+    <form class="appearance-stack" method="POST" action="{{ route('staff.terminology.update') }}" data-async-form data-async-pending-label="Saving terminology…" x-data="{ preview: @js(old('terminology', $values)) }">
         @csrf @method('PUT')
         <section class="appearance-panel">
             <div class="appearance-panel-heading"><span><x-ui.icon name="message"/></span><div><h2>Core terms</h2><p>These overrides change interface labels. They do not change URLs, permissions, stored records, or ministry data.</p></div></div>

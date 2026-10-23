@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\UpdateMinistrySettings;
 use App\Models\MinistrySetting;
 use App\Support\MinistryTerminology;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -23,7 +24,7 @@ final class MinistryTerminologyController extends Controller
         ]);
     }
 
-    public function update(Request $request, UpdateMinistrySettings $update): RedirectResponse
+    public function update(Request $request, UpdateMinistrySettings $update): RedirectResponse|JsonResponse
     {
         $rules = ['terminology' => ['required', 'array:'.implode(',', array_map(fn (string $key): string => $key, array_keys(MinistryTerminology::TERMS)))]];
         foreach (MinistryTerminology::TERMS as $term => $_definition) {
@@ -46,6 +47,12 @@ final class MinistryTerminologyController extends Controller
 
         $update->execute(['terminology' => $normalized ?: null], $request->user(), $request->ip());
 
-        return to_route('staff.terminology')->with('status', 'Ministry terminology saved.');
+        $message = 'Ministry terminology saved.';
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message, 'data' => ['terminology' => $normalized]]);
+        }
+
+        return to_route('staff.terminology')->with('status', $message);
     }
 }

@@ -1,17 +1,27 @@
 # 12 — Implementation Status
 
-**Updated:** 2026-10-21
+**Updated:** 2026-10-22
 **Current phase:** Shared-hosting transition verification — Laravel-first production profile
 
-This file records verified implementation status. Product rules remain in documents `00`–`11`; this file is not a substitute for their quality gates.
+This file records verified implementation status. Product rules remain in documents `00`–`11` and `18`; this file is not a substitute for their quality gates.
 
-## Current product direction — 2026-10-21
+## Current product direction — 2026-10-22
+
+The canonical source-of-truth map is in `00-product-master.md`; the accepted cross-cutting application-experience and performance rules are in `18-experience-performance-contract.md`. This status document records implementation and verification evidence only. Historical notes and a current preview do not override those contracts.
 
 - Keep platform defaults neutral across cultures and denominations: white/gray light surfaces and charcoal/near-black dark surfaces. Each installation owns its primary/accent colors, mode-specific canvas/panels/sidebar, and derived readable foregrounds.
 - Build the optional AI page editor around installation-owned provider/model configuration, approved page blocks, section-scoped revisions, and staff review before save or publication.
 - Make routine staff/member operations feel responsive and app-like with in-place saves where safe and a shared, theme-aware viewport notification system. This is an incremental rollout; the AI model settings forms are the first explicit in-place slice, while many existing forms still redirect.
 - Keep shared-host Laravel/Blade behavior and normal form submissions as the portable baseline. Do not describe a source implementation as released until its build, accessibility, browser, migration, and applicable tests pass.
 - Ministry terminology settings are being added as display-only singular/plural overrides. Initial source includes persistence, an audited staff editor, and a shared lookup for core domain labels; consistent use across existing interfaces and browser validation remain pending.
+- The first central page-editor consolidation slice adds a typed `pages` identity (`standard` or future `homepage`) and a stable `source_key` for migration. Existing homepage configuration tables and routes remain active until block parity and public-renderer migration are verified.
+- Batch 2 adds the reusable homepage block contract (`carousel`, `live_service`, `locations`, `giving`, `prayer`, `sermon_spotlight`, `books`, `announcements`, `volunteer`, `newsletter`, `next_steps`, `welcome`, and `custom`) to the central page workspace and gives the public renderer safe, escaped, feature-aware output for those types. The dedicated homepage editor remains the active authoring/runtime path until the later migration batch completes.
+- Batch 3 adds an idempotent “Open homepage editor” import action. It projects the currently published homepage slides and enabled sections into one draft `pages` record with `page_type=homepage` and `source_key=homepage`, preserving the original homepage tables and editor. This is a reviewable migration bridge; it does not switch public homepage runtime or automatically overwrite later homepage changes.
+- Batch 4 adds the controlled runtime handoff: only a central homepage record that is explicitly published can serve `/`; otherwise the existing homepage renderer remains active. This keeps the migration reversible and makes publication the required cutover decision.
+- Batch 5 makes central page identity visible in the Pages workspace by showing whether a record is a homepage or standard page. The manual editor’s richer homepage controls remain intentionally staged behind the central schema until the rebuilt preview is available for interaction review.
+- Batch 6 adds an explicit central-homepage draft notice in the editor so staff understand the imported source and the publication consequence before activating the new root renderer.
+- Batch 7 applies the central editor’s destination validation and publish checks to homepage-oriented blocks. Internal paths and HTTP(S) destinations are accepted; unsafe schemes and labelled buttons without destinations are rejected before publication.
+- Batch 8 adds a visible handoff from the legacy homepage editor to the central editor, so staff can move between the two workflows without guessing where homepage editing is heading.
 
 ## Built
 
@@ -161,6 +171,14 @@ The Zoom Video SDK is now dynamically imported only after an admitted user press
 The bounded AI page-editor exception is recorded in D-029 and in the owning architecture, data, contract, system, interface, and operations documents. Source includes installation-owned encrypted Gemini/OpenRouter credentials, provider model-catalog refresh on demand and daily through Laravel's scheduler, structured-output primary/fallback route selection, live compatibility checks, redacted configuration audit events, a protected staff AI model settings page, and the `ai_page_editor` feature flag defaulted off. The page editor supports full-page plans with review before application, plus manual block insertion, editing, duplication, removal, and ordering. A selected-block revision endpoint sends the complete ordered public draft to the configured provider as context and constrains output to the selected block's existing fields; URL values are retained. Its inspector stages the response for staff review and explicit application. Both workflows remain unsaved until staff save through the regular draft form; publishing remains a separate permission-gated review. Generation audit events include provider/model, fallback use, and latency, never prompt or page content. Per D-030, provider and route configuration requires `ai.manage` and verified email with auditing, but does not require MFA. The feature test is present but could not run in the earlier verification environment because `services/api/vendor/autoload.php` was absent. Provider behavior, migration compatibility, full Blade/browser review, and applicable release checks remain pending.
 
 The AI model settings provider, catalog refresh, route save, and route compatibility-check forms now support in-place JSON submissions with pending, success, and error feedback. Validation is attached to relevant fields, catalog updates refresh the searchable model selectors, and non-JavaScript form submissions retain their redirect behavior. The existing Vite container built the updated assets without rebuilding the application image; browser interaction review remains pending.
+
+The shared async-form protocol now also supports terminology and page-draft saves. Existing page drafts remain in place after save; newly created drafts navigate into their editor from a JSON response. Normal browser submissions remain the no-JavaScript fallback. Shared public, workspace, and worship shell behavior has moved from inline Blade scripts into the route lifecycle, and public sidebar/mobile links now opt into enhanced navigation. The local checkout has no Node dependencies, so an asset build and browser interaction review remain pending.
+
+The canonical semantic palette now explicitly separates ministry `brand` identity from the `action` token used by primary controls. `action` currently resolves to the ministry-configured accent color and uses its calculated readable foreground, so all primary controls follow one accessible rule without adding a duplicate button-color setting. The legacy override stylesheet remains loaded during the staged visual-system consolidation; moving it into the Vite source remains a dedicated follow-up to avoid unreviewed regressions across the existing staff, member, and public surfaces.
+
+Member workspace routes now fetch only the records required by the current screen; the member home retains its combined dashboard queries. A pending migration adds indexes for public event chronology and member event-registration listings. Migration execution, asset build, and browser review remain pending until the consolidated rebuild.
+
+The local debug web stack now emits a `Server-Timing: app` response metric, and Caddy applies long-lived immutable caching to fingerprinted Vite assets and versioned shared CSS. HTML remains private/no-cache. Production keeps the timing header off unless debug mode is enabled.
 
 The shared application shell now provides a fixed viewport notification stack for completed flashes and in-place form feedback, with status-aware colors, dismissal, live announcements, safe-area-aware placement, and active light/dark theme colors. Existing staff and member flash notices are surfaced in the stack while inline field errors remain beside their fields. The latest notification changes are in source but not yet in the built preview bundle; the Docker API was unavailable during this update. Visual/accessibility review remains required.
 

@@ -93,6 +93,14 @@ When a question is resolved, record date, decision maker, evidence, alternatives
 
 **Status:** Accepted by user direction, 2026-10-20. Existing stored primary/accent choices are preserved as ministry-owned settings; new neutral surface defaults are supplied through an additive migration.
 
+### D-030 — Structured responsive page documents
+
+**Decision:** The central page editor will evolve from a flat ordered block list to a versioned page document containing sections/containers, columns, and child elements. Sections own full-width/background/spacing settings; columns own responsive width, stacking, alignment, and gap behavior; elements own content and element-specific settings. Responsive overrides are explicit for desktop, tablet, and mobile, with safe defaults when an override is absent. A compatibility reader will continue to open existing flat documents while they are migrated.
+
+**Reason:** A flat list cannot express reusable parent containers, multiple elements in one column, nested layout, or breakpoint-specific behavior. The structured model is required for an Elementor-style editor while preserving the shared-hosting renderer, approved element allowlist, module gates, and draft-first publication workflow.
+
+**Status:** Accepted for the next page-editor implementation batch, 2026-10-22.
+
 ### D-029 — Bounded AI page-editor provider configuration
 
 **Decision:** Amend the first-release AI exclusion in `01-architecture.md` to allow a feature-gated AI page-editor assistant. The first supported provider connections are Google Gemini directly and OpenRouter. Each installation owns and configures its credentials. The staff AI settings page maintains a provider-neutral model catalog and an ordered model route for page drafting. Catalog discovery does not activate a model: an administrator must select a route, run a structured-output compatibility check, and explicitly activate it. Enabled model catalogs refresh daily and on demand. Removed or incompatible models make the route unavailable and require review; the system does not silently replace the selected primary model. Generated page copy is validated and placed in the existing visual editor; it is persisted as a draft revision only when staff explicitly save it, then goes through the existing publishing review. The assistant receives only the staff-entered brief, title, and optional public details; it does not read pastoral-care, giving, attendance, or children's records.
@@ -132,3 +140,11 @@ When a question is resolved, record date, decision maker, evidence, alternatives
 **Reason:** User direction, 2026-10-21. The Public menu should follow the same direct row pattern as Staff and Member navigation, while preserving the existing public-link management capabilities.
 
 **Status:** Accepted and implemented with additive section and menu-selection migrations. Existing links default to Main and remain selected. Both migrations are applied in the local Compose database; the compact responsive Public rows and selection interaction were reviewed in the local browser.
+
+### D-034 — Unified application-experience and performance contract
+
+**Decision:** The product uses one explicit cross-cutting contract for the application experience: neutral defaults; ministry-owned branding, terminology, navigation, and sidebar treatment; semantic tokens; accent-derived primary action foregrounds; theme-aware overlays and notifications; scoped, app-like navigation and saves; and measured performance rules. The contract is `18-experience-performance-contract.md` and is read with the Product Master before feature design.
+
+**Reason:** Design and performance decisions had accumulated across an audit, implementation notes, and individual feature discussions. A dedicated contract prevents future features from reintroducing inconsistent styling, full-page saves, clipping overlays, duplicate navigation behavior, or deployment assumptions that break shared-host portability.
+
+**Status:** Accepted by user direction, 2026-10-22. It formalizes existing accepted directions and does not claim unverified implementation work as complete.

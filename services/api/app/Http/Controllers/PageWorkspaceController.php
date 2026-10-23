@@ -6,6 +6,7 @@ use App\Models\FeatureSetting;
 use App\Models\MinistrySetting;
 use App\Services\PermissionChecker;
 use App\Services\ModuleAvailability;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -62,7 +63,7 @@ class PageWorkspaceController extends Controller
         return view('public.page', compact('page', 'settings', 'features') + ['editorPreview' => true]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|JsonResponse
     {
         $data = $this->data($request);
         $id = (string) Str::uuid();
@@ -72,7 +73,16 @@ class PageWorkspaceController extends Controller
             $this->audit($request, 'content.page_created', $id, ['slug' => $data['slug']]);
         });
 
-        return to_route('staff.pages.edit', $id)->with('status', 'Draft created. Review and publish it when it is ready.');
+        $message = 'Draft created. Review and publish it when it is ready.';
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => $message,
+                'data' => ['redirect' => route('staff.pages.edit', $id), 'page_id' => $id],
+            ], 201);
+        }
+
+        return to_route('staff.pages.edit', $id)->with('status', $message);
     }
 
     public function edit(Request $request, string $page): View
@@ -85,7 +95,7 @@ class PageWorkspaceController extends Controller
         return view('staff.pages.form', compact('settings', 'page', 'revisions', 'canPublish') + ['user' => $request->user(), 'starter' => null, 'blocks' => $this->editorBlocks($page->blocks ?? null, $page->body), 'features' => $this->enabledFeatures(), 'mediaAssets' => $this->pageMediaAssets(), 'aiDraftAvailable' => app(ModuleAvailability::class)->visibleToStaff('ai_page_editor', $request->user()), 'aiDraftRoute' => DB::table('ai_task_routes')->where('task_key', 'page_editor')->first()]);
     }
 
-    public function update(Request $request, string $page): RedirectResponse
+    public function update(Request $request, string $page): RedirectResponse|JsonResponse
     {
         $record = DB::table('pages')->where('id', $page)->firstOrFail();
         $data = $this->data($request, $page);
@@ -96,7 +106,16 @@ class PageWorkspaceController extends Controller
             $this->audit($request, 'content.page_updated', $page, ['revision' => $revision, 'previous_status' => $record->status]);
         });
 
-        return back()->with('status', 'Changes saved as a draft. The page needs review before it is public.');
+        $message = 'Changes saved as a draft. The page needs review before it is public.';
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => $message,
+                'data' => ['page_id' => $page, 'revision' => $revision, 'status' => 'draft'],
+            ]);
+        }
+
+        return back()->with('status', $message);
     }
 
     public function publish(Request $request, string $page): RedirectResponse
@@ -111,7 +130,7 @@ class PageWorkspaceController extends Controller
                 ) {
                 throw ValidationException::withMessages(['blocks' => 'Choose an image for every image section, or remove sections you do not need.']);
             }
-            if (in_array($block['type'], ['hero', 'call_to_action', 'media_text'], true) && filled($data['button_label'] ?? '') && blank($data['button_url'] ?? '')) {
+            if (in_array($block['type'], ['hero', 'call_to_action', 'media_text', 'carousel', 'live_service', 'locations', 'giving', 'prayer', 'sermon_spotlight', 'books', 'announcements', 'volunteer', 'newsletter', 'next_steps', 'welcome', 'custom'], true) && filled($data['button_label'] ?? '') && blank($data['button_url'] ?? '')) {
                 throw ValidationException::withMessages(['blocks' => 'Choose a destination for every button, or remove its label before publishing.']);
             }
         }
@@ -137,7 +156,7 @@ class PageWorkspaceController extends Controller
         abort_if(in_array($data['slug'], self::RESERVED, true), 422, 'This page address is reserved.');
 
         $blocks = $this->normaliseBlocks($data['blocks'] ?? null, $data['body'] ?? null);
-        $data['blocks'] = json_encode($blocks, JSON_THROW_ON_ERROR);
+        $data['blocks'] = json_encode(app(\App\Services\PageDocumentService::class)->fromFlat($blocks), JSON_THROW_ON_ERROR);
         $data['body'] = $this->plainTextFromBlocks($blocks);
 
         return $data;
@@ -151,6 +170,9 @@ class PageWorkspaceController extends Controller
                 $decoded = json_decode($encodedBlocks, true, 512, JSON_THROW_ON_ERROR);
 
                 if (is_array($decoded)) {
+                    if (($decoded['version'] ?? null) === 2) {
+                        return app(\App\Services\PageDocumentService::class)->flatten($decoded);
+                    }
                     return $decoded;
                 }
             } catch (\JsonException) {
@@ -182,6 +204,10 @@ class PageWorkspaceController extends Controller
             throw ValidationException::withMessages(['blocks' => 'A page can contain up to 60 blocks.']);
         }
 
+        if (($decoded['version'] ?? null) === 2) {
+            return app(\App\Services\PageDocumentService::class)->flatten($decoded);
+        }
+
         $allowed = [
             'hero' => ['eyebrow', 'title', 'body', 'button_label', 'button_url'],
             'heading' => ['text'],
@@ -200,11 +226,29 @@ class PageWorkspaceController extends Controller
             'service_times' => ['title', 'body'],
             'events' => ['title', 'body'],
             'groups' => ['title', 'body'],
+            'carousel' => ['eyebrow', 'title', 'body', 'slides', 'button_label', 'button_url'],
+            'live_service' => ['title', 'body', 'button_label', 'button_url'],
+            'locations' => ['title', 'body', 'button_label', 'button_url'],
+            'giving' => ['title', 'body', 'button_label', 'button_url'],
+            'prayer' => ['title', 'body', 'button_label', 'button_url'],
+            'sermon_spotlight' => ['title', 'body', 'button_label', 'button_url'],
+            'books' => ['title', 'body', 'button_label', 'button_url'],
+            'announcements' => ['title', 'body', 'button_label', 'button_url'],
+            'volunteer' => ['title', 'body', 'button_label', 'button_url'],
+            'newsletter' => ['title', 'body', 'button_label', 'button_url'],
+            'next_steps' => ['title', 'body', 'button_label', 'button_url'],
+            'welcome' => ['title', 'body', 'button_label', 'button_url'],
+            'custom' => ['title', 'body', 'button_label', 'button_url'],
             'section' => ['layout', 'title', 'body', 'column_one_title', 'column_one_body', 'column_two_title', 'column_two_body', 'column_three_title', 'column_three_body', 'background_color', 'padding'],
             'divider' => [],
         ];
         if (! in_array('groups', $this->enabledFeatures(), true)) {
             unset($allowed['groups']);
+        }
+        foreach (['live_service' => 'digital_church', 'giving' => 'giving', 'books' => 'books_library', 'volunteer' => 'volunteers'] as $blockType => $feature) {
+            if (! in_array($feature, $this->enabledFeatures(), true)) {
+                unset($allowed[$blockType]);
+            }
         }
 
         $blocks = [];
@@ -224,6 +268,7 @@ class PageWorkspaceController extends Controller
                 if ($key === 'layout' && ! in_array($data[$key], ['one', 'two', 'three'], true)) throw ValidationException::withMessages(['blocks' => 'Choose a valid section column layout.']);
                 if ($key === 'padding' && ! in_array($data[$key], ['compact', 'regular', 'spacious'], true)) throw ValidationException::withMessages(['blocks' => 'Choose a valid section spacing option.']);
                 if (in_array($key, ['url', 'media_url'], true) && $data[$key] !== '' && ! preg_match('#^https?://#i', $data[$key])) throw ValidationException::withMessages(['blocks' => 'Media links must use an HTTP or HTTPS URL.']);
+                if ($key === 'button_url' && $data[$key] !== '' && ! preg_match('#^(?:https?://|/)#i', $data[$key])) throw ValidationException::withMessages(['blocks' => 'Button destinations must use an HTTP(S) link or an internal path.']);
                 if ($key === 'images' && $data[$key] !== '') {
                     $images = array_values(array_filter(preg_split('/\R/', $data[$key]) ?: []));
                     if (count($images) > 12 || collect($images)->contains(fn (string $url): bool => ! preg_match('#^https?://#i', trim($url)))) throw ValidationException::withMessages(['blocks' => 'A gallery accepts up to 12 HTTP or HTTPS image links.']);
@@ -250,10 +295,21 @@ class PageWorkspaceController extends Controller
     {
         return DB::table('media_assets')
             ->where('status', 'published')
-            ->where('provider_key', 'like', 'http%')
             ->orderByDesc('published_at')
+            ->orderByDesc('created_at')
             ->limit(24)
-            ->get(['id', 'title', 'provider_key', 'library']);
+            ->get(['id', 'title', 'provider_key', 'provider', 'library', 'kind', 'file_mime'])
+            ->map(function (object $asset): object {
+                if (($asset->provider ?? 'local') === 'local' && ! str_starts_with((string) $asset->provider_key, 'http')) {
+                    $asset->provider_key = route('staff.media-library.file', $asset->id);
+                }
+                $mime = strtolower((string) ($asset->file_mime ?? ''));
+                $kind = strtolower((string) ($asset->kind ?? ''));
+                $asset->media_type = str_starts_with($mime, 'image/') || $kind === 'image' ? 'image'
+                    : (str_starts_with($mime, 'video/') || $kind === 'video' ? 'video'
+                    : (str_starts_with($mime, 'audio/') || $kind === 'audio' ? 'audio' : 'file'));
+                return $asset;
+            });
     }
 
     /** @return array<int, string> */

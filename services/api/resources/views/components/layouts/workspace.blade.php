@@ -47,29 +47,5 @@
         <nav class="workspace-mobile-nav" aria-label="{{ $surface === 'member' ? 'Member' : 'Staff' }} mobile navigation">
             @foreach(app(\App\Services\NavigationLayout::class)->entries($surface, 'mobile', auth()->user(), $surfaceFeatures) as $entry)<a href="{{ $entry['url'] }}" wire:navigate.hover @if(request()->routeIs($entry['match'], $entry['match'].'.*') && ($surface !== 'member' || !str_starts_with($entry['key'], 'page:') || request()->route('slug') === str($entry['key'])->after(':'))) aria-current="page" @endif><x-ui.icon :name="$entry['icon']"/><span>{{ $entry['label'] }}</span></a>@endforeach
         </nav>
-        <script>
-            (() => {
-            const workspaceShell = document.currentScript.closest('[data-workspace-shell]');
-            workspaceShell?.querySelectorAll('[data-service-edit-open]').forEach((trigger) => {
-                trigger.addEventListener('click', () => document.getElementById(trigger.dataset.serviceEditOpen)?.showModal());
-            });
-            workspaceShell?.querySelectorAll('[data-service-edit-dialog]').forEach((dialog) => {
-                dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
-                dialog.querySelectorAll('[data-service-edit-close]').forEach((button) => button.addEventListener('click', () => dialog.close()));
-            });
-            workspaceShell?.querySelectorAll('.workspace-content .data-panel').forEach((panel) => {
-                if (panel.matches('.module-panel, .service-schedule-panel, .security-sessions-panel, .responsive-records')) return;
-                const table = panel.querySelector('table');
-                const labels = [...(table?.querySelectorAll('thead th') ?? [])].map((header, index) => header.textContent.trim() || `Details ${index + 1}`);
-                if (!table || labels.length === 0) return;
-                panel.classList.add('mobile-record-table');
-                table.querySelectorAll('tbody tr').forEach((row) => {
-                    const cells = [...row.querySelectorAll(':scope > td')];
-                    if (cells.length === 1 && cells[0].colSpan > 1) return;
-                    cells.forEach((cell, index) => cell.dataset.label = labels[index] || `Details ${index + 1}`);
-                });
-            });
-            })();
-        </script>
     </div>
 </x-layouts.app>

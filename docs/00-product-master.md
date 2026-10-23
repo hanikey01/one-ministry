@@ -1,8 +1,8 @@
 # Ministry Platform — Product Master Document
 
 **Status:** Canonical product baseline; implementation details remain subject to review  
-**Version:** 0.3  
-**Date:** 2026-10-14
+**Version:** 0.4
+**Date:** 2026-10-22
 
 ## 1. Purpose
 
@@ -11,6 +11,23 @@ Build a Christian ministry web application that an independent ministry can depl
 The primary distribution target is ordinary shared PHP hosting. The finished application runs as one Laravel application and does not require a Node.js runtime, Docker, Redis, a daemon worker, or a self-hosted realtime service. Those are optional enhancement profiles. Video delivery, payments, mail, storage, meetings, and optional realtime services remain installation-owned external providers.
 
 This document defines product behavior. The companion documents define the architecture, data model, interfaces, modules, design, build sequence, and operations. Technical choices are working recommendations; validation gates are identified in the build plan.
+
+## Source of truth
+
+This document is the product baseline. Read it with the following owners before designing or changing a feature:
+
+| Concern | Owning document |
+| --- | --- |
+| Shared application experience, navigation, theming, app-like interactions, and performance rules | [18 — Application Experience and Performance Contract](18-experience-performance-contract.md) |
+| Interface components, accessibility, page editor, and visual-detail rules | [07 — Experience and Design System](07-design.md) |
+| Laravel/shared-hosting boundaries and deployment profiles | [01 — Architecture](01-architecture.md) and [13 — Shared-Hosting Transition](13-shared-hosting-transition.md) |
+| Domain state rules, feature gating, privacy, and authorization | [05 — Systems](05-systems.md), [02 — Database](02-database.md), and [10 — Permissions Matrix](10-permissions-matrix.md) |
+| APIs and browser/internal contracts | [03 — API Contracts](03-api-contracts.md) |
+| Work sequencing and quality gates | [06 — Build Plan](06-build-plan.md) |
+| Accepted and unresolved product choices | [09 — Decisions](09-decisions.md) |
+| Implemented and actually verified work | [12 — Implementation Status](12-implementation-status.md) |
+
+Historical audits and status notes describe context; they do not override the documents above. When a requirement conflicts, record the proposed resolution in `09-decisions.md` before implementation.
 
 ## 2. Product principles
 

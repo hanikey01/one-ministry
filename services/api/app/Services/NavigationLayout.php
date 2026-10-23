@@ -133,7 +133,7 @@ final class NavigationLayout
             'staff.content' => $this->item('Content library', 'content', 'staff.content', 'Publishing', 'content.manage'),
             'staff.pages' => $this->item('Pages', 'content', 'staff.pages', 'Publishing', 'content.manage'),
             'staff.navigation' => $this->item('Navigation', 'menu', 'staff.navigation', 'Publishing', 'content.manage'),
-            'staff.homepage' => $this->item('Homepage', 'homepage', 'staff.homepage', 'Publishing', 'content.manage'),
+            'staff.media-library' => $this->item('Media library', 'image', 'staff.media-library', 'Publishing', 'content.manage'),
             'staff.locations' => $this->item('Locations', 'location', 'staff.locations', 'Administration', 'locations.read'),
             'staff.modules' => $this->item('Modules', 'modules', 'staff.modules', 'Administration', 'features.read'),
             'staff.access' => $this->item('Staff access', 'access', 'staff.access', 'Administration', 'roles.manage'),

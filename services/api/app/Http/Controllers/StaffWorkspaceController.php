@@ -19,6 +19,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
@@ -54,8 +55,18 @@ class StaffWorkspaceController extends Controller
     {
         $delivery = app(EmailDeliverySettingsService::class)->setting();
         $zoom = app(ZoomVideoSdkSettingsService::class)->setting();
+        $homepagePages = DB::table('pages')->where('status', 'published')->orderBy('title')->get(['id', 'title', 'slug']);
 
-        return view('staff.settings', ['settings' => MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID), 'user' => $request->user(), 'timezones' => timezone_identifiers_list(), 'emailDelivery' => $delivery, 'emailProviders' => EmailDeliverySettingsService::providers(), 'zoomVideoSdk' => $zoom]);
+        return view('staff.settings', ['settings' => MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID), 'homepagePages' => $homepagePages, 'user' => $request->user(), 'timezones' => timezone_identifiers_list(), 'emailDelivery' => $delivery, 'emailProviders' => EmailDeliverySettingsService::providers(), 'zoomVideoSdk' => $zoom]);
+    }
+
+    public function updateHomepage(Request $request): RedirectResponse
+    {
+        $data = $request->validate(['homepage_page_id' => ['nullable', 'uuid', Rule::exists('pages', 'id')->where(fn ($query) => $query->where('status', 'published'))]]);
+        $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
+        $settings->forceFill(['homepage_page_id' => $data['homepage_page_id'] ?? null])->save();
+
+        return to_route('staff.settings')->with('status', 'Homepage selection saved.');
     }
 
     public function people(Request $request): View
@@ -427,6 +438,92 @@ class StaffWorkspaceController extends Controller
         $assets = DB::table('media_assets')->whereIn('library', $availableLibraries)->orderByDesc('created_at')->paginate(15);
 
         return view('staff.content', compact('settings', 'assets') + ['user' => $request->user()]);
+    }
+
+    public function mediaLibrary(Request $request): View
+    {
+        $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
+        $query = trim((string) $request->query('q'));
+        $view = $request->query('view', 'grid') === 'list' ? 'list' : 'grid';
+        $type = in_array($request->query('type'), ['image', 'video', 'application'], true) ? $request->query('type') : '';
+        $status = in_array($request->query('status'), ['draft', 'published', 'rejected'], true) ? $request->query('status') : '';
+        $sort = in_array($request->query('sort'), ['oldest', 'name', 'size'], true) ? $request->query('sort') : 'newest';
+        $assets = DB::table('media_assets')->where('library', 'media_library')
+            ->when($query !== '', fn ($q) => $q->where(function ($inner) use ($query): void {
+                $inner->where('title', 'like', "%{$query}%")->orWhere('file_name', 'like', "%{$query}%");
+            }))->when($type !== '', fn ($q) => $q->where('file_mime', 'like', $type.'/%'))
+            ->when($status !== '', fn ($q) => $q->where('status', $status))
+            ->when($sort === 'oldest', fn ($q) => $q->oldest('created_at'))
+            ->when($sort === 'name', fn ($q) => $q->orderBy('title'))
+            ->when($sort === 'size', fn ($q) => $q->orderByDesc('file_size_bytes'))
+            ->when($sort === 'newest', fn ($q) => $q->latest('created_at'))
+            ->paginate(24)->withQueryString();
+
+        return view('staff.media-library', compact('settings', 'assets', 'query', 'view', 'type', 'status', 'sort') + ['user' => $request->user()]);
+    }
+
+    public function uploadMediaLibrary(Request $request): RedirectResponse|JsonResponse
+    {
+        $data = $request->validate([
+            'title' => ['nullable', 'string', 'max:200'],
+            'file' => ['required', 'array', 'min:1'],
+            'file.*' => ['file', 'mimes:jpg,jpeg,png,webp,gif,svg,mp4,webm,mov,pdf,doc,docx,ppt,pptx,xls,xlsx,txt', 'max:102400'],
+        ]);
+        $uploaded = [];
+        foreach ($request->file('file', []) as $file) {
+            $path = $file->store('media-library', 'local');
+            $title = ($data['title'] ?? null) ?: str($file->getClientOriginalName())->beforeLast('.')->replace(['-', '_'], ' ')->headline()->toString();
+            $id = (string) Str::uuid();
+            DB::table('media_assets')->insert([
+            'id' => $id, 'title' => $title, 'description' => null,
+            'provider' => 'local', 'provider_key' => $path, 'library' => 'media_library', 'kind' => str($file->getMimeType())->before('/')->toString(),
+            'status' => 'published', 'published_at' => now(), 'file_disk' => 'local', 'file_path' => $path, 'file_name' => $file->getClientOriginalName(),
+            'file_mime' => $file->getMimeType(), 'file_size_bytes' => $file->getSize(), 'created_at' => now(), 'updated_at' => now(),
+            ]);
+            $uploaded[] = ['id' => $id, 'title' => $title, 'url' => route('staff.media-library.file', $id), 'kind' => str($file->getMimeType())->before('/')->toString()];
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Media uploaded and published.', 'assets' => $uploaded], 201);
+        }
+
+        return to_route('staff.media-library')->with('status', 'Media uploaded and published.');
+    }
+
+    public function mediaLibraryFile(Request $request, string $asset): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $record = DB::table('media_assets')->where(['id' => $asset, 'library' => 'media_library', 'status' => 'published'])->first();
+        abort_unless($record && $record->provider === 'local' && $record->file_path, 404);
+        $path = Storage::disk($record->file_disk ?: 'local')->path($record->file_path);
+        abort_unless(is_file($path), 404);
+        return response()->file($path, ['Content-Disposition' => 'inline; filename="'.addslashes($record->file_name ?: $record->title).'"']);
+    }
+
+    public function updateMediaLibrary(Request $request, string $asset): RedirectResponse|JsonResponse
+    {
+        $data = $request->validate(['title' => ['required', 'string', 'max:200'], 'file_name' => ['required', 'string', 'max:255'], 'alt_text' => ['nullable', 'string', 'max:180'], 'caption' => ['nullable', 'string', 'max:255'], 'description' => ['nullable', 'string', 'max:5000']]);
+        abort_unless(DB::table('media_assets')->where(['id' => $asset, 'library' => 'media_library'])->exists(), 404);
+        DB::table('media_assets')->where('id', $asset)->update([...$data, 'updated_at' => now()]);
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Media details updated.', 'asset' => DB::table('media_assets')->where('id', $asset)->first()]);
+        }
+
+        return to_route('staff.media-library')->with('status', 'Media details updated.');
+    }
+
+    public function deleteMediaLibrary(Request $request, string $asset): RedirectResponse|JsonResponse
+    {
+        $record = DB::table('media_assets')->where(['id' => $asset, 'library' => 'media_library'])->first();
+        abort_unless($record, 404);
+        if ($record->file_path && Storage::disk($record->file_disk ?: 'local')->exists($record->file_path)) {
+            Storage::disk($record->file_disk ?: 'local')->delete($record->file_path);
+        }
+        DB::table('media_assets')->where('id', $asset)->delete();
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Media deleted.']);
+        }
+        return to_route('staff.media-library')->with('status', 'Media deleted.');
     }
 
     public function followUp(Request $request): View

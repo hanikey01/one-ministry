@@ -304,7 +304,7 @@
             .page-editor-meta input { min-width: 0; min-height: 39px; border: 1px solid var(--line-strong); border-radius: 9px; padding: 0 10px; background: var(--surface-muted); color: var(--ink); font: inherit; font-size: .68rem; }
             .page-editor-meta > span { display: grid; align-content: center; gap: 4px; border-left: 1px solid var(--line); padding-left: 13px; }
             .page-editor-meta > span strong { color: var(--ink); font-size: .66rem; }.page-editor-meta > span small { color: var(--muted); font-size: .57rem; line-height: 1.4; }
-            .page-block-editor-shell { display: grid; grid-template-columns: 205px minmax(0, 1fr) 255px; align-items: start; gap: 12px; }
+            .page-block-editor-shell { display: grid; grid-template-columns: 0 minmax(0, 1fr) 255px; align-items: start; gap: 12px; }
             .page-block-library, .page-block-inspector, .page-block-canvas-wrap { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow-sm); }
             .page-block-library, .page-block-inspector { position: sticky; top: 88px; overflow: hidden; }
             .page-block-library > header, .page-block-inspector > header { padding: 16px 15px 13px; border-bottom: 1px solid var(--line); }
@@ -371,7 +371,7 @@
                 .page-workflow-actions > span, .page-workflow-actions small { max-width: none; text-align: left; }
                 .page-body-label textarea { min-height: 270px; }
                 .page-editor-meta { grid-template-columns: 1fr; }.page-editor-meta > span { border-top: 1px solid var(--line); border-left: 0; padding: 10px 0 0; }
-                .page-block-editor-shell { grid-template-columns: 1fr; }.page-block-library, .page-block-inspector { position: static; }.page-block-library-group { grid-template-columns: repeat(2, minmax(0, 1fr)); }.page-block-library-group > small { grid-column: 1 / -1; }.page-block-canvas-wrap { min-height: 0; }.page-block-canvas { width: calc(100% - 22px); margin: 11px; padding: 10px; }.page-block-add-canvas { width: calc(100% - 22px); margin: 0 11px 11px; }
+                .page-block-editor-shell { grid-template-columns: 1fr; }.page-block-library { position: static; }.page-block-library-group { grid-template-columns: repeat(2, minmax(0, 1fr)); }.page-block-library-group > small { grid-column: 1 / -1; }.page-block-canvas-wrap { min-height: 0; }.page-block-canvas { width: calc(100% - 22px); margin: 11px; padding: 10px; }.page-block-add-canvas { width: calc(100% - 22px); margin: 0 11px 11px; }
             }
 
             .member-content { padding: clamp(24px, 3vw, 42px); }
@@ -1158,10 +1158,10 @@
                 .learning-button, .public-worship-action, .setup-back, .setup-next,
                 .setup-finish, .setup-preview-action, .home-quiet-action,
                 .public-footer-cta a, .workspace-sidebar-actions a, .member-sidebar-footer a) {
-                border-color: var(--accent) !important;
-                background: var(--accent) !important;
+                border-color: var(--action) !important;
+                background: var(--action) !important;
                 background-image: none !important;
-                color: var(--accent-foreground) !important;
+                color: var(--action-foreground) !important;
             }
 
             /* Keep the navigation editor's tabs and icon fields distinct from primary actions. */
@@ -1511,3 +1511,667 @@ body.ministry-app .icon-picker-panel .icon-picker-option[aria-pressed="true"] sp
     .navigation-public-detail-item > summary span { width: 100%; margin-left: 0; }
     .navigation-public-detail-item form .navigation-field-grid { grid-template-columns: 1fr; }
 }
+/* Page editor inspector popup: keep popup geometry authoritative after shared editor rules. */
+.workspace-content .page-block-inspector { position: fixed !important; z-index: 46; top: 96px; right: 24px; bottom: auto; left: auto; width: min(360px, calc(100vw - 48px)); max-height: calc(100vh - 120px); overflow: auto; transform: translateX(calc(100% + 28px)); transition: transform .22s ease; }
+.workspace-content .page-block-inspector.is-open { transform: translateX(0); }
+@media(max-width:800px) {
+    .workspace-content .page-block-inspector { top: auto; right: 10px; bottom: 10px; left: 10px; width: auto; max-height: 82vh; border-radius: 18px; transform: translateY(calc(100% + 22px)); }
+    .workspace-content .page-block-inspector.is-open { transform: translateY(0); }
+}
+
+/* Canvas-first editor: tool panels never reserve canvas width. */
+.workspace-content .page-block-editor-shell { display: block !important; width: 100%; }
+.workspace-content .page-block-canvas-wrap { display: block; width: 100%; min-width: 0; grid-column: auto !important; }
+.workspace-content .page-block-canvas { width: 100%; max-width: none; }
+.workspace-content .page-block-canvas[data-preview="desktop"] { max-width: none; margin-inline: 0; }
+.workspace-content .page-block-canvas[data-preview="tablet"] { width: min(100%, 768px); max-width: 768px !important; margin-inline: auto; }
+.workspace-content .page-block-canvas[data-preview="mobile"] { width: min(100%, 390px); max-width: 390px !important; margin-inline: auto; }
+.workspace-content .page-block-library { position: fixed !important; z-index: 40; top: 96px; bottom: 24px; left: 0; width: 280px; max-height: none; overflow: auto; transform: translateX(-102%); transition: transform .22s ease; }
+.workspace-content .page-block-library.is-open { transform: translateX(0); }
+@media(max-width:800px) {
+    .workspace-content .page-block-library { top: auto; right: 10px; bottom: 10px; left: 10px; width: auto; max-height: 82vh; border-radius: 18px; transform: translateY(calc(100% + 20px)); }
+    .workspace-content .page-block-library.is-open { transform: translateY(0); }
+}
+
+.workspace-content .page-canvas-header .page-canvas-toolbar { display: inline-flex; align-items: center; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-muted, var(--surface)); }
+.workspace-content .page-canvas-header .page-canvas-toolbar button { display: grid; width: 34px; height: 30px; min-height: 30px; place-items: center; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--muted); }
+.workspace-content .page-canvas-header .page-canvas-toolbar button svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+@media(max-width:620px) { .workspace-content .page-canvas-header { gap: 8px; padding: 11px 12px; } .workspace-content .page-canvas-header strong { font-size: .82rem; } .workspace-content .page-canvas-header .page-canvas-toolbar button { width: 32px; height: 29px; min-height: 29px; } }
+
+.workspace-content .page-block-inspector > header { position: sticky; z-index: 3; top: 0; padding-inline-end: 52px; background: var(--surface); }
+.workspace-content .page-block-inspector .page-block-inspector-close { position: absolute; top: 12px; right: 12px; display: grid !important; width: 30px !important; height: 30px !important; min-width: 30px; min-height: 30px; place-items: center; margin: 0; padding: 0 !important; border: 1px solid var(--line) !important; border-radius: 9px; background: var(--surface-muted, var(--surface)) !important; color: var(--muted) !important; font-size: 0 !important; line-height: 0; appearance: none; }
+.workspace-content .page-block-inspector .page-block-inspector-close svg { display: block; width: 16px !important; height: 16px !important; fill: none !important; stroke: currentColor !important; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
+
+/* The picker follows the real application boundary: the 278px desktop sidebar. */
+.workspace-content .page-block-library-trigger { position: fixed !important; z-index: 51 !important; top: 50%; right: auto; bottom: auto; left: 290px; display: grid !important; visibility: visible !important; opacity: 1 !important; width: 42px; height: 42px; place-items: center; transform: translateY(-50%); }
+.workspace-content .page-block-library-trigger:hover { transform: translateY(-50%) scale(1.04); }
+.page-library-is-open .page-block-library-trigger { visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; transform: translateY(-50%) scale(.92); }
+.workspace-content .page-block-library { position: fixed !important; z-index: 50; top: 88px; right: auto; bottom: 24px; left: 278px; width: 292px; max-height: none; transform: translateX(-105%); }
+.workspace-content .page-block-library:not(.is-open) { visibility: hidden; opacity: 0; pointer-events: none; }
+.workspace-content .page-block-library.is-open { transform: translateX(0); }
+.workspace-content .page-block-library.is-open { visibility: visible; opacity: 1; pointer-events: auto; }
+.workspace-content .page-block-library-close { position: absolute; z-index: 4; top: 12px; right: 12px; display: grid !important; width: 30px !important; height: 30px !important; min-width: 30px; min-height: 30px; place-items: center; border: 1px solid var(--line) !important; border-radius: 9px; background: var(--surface-muted, var(--surface)) !important; color: var(--muted) !important; padding: 0 !important; font-size: 0 !important; line-height: 0; appearance: none; cursor: pointer; }
+.workspace-content .page-block-library-close svg { display: block; width: 16px !important; height: 16px !important; fill: none !important; stroke: currentColor !important; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
+.workspace-content .page-block-library > header { position: sticky; z-index: 3; top: 0; padding-inline-end: 52px; background: var(--surface); }
+.page-block-library-backdrop { z-index: 49 !important; }
+@media(max-width:800px) {
+    .workspace-content .page-block-library-trigger { top: 50%; bottom: auto; left: 12px; transform: translateY(-50%); }
+    .workspace-content .page-block-library-trigger:hover { transform: translateY(-50%) scale(1.04); }
+    .workspace-content .page-block-library { top: 84px; right: auto; bottom: 16px; left: 0; width: min(300px, 86vw); max-height: none; border-radius: 0 18px 18px 0; transform: translateX(-105%); }
+    .workspace-content .page-block-library.is-open { transform: translateX(0); }
+    .page-library-is-open .page-block-library-trigger { transform: translateY(-50%) scale(.92); }
+}
+.workspace-content .page-inspector-tabs { display:grid; grid-template-columns:1fr 1fr; gap:4px; margin:0 14px; padding:4px; border:1px solid var(--line); border-radius:10px; background:var(--surface-muted,var(--surface)); }
+.workspace-content .page-inspector-tabs button { min-height:30px; border:0; border-radius:7px; background:transparent; color:var(--muted); font:inherit; font-size:.62rem; font-weight:760; cursor:pointer; }
+.workspace-content .page-inspector-tabs button.is-active { background:var(--surface); color:var(--ink); box-shadow:0 1px 3px rgb(15 23 20 / 12%); }
+.workspace-content .page-inspector-tabs button:focus-visible { outline:2px solid color-mix(in srgb,var(--brand) 55%,transparent); outline-offset:1px; }
+.workspace-content .page-block-inspector [data-section-ai-controls] { display:grid; gap:9px; padding:14px 16px 18px; }
+.workspace-content .page-block-inspector [data-section-ai-controls] textarea { min-height:82px; }
+.workspace-content .page-block-inspector [data-section-ai-controls][hidden], .workspace-content .page-block-inspector [data-inspector][hidden] { display:none; }
+.workspace-content .page-block-library,
+.workspace-content .page-block-inspector { border:1px solid var(--line-strong); border-radius:14px; background:var(--surface); box-shadow:0 18px 42px rgb(0 0 0 / 14%); }
+.workspace-content .page-block-library > header,
+.workspace-content .page-block-inspector > header { padding:13px 14px 11px; border-bottom:1px solid var(--line); }
+.workspace-content .page-block-library > header p,
+.workspace-content .page-block-inspector > header p { color:var(--muted); font-size:.5rem; letter-spacing:.12em; }
+.workspace-content .page-block-library > header h2,
+.workspace-content .page-block-inspector > header h2 { font-size:.78rem; letter-spacing:-.01em; }
+.workspace-content .page-block-library > header span,
+.workspace-content .page-block-inspector > header span { color:var(--muted); font-size:.58rem; }
+.workspace-content .page-block-library-group { gap:3px; padding:9px 10px; border-bottom:1px solid var(--line); }
+.workspace-content .page-block-library-group:last-child { border-bottom:0; }
+.workspace-content .page-block-library-group small { color:var(--muted); font-size:.5rem; letter-spacing:.1em; }
+.workspace-content .page-block-library-group button { min-height:30px; border:1px solid transparent; border-radius:7px; padding:0 8px; background:transparent; color:var(--ink); font-size:.62rem; text-align:left; }
+.workspace-content .page-block-library-group button:hover { border-color:var(--line); background:var(--surface-muted,var(--surface)); color:var(--ink); transform:none; }
+.workspace-content .page-block-library-group button,
+.workspace-content .page-block-library-group button:hover,
+.workspace-content .page-block-library-group button:active { background:transparent !important; color:var(--ink) !important; box-shadow:none !important; }
+.workspace-content .page-block-library-group button:hover { border-color:var(--line-strong); background:var(--surface-muted,var(--surface)) !important; }
+.workspace-content .page-block-library,
+.workspace-content .page-block-inspector { background:#fff !important; color:#171717 !important; }
+.workspace-content .page-block-library > header,
+.workspace-content .page-block-inspector > header,
+.workspace-content .page-block-library-group { background:#fff !important; }
+.workspace-content .page-block-library-group button,
+.workspace-content .page-block-library-group button:hover { color:#171717 !important; background:#fff !important; }
+.workspace-content .page-block-library-group button:hover { background:#f4f4f5 !important; }
+.staff-theme-dark .workspace-content .page-block-library,
+.staff-theme-dark .workspace-content .page-block-inspector,
+.staff-theme-dark .workspace-content .page-block-library > header,
+.staff-theme-dark .workspace-content .page-block-inspector > header,
+.staff-theme-dark .workspace-content .page-block-library-group { background:#0b0b0c !important; color:#f4f4f5 !important; }
+.staff-theme-dark .workspace-content .page-block-library-group button,
+.staff-theme-dark .workspace-content .page-block-library-group button:hover { color:#f4f4f5 !important; background:#0b0b0c !important; }
+.staff-theme-dark .workspace-content .page-block-library-group button:hover { background:#1b1b1e !important; }
+.workspace-content .page-block-inspector [data-inspector] { gap:9px; padding:12px 14px 14px; }
+.workspace-content .page-block-inspector label { color:var(--muted); font-size:.58rem; }
+.workspace-content .page-block-inspector input,
+.workspace-content .page-block-inspector textarea,
+.workspace-content .page-block-inspector select { border-color:var(--line-strong); border-radius:7px; background:var(--surface-muted,var(--surface)); color:var(--ink); padding:7px 8px; font-size:.62rem; }
+.workspace-content .page-block-inspector .page-inspector-actions button { min-height:29px; border-color:var(--line); background:var(--surface); color:var(--ink); }
+.workspace-content .page-block-inspector .page-inspector-actions button:hover { border-color:var(--line-strong); background:var(--surface-muted,var(--surface)); color:var(--ink); }
+.workspace-content .page-block-inspector,
+.workspace-content .page-block-inspector > header,
+.workspace-content .page-block-inspector .page-inspector-tabs,
+.workspace-content .page-block-inspector .page-inspector-selected,
+.workspace-content .page-block-inspector .page-inspector-actions { border-color:#d4d4d8 !important; }
+.workspace-content .page-block-inspector .page-inspector-tabs { background:#f4f4f5 !important; }
+.workspace-content .page-block-inspector .page-inspector-tabs button.is-active { border:1px solid #d4d4d8 !important; }
+.workspace-content .page-block-inspector .page-block-inspector-close { border-color:#d4d4d8 !important; }
+.staff-theme-dark .workspace-content .page-block-inspector,
+.staff-theme-dark .workspace-content .page-block-inspector > header,
+.staff-theme-dark .workspace-content .page-block-inspector .page-inspector-tabs,
+.staff-theme-dark .workspace-content .page-block-inspector .page-inspector-selected,
+.staff-theme-dark .workspace-content .page-block-inspector .page-inspector-actions { border-color:#3f3f46 !important; }
+.staff-theme-dark .workspace-content .page-block-inspector .page-inspector-tabs { background:#18181b !important; }
+.staff-theme-dark .workspace-content .page-block-inspector .page-inspector-tabs button.is-active { border:1px solid #3f3f46 !important; }
+.staff-theme-dark .workspace-content .page-block-inspector .page-block-inspector-close { border-color:#3f3f46 !important; }
+.workspace-content .page-block-inspector button:not(.page-block-inspector-close) {
+    border:1px solid #d4d4d8 !important;
+    border-radius:8px;
+    background:#fafafa !important;
+    color:#27272a !important;
+    box-shadow:none !important;
+}
+.workspace-content .page-block-inspector button:not(.page-block-inspector-close):hover {
+    border-color:#a1a1aa !important;
+    background:#f4f4f5 !important;
+    color:#18181b !important;
+}
+.workspace-content .page-block-inspector .page-inspector-tabs button.is-active {
+    background:#e4e4e7 !important;
+    color:#18181b !important;
+}
+.staff-theme-dark .workspace-content .page-block-inspector button:not(.page-block-inspector-close) {
+    border-color:#3f3f46 !important;
+    background:#18181b !important;
+    color:#f4f4f5 !important;
+}
+.staff-theme-dark .workspace-content .page-block-inspector button:not(.page-block-inspector-close):hover {
+    border-color:#71717a !important;
+    background:#27272a !important;
+    color:#fafafa !important;
+}
+.staff-theme-dark .workspace-content .page-block-inspector .page-inspector-tabs button.is-active {
+    background:#3f3f46 !important;
+    color:#fafafa !important;
+}
+.ministry-app .workspace-content .page-block-inspector button:not(.page-block-inspector-close),
+.ministry-app .workspace-content .page-block-inspector button:not(.page-block-inspector-close):hover,
+.ministry-app .workspace-content .page-block-inspector button:not(.page-block-inspector-close):active {
+    border:1px solid #d4d4d8 !important;
+    background:#fafafa !important;
+    color:#27272a !important;
+    box-shadow:none !important;
+}
+.ministry-app .workspace-content .page-block-inspector .page-inspector-tabs button.is-active {
+    background:#e4e4e7 !important;
+    color:#18181b !important;
+}
+.staff-theme-dark .ministry-app .workspace-content .page-block-inspector button:not(.page-block-inspector-close),
+.staff-theme-dark .ministry-app .workspace-content .page-block-inspector button:not(.page-block-inspector-close):hover,
+.staff-theme-dark .ministry-app .workspace-content .page-block-inspector button:not(.page-block-inspector-close):active {
+    border-color:#3f3f46 !important;
+    background:#18181b !important;
+    color:#f4f4f5 !important;
+}
+.staff-theme-dark .ministry-app .workspace-content .page-block-inspector .page-inspector-tabs button.is-active {
+    background:#3f3f46 !important;
+    color:#fafafa !important;
+}
+html body .ministry-app .workspace-content .page-block-inspector button:not(.page-block-inspector-close) {
+    background-color:#fafafa !important;
+    border-color:#d4d4d8 !important;
+    color:#27272a !important;
+}
+html body .ministry-app .workspace-content .page-block-inspector .page-inspector-tabs button.is-active {
+    background-color:#e4e4e7 !important;
+    color:#18181b !important;
+}
+html body .staff-theme-dark .ministry-app .workspace-content .page-block-inspector button:not(.page-block-inspector-close) {
+    background-color:#18181b !important;
+    border-color:#3f3f46 !important;
+    color:#f4f4f5 !important;
+}
+html body .staff-theme-dark .ministry-app .workspace-content .page-block-inspector .page-inspector-tabs button.is-active {
+    background-color:#3f3f46 !important;
+    color:#fafafa !important;
+}
+.workspace-content .ai-page-draft-panel { box-sizing:border-box; }
+@media (min-width:801px) {
+    .workspace-content .ai-page-draft-panel { width:100%; max-width:none; grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+    .workspace-content .ai-page-draft-panel > div:first-child,
+    .workspace-content .ai-page-draft-panel > .ai-page-route-state,
+    .workspace-content .ai-page-draft-panel > .ai-page-draft-actions { grid-column:1 / -1; }
+}
+
+/* Neutral, compact block palette. Accent is reserved for keyboard focus only. */
+.workspace-content .page-block-library-group { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; padding:10px; background:#fff !important; }
+.workspace-content .page-block-library-group > small { grid-column:1 / -1; margin:1px 2px 2px; color:#71717a !important; }
+.workspace-content .page-block-library-group button,
+.workspace-content .page-block-library-group button:hover,
+.workspace-content .page-block-library-group button:active { display:flex; min-height:52px; align-items:center; gap:7px; border:1px solid #e4e4e7 !important; border-radius:8px; padding:7px 8px; background:#fafafa !important; color:#27272a !important; font-size:.61rem; font-weight:650; line-height:1.2; white-space:normal; }
+.workspace-content .page-block-library-group button:hover { border-color:#d4d4d8 !important; background:#f4f4f5 !important; transform:none; }
+.workspace-content .page-block-library-group button:focus-visible { outline:2px solid var(--brand) !important; outline-offset:2px; }
+.workspace-content .page-block-library-group button::before { display:grid; width:24px; height:24px; flex:0 0 24px; place-items:center; border:1px solid #e4e4e7; border-radius:6px; background:#fff; color:#52525b; font-size:.62rem; font-weight:750; line-height:1; }
+.workspace-content .page-block-library-group button[data-add='heading']::before { content:'Aa'; }
+.workspace-content .page-block-library-group button[data-add='paragraph']::before { content:'¶'; }
+.workspace-content .page-block-library-group button[data-add='image']::before { content:'▧'; }
+.workspace-content .page-block-library-group button[data-add='gallery']::before { content:'▦'; }
+.workspace-content .page-block-library-group button[data-add='video_embed']::before { content:'▶'; }
+.workspace-content .page-block-library-group button[data-add='audio']::before { content:'♪'; }
+.workspace-content .page-block-library-group button[data-add='file']::before { content:'↓'; }
+.workspace-content .page-block-library-group button[data-add='quote']::before { content:'“'; }
+.workspace-content .page-block-library-group button[data-add='list']::before { content:'≡'; }
+.workspace-content .page-block-library-group button[data-add='accordion']::before { content:'⌄'; }
+.workspace-content .page-block-library-group button[data-add='divider']::before { content:'—'; }
+.workspace-content .page-block-library-group button[data-add='spacer']::before { content:'↕'; }
+.workspace-content .page-block-library-group button[data-add='hero']::before { content:'H'; }
+.workspace-content .page-block-library-group button[data-add='call_to_action']::before { content:'→'; }
+.workspace-content .page-block-library-group button[data-add='section']::before { content:'▤'; }
+.workspace-content .page-block-library-group button[data-add='media_text']::before { content:'▣'; }
+.workspace-content .page-block-library-group button[data-add='service_times']::before { content:'◷'; }
+.workspace-content .page-block-library-group button[data-add='events']::before { content:'□'; }
+.workspace-content .page-block-library-group button[data-add='groups']::before { content:'♙'; }
+.staff-theme-dark .workspace-content .page-block-library-group { background:#0b0b0c !important; }
+.staff-theme-dark .workspace-content .page-block-library-group > small { color:#a1a1aa !important; }
+.staff-theme-dark .workspace-content .page-block-library-group button,
+.staff-theme-dark .workspace-content .page-block-library-group button:hover,
+.staff-theme-dark .workspace-content .page-block-library-group button:active { border-color:#27272a !important; background:#151518 !important; color:#f4f4f5 !important; }
+.staff-theme-dark .workspace-content .page-block-library-group button:hover { border-color:#3f3f46 !important; background:#1c1c20 !important; }
+.staff-theme-dark .workspace-content .page-block-library-group button::before { border-color:#333338; background:#0b0b0c; color:#d4d4d8; }
+.workspace-content .page-block-library-group { border-bottom-color:#d4d4d8 !important; }
+.workspace-content .page-block-library-group button,
+.workspace-content .page-block-library-group button::before { border-color:#d4d4d8 !important; }
+.staff-theme-dark .workspace-content .page-block-library-group { border-bottom-color:#3f3f46 !important; }
+.staff-theme-dark .workspace-content .page-block-library-group button,
+.staff-theme-dark .workspace-content .page-block-library-group button::before { border-color:#3f3f46 !important; }
+/* Keep inspector controls identical to the neutral floating element panel. */
+.page-block-inspector button[data-inspector-tab],
+.page-block-inspector .page-inspector-actions button {
+    min-height:30px !important;
+    border:1px solid #d4d4d8 !important;
+    border-radius:10px !important;
+    background:#fafafa !important;
+    color:#27272a !important;
+    box-shadow:none !important;
+}
+.page-block-inspector button[data-inspector-tab]:hover,
+.page-block-inspector .page-inspector-actions button:hover {
+    border-color:#a1a1aa !important;
+    background:#f4f4f5 !important;
+    color:#18181b !important;
+}
+.page-block-inspector button[data-inspector-tab].is-active { background:#e4e4e7 !important; color:#18181b !important; }
+.staff-theme-dark .page-block-inspector button[data-inspector-tab],
+.staff-theme-dark .page-block-inspector .page-inspector-actions button { border-color:#3f3f46 !important; background:#18181b !important; color:#f4f4f5 !important; }
+.staff-theme-dark .page-block-inspector button[data-inspector-tab]:hover,
+.staff-theme-dark .page-block-inspector .page-inspector-actions button:hover { border-color:#71717a !important; background:#27272a !important; color:#fafafa !important; }
+.staff-theme-dark .page-block-inspector button[data-inspector-tab].is-active { background:#3f3f46 !important; color:#fafafa !important; }
+body.ministry-app .workspace-shell .workspace-content .page-block-inspector button[data-inspector-tab],
+body.ministry-app .workspace-shell .workspace-content .page-block-inspector .page-inspector-actions button {
+    background:#fafafa !important;
+    border-color:#d4d4d8 !important;
+    color:#27272a !important;
+}
+body.ministry-app .workspace-shell .workspace-content .page-block-inspector button[data-inspector-tab].is-active { background:#e4e4e7 !important; color:#18181b !important; }
+body.ministry-app .workspace-shell .workspace-content .page-block-inspector.is-open ~ .page-block-library { pointer-events:none; }
+.page-block-inspector.is-open ~ .page-block-library-close { visibility:hidden !important; }
+/* Keep member sidebar actions visibly separated in the mobile drawer. */
+.workspace-sidebar-actions { display: grid !important; gap: 7px !important; }
+
+/* Compact, theme-aware media picker used by the central page editor. */
+.page-media-dialog > section { overflow: hidden; }
+.page-media-dialog > section > header { background: var(--surface); }
+.page-media-upload { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); padding: 12px 18px; background: var(--surface-muted); }
+.page-media-upload-button { display: inline-flex; min-height: 32px; align-items: center; border: 1px solid var(--line-strong); border-radius: 8px; padding: 0 11px; background: var(--surface); color: var(--ink); font: inherit; font-size: .62rem; font-weight: 760; cursor: pointer; }
+.page-media-upload-button:hover { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 6%, var(--surface)); }
+.page-media-upload-button input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+.page-media-upload small { min-width: 0; overflow: hidden; color: var(--muted); font-size: .58rem; text-overflow: ellipsis; white-space: nowrap; }
+.page-media-list { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); max-height: min(390px, 54vh); overflow: auto; background: var(--surface); }
+.page-media-dialog .page-media-list button { min-width: 0; min-height: 76px; align-content: start; border: 1px solid var(--line) !important; background: var(--surface-muted) !important; color: var(--ink) !important; }
+.page-media-dialog .page-media-list button:hover, .page-media-dialog .page-media-list button:focus-visible { border-color: var(--brand) !important; background: color-mix(in srgb, var(--brand) 8%, var(--surface)) !important; color: var(--ink) !important; outline: 0; box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 12%, transparent); }
+.page-media-dialog .page-media-list button strong { overflow: hidden; color: var(--ink) !important; text-overflow: ellipsis; white-space: nowrap; }
+.page-media-dialog .page-media-list button span { overflow: hidden; color: var(--muted) !important; text-overflow: ellipsis; white-space: nowrap; }
+.staff-theme-dark .page-media-upload, .staff-theme-dark .page-media-list { background: var(--surface); }
+.staff-theme-dark .page-media-upload-button { border-color: #52525b !important; background: #18181b !important; color: #f4f4f5 !important; }
+.staff-theme-dark .page-media-dialog .page-media-list button { border-color: #3f3f46 !important; background: #202126 !important; color: #f4f4f5 !important; }
+.staff-theme-dark .page-media-dialog .page-media-list button:hover, .staff-theme-dark .page-media-dialog .page-media-list button:focus-visible { border-color: #a1a1aa !important; background: #27272a !important; }
+.staff-theme-dark .page-media-dialog .page-media-list button strong { color: #f4f4f5 !important; }
+.staff-theme-dark .page-media-dialog .page-media-list button span { color: #a1a1aa !important; }
+
+/* The picker cards are intentionally isolated from the app's action-button skin.
+   Some page-level button rules otherwise turn these cards dark after an in-app
+   update, even while the dialog itself is using the light surface tokens. */
+body.ministry-app .page-media-dialog .page-media-list > button {
+    border: 1px solid #d4d4d8 !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #18181b !important;
+    box-shadow: none !important;
+}
+body.ministry-app .page-media-dialog .page-media-list > button:hover,
+body.ministry-app .page-media-dialog .page-media-list > button:focus-visible {
+    border-color: #71717a !important;
+    background: #f4f4f5 !important;
+    background-color: #f4f4f5 !important;
+    color: #18181b !important;
+}
+body.ministry-app .page-media-dialog .page-media-list > button strong {
+    color: var(--ink) !important;
+}
+body.ministry-app .page-media-dialog .page-media-list > button span {
+    color: var(--muted) !important;
+}
+body.ministry-app .page-media-dialog .page-media-list > button.page-media-option {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    background: var(--surface-muted) !important;
+    background-color: var(--surface-muted) !important;
+    border: 1px solid var(--line) !important;
+    color: var(--ink) !important;
+}
+
+/* Media selection is an editor utility, so it must not inherit the ministry
+   accent used for public calls to action. */
+body.ministry-app .page-media-picker-trigger {
+    border: 1px solid var(--line-strong) !important;
+    background: var(--surface-muted) !important;
+    color: var(--ink) !important;
+    box-shadow: none !important;
+}
+body.ministry-app .page-media-picker-trigger:hover,
+body.ministry-app .page-media-picker-trigger:focus-visible {
+    border-color: var(--line-strong) !important;
+    background: var(--surface) !important;
+    color: var(--ink) !important;
+    outline: 0;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--line-strong) 18%, transparent) !important;
+}
+.page-media-dialog .page-media-option { grid-template-columns: 42px minmax(0,1fr); grid-template-rows: auto auto; column-gap: 9px; align-items: center; }
+.page-media-dialog .page-media-thumb { grid-row: 1 / span 2; display: grid; width: 42px; height: 42px; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--muted); font-size: .48rem; font-weight: 800; }
+.page-media-dialog .page-media-thumb img, .page-media-dialog .page-media-thumb video { width: 100%; height: 100%; object-fit: cover; }
+.page-media-dialog .page-media-file-tile { letter-spacing: .04em; }
+
+/* Structured page document renderer */
+.public-page-structured { display: grid; gap: 0; }
+.public-page-structured-section { padding: 0; background: var(--page-section-bg, transparent); }
+.public-page-structured-columns { display: grid; grid-template-columns: repeat(var(--page-columns, 1), minmax(0, 1fr)); gap: var(--page-column-gap, 24px); width: min(100% - 40px, 1120px); margin-inline: auto; padding: 48px 0; }
+.public-page-structured-column { min-width: 0; }
+.public-page-structured-column > * { min-width: 0; }
+@media (max-width: 760px) { .public-page-structured-columns { grid-template-columns: 1fr; width: min(100% - 28px, 620px); gap: 18px; padding: 30px 0; } }
+.page-object-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin: 12px 15px 0; border: 1px solid var(--line); border-radius: 9px; padding: 3px; background: var(--surface-muted); }
+.page-object-tabs button { min-height: 30px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: .58rem; font-weight: 760; cursor: pointer; }
+.page-object-tabs button.is-active, .page-object-tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / 8%); }
+.page-object-tab-panel { min-width: 0; }
+.page-object-tab-empty { margin: 16px; border: 1px dashed var(--line-strong); border-radius: 9px; padding: 14px; color: var(--muted); font-size: .62rem; line-height: 1.5; }
+
+.page-object-tab-panel[hidden]{display:none!important}
+
+/* Inspector panels must always follow the selected object tab. This also keeps
+   the editor coherent while its JavaScript replaces a block's settings. */
+body.ministry-app .workspace-content .page-block-inspector [data-object-panel] {
+    display: none !important;
+}
+body.ministry-app .workspace-content .page-block-inspector [data-object-panel="content"],
+body.ministry-app .workspace-content .page-block-inspector:has([data-object-tab="style"][aria-selected="true"]) [data-object-panel="style"],
+body.ministry-app .workspace-content .page-block-inspector:has([data-object-tab="advanced"][aria-selected="true"]) [data-object-panel="advanced"] {
+    display: block !important;
+}
+
+
+.page-object-control-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}.page-object-control-grid label{display:grid;gap:.35rem;font-size:.78rem;font-weight:600;color:var(--ink)}.page-object-control-grid input,.page-object-control-grid select{width:100%;min-height:2.35rem;border:1px solid var(--line);border-radius:.65rem;background:var(--surface);color:var(--ink);padding:.45rem .6rem}.page-object-control-grid input[type=color]{padding:.2rem;height:2.35rem}.page-object-control-grid label:first-child{grid-column:1/-1}@media(max-width:700px){.page-object-control-grid{grid-template-columns:1fr}}
+
+
+.page-canvas-block[data-editor-object=section]{position:relative}.page-canvas-block[data-editor-object=section]::before{content:'Section';position:absolute;top:.35rem;right:.5rem;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-muted);opacity:.7;pointer-events:none}.page-canvas-columns>div[data-editor-object=column]{position:relative;outline:1px dashed transparent;outline-offset:4px;cursor:pointer;transition:outline-color .15s ease}.page-canvas-columns>div[data-editor-object=column]:hover,.page-canvas-columns>div[data-editor-object=column].is-object-selected{outline-color:var(--accent)}.page-canvas-columns>div[data-editor-object=column]::after{content:'Column';position:absolute;top:.35rem;right:.35rem;font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-muted);opacity:0;pointer-events:none}.page-canvas-columns>div[data-editor-object=column]:hover::after,.page-canvas-columns>div[data-editor-object=column].is-object-selected::after{opacity:1}.page-canvas-block-content[data-editor-object=element]{cursor:text}.page-canvas-block-content[data-editor-object=element].is-object-selected{outline:1px solid color-mix(in srgb,var(--accent) 45%,transparent);outline-offset:5px}
+
+
+.page-object-layout-heading{grid-column:1/-1;display:grid;gap:.2rem;padding-bottom:.5rem;border-bottom:1px solid var(--line)}.page-object-layout-heading strong{font-size:.9rem}.page-object-layout-heading small{color:var(--ink-muted);font-size:.75rem}
+
+
+.page-object-layout-controls{grid-column:1/-1;display:grid;gap:.55rem;border-top:1px solid var(--line);padding-top:.8rem;margin-top:.25rem}.page-object-layout-controls>strong{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-muted)}.page-object-layout-controls label{display:grid;grid-template-columns:minmax(0,1fr) minmax(130px,42%);align-items:center;gap:.75rem;font-size:.78rem;font-weight:600}.page-object-layout-controls select{min-height:2.2rem;border:1px solid var(--line);border-radius:.6rem;background:var(--surface);color:var(--ink);padding:.4rem .55rem}
+
+
+/* Inspector chrome: pinned header/mode controls and centered mobile dialog */
+.workspace-content .page-block-inspector{display:flex;flex-direction:column;overflow:hidden;}
+.workspace-content .page-block-inspector>header{position:sticky;top:0;flex:0 0 auto;z-index:8;}
+.workspace-content .page-block-inspector .page-inspector-tabs,.workspace-content .page-block-inspector .page-object-tabs{position:sticky;top:0;z-index:7;flex:0 0 auto;}
+.workspace-content .page-block-inspector [data-inspector]{min-height:0;overflow:auto;padding-bottom:76px;}
+.workspace-content .page-block-inspector .page-inspector-actions{position:sticky;bottom:0;z-index:9;margin:0 -14px -14px;padding:10px 14px 14px;background:var(--surface);box-shadow:0 -8px 16px rgb(0 0 0 / 8%);}
+@media(max-width:680px){.workspace-content .page-block-inspector{top:50%;right:12px;bottom:auto;left:12px;width:auto;max-height:min(78vh,680px);transform:translateY(-50%) translateY(110vh);border-radius:16px;}
+.workspace-content .page-block-inspector.is-open{transform:translateY(-50%) translateY(0);}
+.workspace-content .page-block-inspector [data-inspector]{padding-bottom:82px;}
+}
+.staff-theme-dark .workspace-content .page-block-inspector .page-inspector-actions{background:var(--surface);box-shadow:0 -8px 16px rgb(0 0 0 / 22%);}
+
+
+/* Neutral object inspector tabs */
+.workspace-content .page-object-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:0 14px;padding:4px;border:1px solid #d4d4d8;border-radius:10px;background:#f4f4f5;}
+.workspace-content .page-object-tabs button{min-height:30px;border:0;border-radius:7px;background:transparent;color:#52525b;font:inherit;font-size:.62rem;font-weight:760;cursor:pointer;}
+.workspace-content .page-object-tabs button:hover{background:#e4e4e7;color:#27272a;}
+.workspace-content .page-object-tabs button.is-active,.workspace-content .page-object-tabs button[aria-selected=true]{border:1px solid #d4d4d8;background:#fff;color:#18181b;box-shadow:0 1px 3px rgb(15 23 20 / 12%);}
+.workspace-content .page-object-tabs button:focus-visible{outline:2px solid #a1a1aa;outline-offset:1px;}
+.staff-theme-dark .workspace-content .page-object-tabs{border-color:#3f3f46;background:#18181b;}
+.staff-theme-dark .workspace-content .page-object-tabs button{color:#a1a1aa;}
+.staff-theme-dark .workspace-content .page-object-tabs button:hover{background:#27272a;color:#f4f4f5;}
+.staff-theme-dark .workspace-content .page-object-tabs button.is-active,.staff-theme-dark .workspace-content .page-object-tabs button[aria-selected=true]{border-color:#3f3f46;background:#27272a;color:#fafafa;box-shadow:0 1px 3px rgb(0 0 0 / 24%);}
+
+/* Final inspector cascade: generic workspace button rules intentionally use
+   !important, so the editor tabs and media controls must win explicitly.
+   Keep these controls neutral and stable when the inspector is re-rendered. */
+html .ministry-app .workspace-content .page-block-inspector .page-object-tabs button:not(.page-block-inspector-close),
+html .ministry-app .workspace-content .page-block-inspector .page-object-tabs button:not(.page-block-inspector-close):hover,
+html .ministry-app .workspace-content .page-block-inspector .page-object-tabs button:not(.page-block-inspector-close):active {
+    min-height: 30px !important;
+    border: 0 !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    color: #52525b !important;
+    box-shadow: none !important;
+}
+html .ministry-app .workspace-content .page-block-inspector .page-object-tabs button.is-active,
+html .ministry-app .workspace-content .page-block-inspector .page-object-tabs button[aria-selected="true"] {
+    border: 1px solid #d4d4d8 !important;
+    border-color: #d4d4d8 !important;
+    background: #fff !important;
+    background-color: #fff !important;
+    color: #18181b !important;
+    box-shadow: 0 1px 3px rgb(15 23 20 / 12%) !important;
+}
+html .ministry-app .workspace-content .page-block-inspector .page-object-tabs button:hover:not(.is-active):not([aria-selected="true"]),
+html .ministry-app .workspace-content .page-block-inspector .page-object-tabs button:focus-visible:not(.is-active):not([aria-selected="true"]) {
+    background: #e4e4e7 !important;
+    background-color: #e4e4e7 !important;
+    color: #27272a !important;
+}
+html .ministry-app.staff-theme-dark .workspace-content .page-block-inspector .page-object-tabs button:not(.page-block-inspector-close) {
+    background: transparent !important;
+    background-color: transparent !important;
+    color: #a1a1aa !important;
+}
+html .ministry-app.staff-theme-dark .workspace-content .page-block-inspector .page-object-tabs button.is-active,
+html .ministry-app.staff-theme-dark .workspace-content .page-block-inspector .page-object-tabs button[aria-selected="true"] {
+    border-color: #3f3f46 !important;
+    background: #27272a !important;
+    background-color: #27272a !important;
+    color: #fafafa !important;
+}
+html .ministry-app.staff-theme-dark .workspace-content .page-block-inspector .page-object-tabs button:hover:not(.is-active):not([aria-selected="true"]) {
+    background: #27272a !important;
+    background-color: #27272a !important;
+    color: #f4f4f5 !important;
+}
+
+/* Media fields are custom editor controls, never ministry-accent CTAs or
+   browser-default selects. */
+html .ministry-app .workspace-content .page-block-inspector .page-media-picker-trigger,
+html .ministry-app .workspace-content .page-block-inspector [data-media],
+html .ministry-app .workspace-content .page-block-inspector [data-media-for] {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-height: 36px !important;
+    border: 1px solid #d4d4d8 !important;
+    border-radius: 8px !important;
+    background: #fafafa !important;
+    background-color: #fafafa !important;
+    color: #27272a !important;
+    box-shadow: none !important;
+    font: inherit !important;
+    text-align: left !important;
+}
+html .ministry-app .workspace-content .page-block-inspector .page-media-picker-trigger:hover,
+html .ministry-app .workspace-content .page-block-inspector .page-media-picker-trigger:focus-visible,
+html .ministry-app .workspace-content .page-block-inspector [data-media]:focus-visible,
+html .ministry-app .workspace-content .page-block-inspector [data-media-for]:focus-visible {
+    border-color: #a1a1aa !important;
+    background: #fff !important;
+    background-color: #fff !important;
+    color: #18181b !important;
+    outline: 0 !important;
+    box-shadow: 0 0 0 3px rgb(161 161 170 / 22%) !important;
+}
+html .ministry-app.staff-theme-dark .workspace-content .page-block-inspector .page-media-picker-trigger,
+html .ministry-app.staff-theme-dark .workspace-content .page-block-inspector [data-media],
+html .ministry-app.staff-theme-dark .workspace-content .page-block-inspector [data-media-for] {
+    border-color: #3f3f46 !important;
+    background: #18181b !important;
+    background-color: #18181b !important;
+    color: #f4f4f5 !important;
+}
+html .ministry-app.staff-theme-dark .workspace-content .page-block-inspector .page-media-picker-trigger:hover,
+html .ministry-app.staff-theme-dark .workspace-content .page-block-inspector .page-media-picker-trigger:focus-visible,
+html .ministry-app.staff-theme-dark .workspace-content .page-block-inspector [data-media]:focus-visible,
+html .ministry-app.staff-theme-dark .workspace-content .page-block-inspector [data-media-for]:focus-visible {
+    border-color: #71717a !important;
+    background: #27272a !important;
+    background-color: #27272a !important;
+}
+
+/* Fallback scope for layouts whose ministry-app class is mounted below body. */
+html body .page-block-inspector .page-object-tabs button:not(.page-block-inspector-close) {
+    border: 0 !important; border-color: transparent !important;
+    background: transparent !important; background-color: transparent !important;
+    color: #52525b !important; box-shadow: none !important;
+}
+html body .page-block-inspector .page-object-tabs button.is-active,
+html body .page-block-inspector .page-object-tabs button[aria-selected="true"] {
+    border: 1px solid #d4d4d8 !important; border-color: #d4d4d8 !important;
+    background: #fff !important; background-color: #fff !important;
+    color: #18181b !important; box-shadow: 0 1px 3px rgb(15 23 20 / 12%) !important;
+}
+html body .page-block-inspector .page-object-tabs button:hover:not(.is-active):not([aria-selected="true"]) {
+    background: #e4e4e7 !important; background-color: #e4e4e7 !important; color: #27272a !important;
+}
+html body .page-block-inspector .page-media-picker-trigger,
+html body .page-block-inspector [data-media],
+html body .page-block-inspector [data-media-for] {
+    min-height: 36px !important; border: 1px solid #d4d4d8 !important;
+    border-radius: 8px !important; background: #fafafa !important; background-color: #fafafa !important;
+    color: #27272a !important; box-shadow: none !important;
+}
+
+/* Keep the inspector chrome visible while only its field region scrolls. */
+html .ministry-app .workspace-content .page-block-inspector > header { position: sticky; top: 0; z-index: 12; }
+html .ministry-app .workspace-content .page-block-inspector > .page-inspector-tabs { position: sticky; top: 58px; z-index: 11; }
+html .ministry-app .workspace-content .page-block-inspector > .page-object-tabs { position: sticky; top: 106px; z-index: 10; }
+
+/* The inspector has one scrollable tab panel and one compact, permanent
+   action row. This avoids a tall sticky footer and keeps commands available
+   for Manual, AI assist, Content, Style, and Advanced. */
+.workspace-content .page-block-inspector [data-inspector] {
+    display: flex !important;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+}
+.workspace-content .page-block-inspector .page-object-tabs {
+    flex: 0 0 auto;
+    margin: 0 14px 8px;
+}
+.workspace-content .page-block-inspector .page-object-tab-panel {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: auto;
+    padding: 0 14px 10px;
+}
+.workspace-content .page-block-inspector .page-inspector-actions {
+    display: grid !important;
+    min-height: 0;
+    flex: 0 0 auto;
+    position: relative !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    order: 5;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+    margin: 0 !important;
+    border-top: 1px solid #d4d4d8 !important;
+    padding: 8px 14px 9px !important;
+    background: #fff !important;
+    box-shadow: 0 -4px 10px rgb(15 23 20 / 6%) !important;
+}
+.workspace-content .page-block-inspector [data-section-ai-controls] {
+    min-height: 0;
+    flex: 1 1 auto;
+    order: 4;
+    overflow: auto;
+    padding: 0 14px 10px;
+}
+.workspace-content .page-block-inspector .page-inspector-actions button {
+    display: grid !important;
+    min-height: 32px !important;
+    place-items: center;
+    padding: 0 !important;
+}
+
+/* Match the existing Manual / AI assist segmented control exactly. */
+html body .page-block-inspector .page-object-tabs {
+    border-color: #d4d4d8 !important;
+    background: #f4f4f5 !important;
+}
+html body .page-block-inspector .page-object-tabs button:not(.page-block-inspector-close),
+html body .page-block-inspector .page-object-tabs button:not(.page-block-inspector-close):hover,
+html body .page-block-inspector .page-object-tabs button:not(.page-block-inspector-close):active {
+    min-height: 30px !important;
+    border: 1px solid #d4d4d8 !important;
+    border-color: #d4d4d8 !important;
+    background: #fafafa !important;
+    background-color: #fafafa !important;
+    color: #27272a !important;
+    box-shadow: none !important;
+}
+html body .page-block-inspector .page-object-tabs button.is-active,
+html body .page-block-inspector .page-object-tabs button[aria-selected="true"] {
+    background: #e4e4e7 !important;
+    background-color: #e4e4e7 !important;
+    color: #18181b !important;
+}
+.staff-theme-dark .workspace-content .page-block-inspector .page-inspector-actions {
+    border-color: #3f3f46 !important;
+    background: #18181b !important;
+    box-shadow: 0 -4px 10px rgb(0 0 0 / 24%) !important;
+}
+.staff-theme-dark .workspace-content .page-block-inspector .page-object-tabs {
+    border-color: #3f3f46 !important;
+    background: #18181b !important;
+}
+.staff-theme-dark .workspace-content .page-block-inspector .page-object-tabs button:not(.page-block-inspector-close),
+.staff-theme-dark .workspace-content .page-block-inspector .page-object-tabs button:not(.page-block-inspector-close):hover,
+.staff-theme-dark .workspace-content .page-block-inspector .page-object-tabs button:not(.page-block-inspector-close):active {
+    border-color: #3f3f46 !important;
+    background: #18181b !important;
+    background-color: #18181b !important;
+    color: #f4f4f5 !important;
+}
+.staff-theme-dark .workspace-content .page-block-inspector .page-object-tabs button.is-active,
+.staff-theme-dark .workspace-content .page-block-inspector .page-object-tabs button[aria-selected="true"] {
+    background: #3f3f46 !important;
+    background-color: #3f3f46 !important;
+    color: #fafafa !important;
+}
+@media (max-width: 680px) {
+    .workspace-content .page-block-inspector .page-inspector-actions { padding: 7px 14px 8px !important; }
+    .workspace-content .page-block-inspector .page-inspector-actions button { min-height: 34px !important; }
+}
+
+/* This matches the specificity of the shared inspector button reset. */
+html body.ministry-app .workspace-shell .workspace-content .page-block-inspector .page-object-tabs button:not(.page-block-inspector-close),
+html body.ministry-app .workspace-shell .workspace-content .page-block-inspector .page-object-tabs button:not(.page-block-inspector-close):hover,
+html body.ministry-app .workspace-shell .workspace-content .page-block-inspector .page-object-tabs button:not(.page-block-inspector-close):active {
+    border: 1px solid #d4d4d8 !important;
+    border-color: #d4d4d8 !important;
+    background: #fafafa !important;
+    background-color: #fafafa !important;
+    color: #27272a !important;
+    box-shadow: none !important;
+}
+html body.ministry-app .workspace-shell .workspace-content .page-block-inspector .page-object-tabs button.is-active,
+html body.ministry-app .workspace-shell .workspace-content .page-block-inspector .page-object-tabs button[aria-selected="true"] {
+    background: #e4e4e7 !important;
+    background-color: #e4e4e7 !important;
+    color: #18181b !important;
+}
+html body.staff-theme-dark.ministry-app .workspace-shell .workspace-content .page-block-inspector .page-object-tabs button:not(.page-block-inspector-close),
+html body.staff-theme-dark.ministry-app .workspace-shell .workspace-content .page-block-inspector .page-object-tabs button:not(.page-block-inspector-close):hover,
+html body.staff-theme-dark.ministry-app .workspace-shell .workspace-content .page-block-inspector .page-object-tabs button:not(.page-block-inspector-close):active {
+    border-color: #3f3f46 !important;
+    background: #18181b !important;
+    background-color: #18181b !important;
+    color: #f4f4f5 !important;
+}
+html body.staff-theme-dark.ministry-app .workspace-shell .workspace-content .page-block-inspector .page-object-tabs button.is-active,
+html body.staff-theme-dark.ministry-app .workspace-shell .workspace-content .page-block-inspector .page-object-tabs button[aria-selected="true"] {
+    background: #3f3f46 !important;
+    background-color: #3f3f46 !important;
+    color: #fafafa !important;
+}
+
+/* The block assistant belongs in Content, alongside the fields it revises. */
+.workspace-content .page-block-inspector .page-inspector-tabs { display: none !important; }
+.workspace-content .page-block-inspector [data-section-ai-controls] { display: grid; gap: 9px; margin-top: 12px; border-top: 1px solid var(--line); padding: 12px 0 2px; }
+.workspace-content .page-block-inspector [data-section-ai-controls][hidden] { display: grid !important; }

@@ -4,6 +4,7 @@ use App\Http\Middleware\EnsureMfa;
 use App\Http\Middleware\EnsureModuleAvailable;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsureVerifiedEmail;
+use App\Http\Middleware\AddServerTiming;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->appendToGroup('web', AddServerTiming::class);
         $middleware->alias(['permission' => EnsurePermission::class, 'mfa' => EnsureMfa::class, 'verified_email' => EnsureVerifiedEmail::class]);
         $middleware->appendToGroup('web', EnsureModuleAvailable::class);
         $middleware->appendToGroup('api', EnsureModuleAvailable::class);

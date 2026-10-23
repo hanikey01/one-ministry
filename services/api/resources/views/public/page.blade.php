@@ -1,5 +1,23 @@
 <x-layouts.public :title="$page->seo_title ?: $page->title" :settings="$settings" :features="$features">
     @php($blocks = $page->blocks ? json_decode($page->blocks, true) : [])
+    @if(is_array($blocks) && ($blocks['version'] ?? null) === 2)
+        <article class="public-page-structured">
+            @foreach($blocks['sections'] ?? [] as $section)
+                @php($sectionSettings = $section['settings'] ?? [])
+                <section class="public-page-section public-page-structured-section" style="--page-section-bg: {{ $sectionSettings['background_color'] ?? 'transparent' }}; --page-section-padding: {{ $sectionSettings['padding'] ?? 'regular' }}; --page-columns: {{ max(1, count($section['columns'] ?? [])) }}">
+                    <div class="public-page-structured-columns">
+                        @foreach($section['columns'] ?? [] as $column)
+                            <div class="public-page-structured-column">
+                                @foreach($column['elements'] ?? [] as $element)
+                                    @include('public.partials.page-element', ['element' => $element])
+                                @endforeach
+                            </div>
+                        @endforeach
+                    </div>
+                </section>
+            @endforeach
+        </article>
+    @else
     <article class="public-page-blocks">
         @forelse($blocks as $block)
             @php($data = $block['data'] ?? [])
@@ -21,6 +39,19 @@
                 @case('service_times')<section class="public-page-callout"><small>SERVICE TIMES</small><h2>{{ $data['title'] ?? 'Join us this week' }}</h2><p>{{ $data['body'] ?? '' }}</p><a href="{{ route('public.locations') }}">View service times and locations</a></section>@break
                 @case('events')<section class="public-page-callout"><small>EVENTS</small><h2>{{ $data['title'] ?? 'What is happening next' }}</h2><p>{{ $data['body'] ?? '' }}</p><a href="{{ route('public.events') }}">Explore events</a></section>@break
                 @case('groups')@if(in_array('groups', $features, true))<section class="public-page-callout"><small>GROUPS</small><h2>{{ $data['title'] ?? 'Find your community' }}</h2><p>{{ $data['body'] ?? '' }}</p><a href="{{ route('public.groups') }}">Find a group</a></section>@endif @break
+                @case('carousel')<section class="public-page-callout"><small>{{ $data['eyebrow'] ?? 'FEATURED' }}</small><h2>{{ $data['title'] ?? '' }}</h2><p>{{ $data['body'] ?? '' }}</p>@if(!empty($data['slides']))<ul>@foreach(array_values(array_filter(preg_split('/\R/', (string) $data['slides']) ?: [])) as $slide)<li>{{ trim($slide) }}</li>@endforeach</ul>@endif@if(!empty($data['button_label']) && !empty($data['button_url']))<a class="button" href="{{ $data['button_url'] }}">{{ $data['button_label'] }}</a>@endif</section>@break
+                @case('live_service')@if(in_array('digital_church', $features, true))<section class="public-page-callout"><small>LIVE SERVICE</small><h2>{{ $data['title'] ?? 'Join us online' }}</h2><p>{{ $data['body'] ?? '' }}</p>@if(!empty($data['button_label']) && !empty($data['button_url']))<a class="button" href="{{ $data['button_url'] }}">{{ $data['button_label'] }}</a>@endif</section>@endif @break
+                @case('locations')<section class="public-page-callout"><small>LOCATIONS</small><h2>{{ $data['title'] ?? 'Find your way here' }}</h2><p>{{ $data['body'] ?? '' }}</p>@if(!empty($data['button_label']) && !empty($data['button_url']))<a class="button" href="{{ $data['button_url'] }}">{{ $data['button_label'] }}</a>@endif</section>@break
+                @case('giving')@if(in_array('giving', $features, true))<section class="public-page-callout"><small>GIVING</small><h2>{{ $data['title'] ?? 'Support the ministry' }}</h2><p>{{ $data['body'] ?? '' }}</p>@if(!empty($data['button_label']) && !empty($data['button_url']))<a class="button" href="{{ $data['button_url'] }}">{{ $data['button_label'] }}</a>@endif</section>@endif @break
+                @case('prayer')<section class="public-page-callout"><small>PRAYER</small><h2>{{ $data['title'] ?? 'How can we pray for you?' }}</h2><p>{{ $data['body'] ?? '' }}</p>@if(!empty($data['button_label']) && !empty($data['button_url']))<a class="button" href="{{ $data['button_url'] }}">{{ $data['button_label'] }}</a>@endif</section>@break
+                @case('sermon_spotlight')<section class="public-page-callout"><small>FEATURED TEACHING</small><h2>{{ $data['title'] ?? 'Featured teaching' }}</h2><p>{{ $data['body'] ?? '' }}</p>@if(!empty($data['button_label']) && !empty($data['button_url']))<a class="button" href="{{ $data['button_url'] }}">{{ $data['button_label'] }}</a>@endif</section>@break
+                @case('books')@if(in_array('books_library', $features, true))<section class="public-page-callout"><small>RESOURCES</small><h2>{{ $data['title'] ?? 'Books and resources' }}</h2><p>{{ $data['body'] ?? '' }}</p>@if(!empty($data['button_label']) && !empty($data['button_url']))<a class="button" href="{{ $data['button_url'] }}">{{ $data['button_label'] }}</a>@endif</section>@endif @break
+                @case('announcements')<section class="public-page-callout"><small>ANNOUNCEMENTS</small><h2>{{ $data['title'] ?? 'Latest announcements' }}</h2><p>{{ $data['body'] ?? '' }}</p></section>@break
+                @case('volunteer')<section class="public-page-callout"><small>SERVE</small><h2>{{ $data['title'] ?? 'Serve with purpose' }}</h2><p>{{ $data['body'] ?? '' }}</p></section>@break
+                @case('newsletter')<section class="public-page-callout"><small>STAY CONNECTED</small><h2>{{ $data['title'] ?? 'Stay connected' }}</h2><p>{{ $data['body'] ?? '' }}</p></section>@break
+                @case('next_steps')<section class="public-page-callout"><small>NEXT STEPS</small><h2>{{ $data['title'] ?? 'Your next step' }}</h2><p>{{ $data['body'] ?? '' }}</p></section>@break
+                @case('welcome')<section class="public-page-callout"><small>WELCOME</small><h2>{{ $data['title'] ?? 'There is room for you' }}</h2><p>{{ $data['body'] ?? '' }}</p></section>@break
+                @case('custom')<section class="public-page-callout"><small>MINISTRY</small><h2>{{ $data['title'] ?? '' }}</h2><p>{{ $data['body'] ?? '' }}</p></section>@break
                 @case('section')<section class="public-page-section public-page-section-{{ $data['layout'] ?? 'two' }} public-page-section-{{ $data['padding'] ?? 'regular' }}" @if(!empty($data['background_color'])) style="background: {{ $data['background_color'] }}" @endif><header><h2>{{ $data['title'] ?? '' }}</h2><p>{{ $data['body'] ?? '' }}</p></header><div class="public-page-columns"><div><h3>{{ $data['column_one_title'] ?? '' }}</h3><p>{{ $data['column_one_body'] ?? '' }}</p></div>@if(($data['layout'] ?? 'two') !== 'one')<div><h3>{{ $data['column_two_title'] ?? '' }}</h3><p>{{ $data['column_two_body'] ?? '' }}</p></div>@endif@if(($data['layout'] ?? '') === 'three')<div><h3>{{ $data['column_three_title'] ?? '' }}</h3><p>{{ $data['column_three_body'] ?? '' }}</p></div>@endif</div></section>@break
                 @case('divider')<hr class="public-page-divider">@break
             @endswitch
@@ -28,4 +59,5 @@
             <header class="public-heading"><p>ABOUT THIS MINISTRY</p><h1>{{ $page->title }}</h1></header><div class="prose">{!! nl2br(e($page->body)) !!}</div>
         @endforelse
     </article>
+    @endif
 </x-layouts.public>

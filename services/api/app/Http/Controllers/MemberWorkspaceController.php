@@ -65,24 +65,35 @@ class MemberWorkspaceController extends Controller
         $person = $this->person($request);
         $features = DB::table('feature_settings')->where('state', 'enabled')->pluck('key')->all();
         abort_if($requiredFeature && ! in_array($requiredFeature, $features, true), 404);
-        $groups = in_array('groups', $features, true) ? DB::table('group_memberships')->join('groups', 'groups.id', '=', 'group_memberships.group_id')->where('person_id', $person->id)->get(['groups.name', 'group_memberships.role']) : collect();
-        $events = DB::table('event_registrations')->join('events', 'events.id', '=', 'event_registrations.event_id')->where('person_id', $person->id)->where('event_registrations.status', 'registered')->where('events.starts_at', '>=', now())->orderBy('events.starts_at')->get(['events.title', 'events.starts_at', 'events.location']);
-        $serving = DB::table('volunteer_assignments')->join('volunteer_teams', 'volunteer_teams.id', '=', 'volunteer_assignments.team_id')->where('person_id', $person->id)->where('starts_at', '>=', now())->orderBy('starts_at')->get(['volunteer_assignments.role', 'volunteer_assignments.starts_at', 'volunteer_assignments.status', 'volunteer_teams.name as team_name']);
-        $donations = in_array('giving', $features, true) ? DB::table('donations')->join('giving_funds', 'giving_funds.id', '=', 'donations.fund_id')->where('donations.person_id', $person->id)->whereIn('donations.status', ['confirmed', 'refunded', 'reversed'])->latest('confirmed_at')->limit(10)->get(['amount_minor', 'currency', 'status', 'confirmed_at', 'giving_funds.name as fund_name']) : collect();
-        $attendance = DB::table('attendance_records')
-            ->where('person_id', $person->id)
-            ->whereIn('status', ['present', 'confirmed', 'self_reported', 'corrected'])
-            ->latest('observed_at')
-            ->limit(6)
-            ->get(['source', 'status', 'observed_at']);
-        $journeys = DB::table('member_journeys')->where('person_id', $person->id)->latest('created_at')->get(['type', 'status', 'created_at', 'completed_at']);
-        $prayers = DB::table('prayer_requests')->where('person_id', $person->id)->latest('created_at')->get(['id', 'visibility', 'status', 'created_at']);
+        $isHome = $view === 'member.home';
+        $groups = ($isHome || $view === 'member.groups') && in_array('groups', $features, true)
+            ? DB::table('group_memberships')->join('groups', 'groups.id', '=', 'group_memberships.group_id')->where('person_id', $person->id)->get(['groups.name', 'group_memberships.role'])
+            : collect();
+        $events = ($isHome || $view === 'member.events')
+            ? DB::table('event_registrations')->join('events', 'events.id', '=', 'event_registrations.event_id')->where('person_id', $person->id)->where('event_registrations.status', 'registered')->where('events.starts_at', '>=', now())->orderBy('events.starts_at')->get(['events.title', 'events.starts_at', 'events.location'])
+            : collect();
+        $serving = ($isHome || $view === 'member.serving')
+            ? DB::table('volunteer_assignments')->join('volunteer_teams', 'volunteer_teams.id', '=', 'volunteer_assignments.team_id')->where('person_id', $person->id)->where('starts_at', '>=', now())->orderBy('starts_at')->get(['volunteer_assignments.role', 'volunteer_assignments.starts_at', 'volunteer_assignments.status', 'volunteer_teams.name as team_name'])
+            : collect();
+        $donations = ($isHome || $view === 'member.giving') && in_array('giving', $features, true)
+            ? DB::table('donations')->join('giving_funds', 'giving_funds.id', '=', 'donations.fund_id')->where('donations.person_id', $person->id)->whereIn('donations.status', ['confirmed', 'refunded', 'reversed'])->latest('confirmed_at')->limit(10)->get(['amount_minor', 'currency', 'status', 'confirmed_at', 'giving_funds.name as fund_name'])
+            : collect();
+        $attendance = ($isHome || $view === 'member.activity')
+            ? DB::table('attendance_records')->where('person_id', $person->id)->whereIn('status', ['present', 'confirmed', 'self_reported', 'corrected'])->latest('observed_at')->limit(6)->get(['source', 'status', 'observed_at'])
+            : collect();
+        $journeys = ($isHome || $view === 'member.next-steps')
+            ? DB::table('member_journeys')->where('person_id', $person->id)->latest('created_at')->get(['type', 'status', 'created_at', 'completed_at'])
+            : collect();
+        $prayers = ($isHome || $view === 'member.prayer')
+            ? DB::table('prayer_requests')->where('person_id', $person->id)->latest('created_at')->get(['id', 'visibility', 'status', 'created_at'])
+            : collect();
 
         return view($view, [
             'settings' => MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID),
             'user' => $request->user(),
             'person' => $person,
-            'preferences' => DB::table('notification_preferences')->where('person_id', $person->id)->first(),
+            'preferences' => $view === 'member.profile' ? DB::table('notification_preferences')->where('person_id', $person->id)->first() : null,
+            'birthday' => $view === 'member.profile' && $person->birthday ? CarbonImmutable::parse($person->birthday) : null,
             'groups' => $groups, 'events' => $events, 'serving' => $serving, 'donations' => $donations,
             'attendance' => $attendance, 'journeys' => $journeys, 'prayers' => $prayers,
             'nextEvent' => $events->first(),

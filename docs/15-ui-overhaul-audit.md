@@ -1,6 +1,6 @@
 # 15 — UI Overhaul Audit and Design Direction
 
-**Status:** Approved redesign direction; foundation and workspace shells implemented in source, detailed page conversion and verification pending.  
+**Status:** Historical audit and redesign rationale. The active application-experience rules are owned by [18 — Application Experience and Performance Contract](18-experience-performance-contract.md) and component/accessibility detail by [07 — Experience and Design System](07-design.md).
 **Audited:** 2026-10-15
 
 ## 1. Result
