@@ -287,6 +287,7 @@ Route::middleware(['auth', 'permission:content.manage', 'throttle:10,1'])->post(
 Route::middleware(['auth', 'permission:content.manage'])->post('/staff/pages', [PageWorkspaceController::class, 'store'])->name('staff.pages.store');
 Route::middleware(['auth', 'permission:content.manage'])->get('/staff/pages/{page}/edit', [PageWorkspaceController::class, 'edit'])->name('staff.pages.edit');
 Route::middleware(['auth', 'permission:content.manage'])->put('/staff/pages/{page}', [PageWorkspaceController::class, 'update'])->name('staff.pages.update');
+Route::middleware(['auth', 'permission:content.manage'])->put('/staff/pages/{page}/quick-edit', [PageWorkspaceController::class, 'quickUpdate'])->name('staff.pages.quick-update');
 Route::middleware(['auth', 'permission:content.publish', 'verified_email', 'mfa'])->post('/staff/pages/{page}/publish', [PageWorkspaceController::class, 'publish'])->name('staff.pages.publish');
 Route::middleware(['auth', 'permission:services.manage'])->get('/staff/follow-up', [StaffWorkspaceController::class, 'followUp'])->name('staff.follow-up');
 Route::middleware(['auth', 'permission:care.manage', 'verified_email', 'mfa'])->get('/staff/care', [StaffWorkspaceController::class, 'care'])->name('staff.care');

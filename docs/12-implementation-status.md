@@ -198,6 +198,10 @@ The previous ministry-owned page palette is superseded before launch. Source now
 
 The appearance preview's Alpine label is now rendered client-side so Blade does not evaluate `previewDark` as PHP; the settings 500 in the API log traced to that template expression. Action buttons use the configured ministry accent and a foreground selected by comparing black/white contrast. A source audit found legacy green-tinted overrides remaining in member layouts, learning styles, and public homepage components; a final shared semantic-color layer now routes dashboard cards, forms, headings, and navigation surfaces through the light/dark tokens while retaining ministry branding on intentional brand areas. Blade view caching and the Vite production asset build pass. Route-by-route browser and contrast verification remain pending; the JS chunk-size warning remains.
 
+### 2026-10-23 — Page editor document foundation
+
+Source now validates and stores version 2 public-page documents as sections, columns, and elements with stable editor IDs, bounded recursive structure, approved element types, feature gates, URL/media restrictions, responsive breakpoint objects, and a rejection path for arbitrary markup, scripts, and styles. Both the staff workspace and JSON page API use this boundary. Existing flat documents convert on their next save; a migration snapshot is first added to immutable page revision history, and later v2 saves do not convert them again. Legacy section and media/text blocks map to genuine multi-column structures without inventing copy. PHP syntax checks pass; focused PHPUnit coverage was added but could not run locally because the API vendor tree is absent. Recursive public rendering, structured canvas controls, migration execution against a representative database, and browser/accessibility review remain pending.
+
 ## Current project backlog — 2026-10-19
 
 This backlog records product work still required after the Laravel shared-hosting transition and the digital-school core implementation. It excludes routine visual polish already covered by route-level audits.

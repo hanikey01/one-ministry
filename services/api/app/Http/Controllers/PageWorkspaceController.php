@@ -99,8 +99,10 @@ class PageWorkspaceController extends Controller
     {
         $record = DB::table('pages')->where('id', $page)->firstOrFail();
         $data = $this->data($request, $page);
-        $revision = (int) DB::table('content_revisions')->where('page_id', $page)->max('revision') + 1;
-        DB::transaction(function () use ($request, $page, $data, $revision, $record): void {
+        $migrationRevision = $this->requiresDocumentMigration($record->blocks ?? null);
+        $revision = (int) DB::table('content_revisions')->where('page_id', $page)->max('revision') + ($migrationRevision ? 2 : 1);
+        DB::transaction(function () use ($request, $page, $data, $revision, $record, $migrationRevision): void {
+            if ($migrationRevision) $this->revision($page, $revision - 1, $this->legacyRevisionPayload($record), $request->user()->id);
             DB::table('pages')->where('id', $page)->update([...$data, 'status' => 'draft', 'review_notes' => null, 'published_at' => null, 'published_by' => null, 'updated_by' => $request->user()->id, 'updated_at' => now()]);
             $this->revision($page, $revision, $data, $request->user()->id);
             $this->audit($request, 'content.page_updated', $page, ['revision' => $revision, 'previous_status' => $record->status]);
@@ -113,6 +115,48 @@ class PageWorkspaceController extends Controller
                 'message' => $message,
                 'data' => ['page_id' => $page, 'revision' => $revision, 'status' => 'draft'],
             ]);
+        }
+
+        return back()->with('status', $message);
+    }
+
+    public function quickUpdate(Request $request, string $page): RedirectResponse|JsonResponse
+    {
+        $record = DB::table('pages')->where('id', $page)->firstOrFail();
+        $request->merge(['slug' => Str::slug((string) $request->input('slug'))]);
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:200'],
+            'slug' => ['required', 'string', 'max:160', Rule::unique('pages', 'slug')->ignore($page)],
+            'seo_title' => ['nullable', 'string', 'max:70'],
+            'seo_description' => ['nullable', 'string', 'max:160'],
+            'status' => ['required', Rule::in(['draft', 'published'])],
+        ]);
+        abort_if(in_array($data['slug'], self::RESERVED, true), 422, 'This page address is reserved.');
+
+        $changes = [
+            ...$data,
+            'updated_by' => $request->user()->id,
+            'updated_at' => now(),
+        ];
+        if ($data['status'] === 'published' && $record->status !== 'published') {
+            $changes['published_at'] = now();
+            $changes['published_by'] = $request->user()->id;
+            $changes['review_notes'] = null;
+        } elseif ($data['status'] === 'draft' && $record->status === 'published') {
+            $changes['published_at'] = null;
+            $changes['published_by'] = null;
+        }
+        DB::table('pages')->where('id', $page)->update($changes);
+        $this->audit($request, 'content.page_metadata_updated', $page, [
+            'previous_title' => $record->title,
+            'previous_slug' => $record->slug,
+            'previous_status' => $record->status,
+            'status' => $data['status'],
+        ]);
+
+        $message = $data['status'] === 'published' ? 'Page published.' : 'Page saved as draft.';
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message, 'data' => ['page_id' => $page]]);
         }
 
         return back()->with('status', $message);
@@ -155,8 +199,9 @@ class PageWorkspaceController extends Controller
         ]);
         abort_if(in_array($data['slug'], self::RESERVED, true), 422, 'This page address is reserved.');
 
-        $blocks = $this->normaliseBlocks($data['blocks'] ?? null, $data['body'] ?? null);
-        $data['blocks'] = json_encode(app(\App\Services\PageDocumentService::class)->fromFlat($blocks), JSON_THROW_ON_ERROR);
+        $document = $this->document($data['blocks'] ?? null, $data['body'] ?? null);
+        $blocks = app(\App\Services\PageDocumentService::class)->flatten($document, $this->enabledFeatures());
+        $data['blocks'] = json_encode($document, JSON_THROW_ON_ERROR);
         $data['body'] = $this->plainTextFromBlocks($blocks);
 
         return $data;
@@ -171,7 +216,7 @@ class PageWorkspaceController extends Controller
 
                 if (is_array($decoded)) {
                     if (($decoded['version'] ?? null) === 2) {
-                        return app(\App\Services\PageDocumentService::class)->flatten($decoded);
+                        return app(\App\Services\PageDocumentService::class)->flatten($decoded, $this->enabledFeatures());
                     }
                     return $decoded;
                 }
@@ -205,7 +250,7 @@ class PageWorkspaceController extends Controller
         }
 
         if (($decoded['version'] ?? null) === 2) {
-            return app(\App\Services\PageDocumentService::class)->flatten($decoded);
+            return app(\App\Services\PageDocumentService::class)->flatten($decoded, $this->enabledFeatures());
         }
 
         $allowed = [
@@ -283,6 +328,32 @@ class PageWorkspaceController extends Controller
         }
 
         return $blocks === [] ? [['type' => 'paragraph', 'data' => ['text' => 'Start writing your page here.']]] : $blocks;
+    }
+
+    /** Preserve an incoming v2 hierarchy; legacy drafts convert only at this boundary. */
+    private function document(?string $encodedBlocks, ?string $legacyBody): array
+    {
+        $service = app(\App\Services\PageDocumentService::class);
+        if ($encodedBlocks) {
+            try {
+                $decoded = json_decode($encodedBlocks, true, 512, JSON_THROW_ON_ERROR);
+            } catch (\JsonException) {
+                throw ValidationException::withMessages(['blocks' => 'The page layout could not be read. Refresh the editor and try again.']);
+            }
+            if ($service->isStructured($decoded)) return $service->normalise($decoded, $this->enabledFeatures());
+        }
+        return $service->fromFlat($this->normaliseBlocks($encodedBlocks, $legacyBody), $this->enabledFeatures());
+    }
+
+    private function requiresDocumentMigration(?string $encodedBlocks): bool
+    {
+        if (! $encodedBlocks) return true;
+        try { return ! app(\App\Services\PageDocumentService::class)->isStructured(json_decode($encodedBlocks, true, 512, JSON_THROW_ON_ERROR)); } catch (\JsonException) { return true; }
+    }
+
+    private function legacyRevisionPayload(object $page): array
+    {
+        return ['title' => $page->title, 'slug' => $page->slug, 'body' => $page->body, 'blocks' => $page->blocks, 'seo_title' => $page->seo_title, 'seo_description' => $page->seo_description, 'migration_snapshot' => 'legacy_flat_document'];
     }
 
     private function isSupportedVideoUrl(string $url): bool

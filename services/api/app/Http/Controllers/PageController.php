@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\FeatureSetting;
+use App\Services\PageDocumentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -43,8 +45,10 @@ class PageController extends Controller
         $record = DB::table('pages')->where('id', $page)->first();
         abort_unless($record, 404);
         $data = $this->data($request, $page);
-        $revision = (int) DB::table('content_revisions')->where('page_id', $page)->max('revision') + 1;
-        DB::transaction(function () use ($request, $page, $data, $revision, $record): void {
+        $migrationRevision = $this->requiresDocumentMigration($record->blocks ?? null);
+        $revision = (int) DB::table('content_revisions')->where('page_id', $page)->max('revision') + ($migrationRevision ? 2 : 1);
+        DB::transaction(function () use ($request, $page, $data, $revision, $record, $migrationRevision): void {
+            if ($migrationRevision) $this->revision($page, $revision - 1, $this->legacyRevisionPayload($record), $request->user()->id);
             DB::table('pages')->where('id', $page)->update([...$data, 'status' => 'draft', 'review_notes' => null, 'published_at' => null, 'published_by' => null, 'updated_by' => $request->user()->id, 'updated_at' => now()]);
             $this->revision($page, $revision, $data, $request->user()->id);
             $this->audit($request, 'content.page_updated', $page, ['revision' => $revision, 'previous_status' => $record->status]);
@@ -83,11 +87,30 @@ class PageController extends Controller
         $request->merge(['slug' => Str::slug((string) $request->input('slug'))]);
         $data = $request->validate(['title' => ['required', 'string', 'max:200'], 'slug' => ['required', 'string', 'max:160', Rule::unique('pages', 'slug')->ignore($page)], 'body' => ['nullable', 'string', 'max:50000'], 'blocks' => ['nullable', 'array', 'max:60'], 'seo_title' => ['nullable', 'string', 'max:70'], 'seo_description' => ['nullable', 'string', 'max:160']]);
         abort_if(in_array($data['slug'], self::RESERVED, true), 422, 'This page address is reserved.');
-        if (array_key_exists('blocks', $data)) {
-            $data['blocks'] = json_encode($data['blocks'], JSON_THROW_ON_ERROR);
-        }
+        $source = $data['blocks'] ?? $this->bodyBlocks($data['body'] ?? '');
+        $documents = app(PageDocumentService::class);
+        $features = FeatureSetting::query()->where('state', 'enabled')->pluck('key')->all();
+        $document = $documents->isStructured($source) ? $documents->normalise($source, $features) : $documents->fromFlat($source, $features);
+        $data['blocks'] = json_encode($document, JSON_THROW_ON_ERROR);
 
         return $data;
+    }
+
+    /** @return array<int, array{type: string, data: array{text: string}}> */
+    private function bodyBlocks(?string $body): array
+    {
+        return array_map(fn (string $text): array => ['type' => 'paragraph', 'data' => ['text' => trim($text)]], array_values(array_filter(preg_split('/\R\s*\R/', (string) $body) ?: [], fn (string $text): bool => trim($text) !== '')));
+    }
+
+    private function requiresDocumentMigration(?string $encodedBlocks): bool
+    {
+        if (! $encodedBlocks) return true;
+        try { return ! app(PageDocumentService::class)->isStructured(json_decode($encodedBlocks, true, 512, JSON_THROW_ON_ERROR)); } catch (\JsonException) { return true; }
+    }
+
+    private function legacyRevisionPayload(object $page): array
+    {
+        return ['title' => $page->title, 'slug' => $page->slug, 'body' => $page->body, 'blocks' => $page->blocks, 'seo_title' => $page->seo_title, 'seo_description' => $page->seo_description, 'migration_snapshot' => 'legacy_flat_document'];
     }
 
     private function revision(string $page, int $revision, array $payload, string $user): void

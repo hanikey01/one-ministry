@@ -35,6 +35,29 @@ const initializePage = (force = false) => {
     cleanupPage();
     initializedPageUrl = pageUrl;
 
+    document.querySelectorAll('.page-quick-edit').forEach((details) => {
+        const form = details.querySelector('form');
+        const close = details.querySelector('[data-quick-edit-close]');
+        if (!form) return;
+        addPageListener(close, 'click', (event) => {
+            event.preventDefault();
+            details.open = false;
+        });
+        addPageListener(details, 'click', (event) => {
+            if (event.target.closest('summary, form')) return;
+            details.open = false;
+        });
+        addPageListener(document, 'click', (event) => {
+            if (details.open && !details.contains(event.target)) details.open = false;
+        });
+        addPageListener(document, 'keydown', (event) => {
+            if (event.key === 'Escape' && details.open) {
+                details.open = false;
+                details.querySelector('summary')?.focus();
+            }
+        });
+    });
+
     const library = document.querySelector('.page-block-library');
     const libraryOpens = document.querySelectorAll('[data-block-library-open]');
     const libraryClosers = document.querySelectorAll('[data-block-library-close]');
@@ -58,7 +81,12 @@ const initializePage = (force = false) => {
     libraryOpens.forEach((opener) => addPageListener(opener, 'click', () => setLibraryOpen(true)));
     libraryClosers.forEach((closer) => addPageListener(closer, 'click', () => setLibraryOpen(false)));
     addPageListener(document, 'keydown', (event) => { if (event.key === 'Escape') setLibraryOpen(false); });
-    addPageListener(library, 'click', (event) => { if (event.target.closest('[data-add]')) setLibraryOpen(false); });
+    addPageListener(library, 'click', (event) => {
+        const addButton = event.target.closest('[data-add]');
+        if (!addButton) return;
+        window.oneMinistryPageEditor?.addBlock?.(addButton.dataset.add);
+        setLibraryOpen(false);
+    });
     const canvasWrap = document.querySelector('.page-block-canvas-wrap');
     const canvas = canvasWrap?.querySelector('[data-canvas]');
     const floatingLibraryOpen = document.querySelector('.page-block-library-trigger');
