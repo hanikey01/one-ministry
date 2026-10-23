@@ -81,7 +81,7 @@ const initializePage = (force = false) => {
         inspectorBackdrop.dataset.inspectorClose = '';
         inspector.parentElement?.append(inspectorBackdrop);
         inspector.setAttribute('aria-hidden', 'true');
-        const closeInspector = () => { inspector.classList.remove('is-open'); inspectorBackdrop.classList.remove('is-open'); inspector.setAttribute('aria-hidden', 'true'); };
+        const closeInspector = () => { inspector.classList.remove('is-open'); inspectorBackdrop.classList.remove('is-open'); inspector.setAttribute('aria-hidden', 'true'); document.body.classList.remove('page-inspector-is-open'); };
         const normalizeInspectorButtons = () => {
             const dark = document.querySelector('.staff-theme-dark');
             inspector.querySelectorAll('button[data-inspector-tab], .page-inspector-actions button').forEach((button) => {
@@ -91,7 +91,7 @@ const initializePage = (force = false) => {
                 button.style.setProperty('box-shadow', 'none', 'important');
             });
         };
-        const openInspector = () => { normalizeInspectorButtons(); inspector.classList.add('is-open'); inspectorBackdrop.classList.add('is-open'); inspector.setAttribute('aria-hidden', 'false'); };
+        const openInspector = () => { setLibraryOpen(false); normalizeInspectorButtons(); inspector.classList.add('is-open'); inspectorBackdrop.classList.add('is-open'); inspector.setAttribute('aria-hidden', 'false'); document.body.classList.add('page-inspector-is-open'); };
         const closeButton = document.createElement('button');
         closeButton.type = 'button'; closeButton.className = 'page-block-inspector-close'; closeButton.dataset.inspectorClose = '';
         closeButton.setAttribute('aria-label', 'Close block settings'); closeButton.title = 'Close block settings';

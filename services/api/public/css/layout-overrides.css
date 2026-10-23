@@ -1868,6 +1868,17 @@ body.ministry-app .page-media-picker-trigger:focus-visible {
 
 .page-object-tab-panel[hidden]{display:none!important}
 
+/* The inspector and element drawer are mutually exclusive overlays. */
+.page-block-editor-shell:has(.page-block-inspector.is-open) .page-block-library,
+.page-inspector-is-open .page-block-library-trigger,
+.page-block-editor-form:has(.page-block-inspector.is-open) .page-block-library-trigger,
+.page-block-editor-shell:has(.page-block-inspector.is-open) + .page-block-library-trigger,
+.page-block-editor-shell:has(.page-block-inspector.is-open) ~ .page-block-library-trigger {
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
 /* Inspector panels must always follow the selected object tab. This also keeps
    the editor coherent while its JavaScript replaces a block's settings. */
 body.ministry-app .workspace-content .page-block-inspector [data-object-panel] {
