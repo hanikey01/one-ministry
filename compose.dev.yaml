@@ -25,7 +25,9 @@ services:
   vite:
     image: node:22-alpine
     working_dir: /var/www/html
-    command: ["sh", "-c", "if [ ! -d node_modules/.vite ]; then npm ci --no-audit --no-fund; fi; exec npm run build -- --watch"]
+    command: ["sh", "-c", "if [ ! -x node_modules/.bin/vite ]; then npm install --no-audit --no-fund --ignore-scripts; fi; exec npm run dev -- --host 0.0.0.0"]
+    ports:
+      - "5173:5173"
     volumes:
       - ./services/api:/var/www/html
       - vite_node_modules:/var/www/html/node_modules

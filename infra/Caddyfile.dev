@@ -1,6 +1,10 @@
 :80 {
     root * /var/www/html/public
     encode zstd gzip
+    @vite_hmr path /@vite/*
+    reverse_proxy @vite_hmr vite:5173
+    @vite_resources path /resources/*
+    reverse_proxy @vite_resources vite:5173
     # Development assets must be revalidated so Vite's watch output appears immediately.
     @dev_assets path /build/* /css/* /js/*
     header @dev_assets Cache-Control "no-store, no-cache, must-revalidate"
