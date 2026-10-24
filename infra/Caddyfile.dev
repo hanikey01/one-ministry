@@ -1,0 +1,9 @@
+:80 {
+    root * /var/www/html/public
+    encode zstd gzip
+    # Development assets must be revalidated so Vite's watch output appears immediately.
+    @dev_assets path /build/* /css/* /js/*
+    header @dev_assets Cache-Control "no-store, no-cache, must-revalidate"
+    php_fastcgi api:9000
+    file_server
+}

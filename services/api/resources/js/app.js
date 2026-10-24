@@ -102,38 +102,6 @@ const initializePage = (force = false) => {
             canvas.dataset.preview = button.dataset.canvasSize;
         }));
     }
-    const inspector = document.querySelector('.page-block-inspector');
-    if (inspector) {
-        const inspectorBackdrop = document.createElement('div');
-        inspectorBackdrop.className = 'page-block-inspector-backdrop';
-        inspectorBackdrop.dataset.inspectorClose = '';
-        inspector.parentElement?.append(inspectorBackdrop);
-        inspector.setAttribute('aria-hidden', 'true');
-        const closeInspector = () => { inspector.classList.remove('is-open'); inspectorBackdrop.classList.remove('is-open'); inspector.setAttribute('aria-hidden', 'true'); document.body.classList.remove('page-inspector-is-open'); };
-        const normalizeInspectorButtons = () => {
-            const dark = document.querySelector('.staff-theme-dark');
-            inspector.querySelectorAll('button[data-inspector-tab], .page-inspector-actions button').forEach((button) => {
-                button.style.setProperty('background-color', dark ? '#18181b' : '#fafafa', 'important');
-                button.style.setProperty('border-color', dark ? '#3f3f46' : '#d4d4d8', 'important');
-                button.style.setProperty('color', dark ? '#f4f4f5' : '#27272a', 'important');
-                button.style.setProperty('box-shadow', 'none', 'important');
-            });
-        };
-        const openInspector = () => { setLibraryOpen(false); normalizeInspectorButtons(); inspector.classList.add('is-open'); inspectorBackdrop.classList.add('is-open'); inspector.setAttribute('aria-hidden', 'false'); document.body.classList.add('page-inspector-is-open'); };
-        const closeButton = document.createElement('button');
-        closeButton.type = 'button'; closeButton.className = 'page-block-inspector-close'; closeButton.dataset.inspectorClose = '';
-        closeButton.setAttribute('aria-label', 'Close block settings'); closeButton.title = 'Close block settings';
-        closeButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg>';
-        inspector.querySelector('header')?.append(closeButton);
-        addPageListener(canvas, 'click', (event) => { if (event.target.closest('[data-index]')) openInspector(); });
-        addPageListener(inspector.querySelector('[data-inspector]'), 'click', (event) => { if (event.target.closest('[data-remove]')) closeInspector(); });
-        inspector.querySelectorAll('[data-inspector-close]').forEach((node) => addPageListener(node, 'click', closeInspector));
-        addPageListener(closeButton, 'click', closeInspector);
-        addPageListener(inspectorBackdrop, 'click', closeInspector);
-        addPageListener(document, 'keydown', (event) => { if (event.key === 'Escape') closeInspector(); });
-    }
-
-
 document.querySelectorAll('[data-zoom-meeting]').forEach((room) => {
     const joinButton = room.querySelector('[data-zoom-join]');
     const status = room.querySelector('[data-zoom-status]');

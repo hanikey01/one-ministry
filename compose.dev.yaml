@@ -33,6 +33,10 @@ services:
     depends_on:
       - api
 
+  proxy:
+    volumes:
+      - ./infra/Caddyfile.dev:/etc/caddy/Caddyfile:ro
+
 volumes:
   vite_node_modules:
 
