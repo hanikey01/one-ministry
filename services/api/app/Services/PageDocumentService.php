@@ -17,7 +17,7 @@ final class PageDocumentService
     /** @var array<string, array<int, string>> */
     private const ELEMENT_FIELDS = [
         'hero' => ['eyebrow', 'title', 'body', 'button_label', 'button_url'],
-        'heading' => ['text'], 'paragraph' => ['text'], 'image' => ['url', 'alt', 'caption', 'image_hint'],
+        'heading' => ['text'], 'paragraph' => ['text'], 'button' => ['label', 'url'], 'feature_list' => ['title', 'items'], 'testimonial' => ['quote', 'name', 'role'], 'statistics' => ['title', 'stat_one_value', 'stat_one_label', 'stat_two_value', 'stat_two_label', 'stat_three_value', 'stat_three_label'], 'image' => ['url', 'alt', 'caption', 'image_hint'],
         'gallery' => ['images', 'columns', 'caption'], 'video_embed' => ['url', 'title', 'caption'],
         'audio' => ['url', 'title', 'caption'], 'file' => ['url', 'label', 'description'],
         'media_text' => ['media_url', 'media_alt', 'placement', 'title', 'body', 'button_label', 'button_url'],
@@ -118,11 +118,18 @@ final class PageDocumentService
     }
     private function validateContent(string $type, array $content): void
     {
-        foreach (['url', 'media_url'] as $field) if (($content[$field] ?? '') !== '' && ! preg_match('#^https?://#i', $content[$field])) $this->invalid('Media links must use an HTTP or HTTPS URL.');
+        foreach (['url', 'media_url'] as $field) if (($type !== 'button' || $field !== 'url') && ($content[$field] ?? '') !== '' && ! preg_match('#^https?://#i', $content[$field])) $this->invalid('Media links must use an HTTP or HTTPS URL.');
         if (($content['button_url'] ?? '') !== '' && ! preg_match('#^(?:https?://|/)#i', $content['button_url'])) $this->invalid('Button destinations must use an HTTP(S) link or an internal path.');
-        if ($type === 'video_embed' && ($content['url'] ?? '') !== '' && ! preg_match('~(?:youtu\.be/|youtube\.com/(?:watch\?v=|embed/|shorts/)|vimeo\.com/(?:video/)?)[A-Za-z0-9_-]+~i', $content['url'])) $this->invalid('Video embeds currently support YouTube and Vimeo links only.');
+        if ($type === 'button' && ($content['url'] ?? '') !== '' && ! preg_match('#^(?:https?://|/)#i', $content['url'])) $this->invalid('Button destinations must use an HTTP(S) link or an internal path.');
+        if ($type === 'video_embed' && ($content['url'] ?? '') !== '' && ! $this->isSupportedVideoUrl($content['url'])) $this->invalid('Video embeds support YouTube, Vimeo, or a published ministry video.');
         if ($type === 'gallery') { $images = array_values(array_filter(preg_split('/\R/', $content['images']) ?: [])); if (count($images) > 12 || collect($images)->contains(fn ($url) => ! preg_match('#^https?://#i', trim($url)))) $this->invalid('A gallery accepts up to 12 HTTP or HTTPS image links.'); if (! in_array($content['columns'], ['two', 'three', 'four'], true)) $this->invalid('Choose a valid gallery column layout.'); }
         if ($type === 'media_text' && ! in_array($content['placement'], ['left', 'right'], true)) $this->invalid('Choose a valid media placement.'); if ($type === 'list' && ! in_array($content['ordered'], ['yes', 'no'], true)) $this->invalid('Choose a valid list style.'); if ($type === 'spacer' && ! in_array($content['height'], ['small', 'medium', 'large'], true)) $this->invalid('Choose a valid spacer height.');
+    }
+
+    private function isSupportedVideoUrl(string $url): bool
+    {
+        return preg_match('~(?:youtu\.be/|youtube\.com/(?:watch\?v=|embed/|shorts/)|vimeo\.com/(?:video/)?)[A-Za-z0-9_-]+~i', $url) === 1
+            || preg_match('~/media/[0-9a-f-]{36}(?:\?.*)?$~i', $url) === 1;
     }
     private function settings(mixed $settings, int $max): array
     {
@@ -133,6 +140,16 @@ final class PageDocumentService
             if (in_array($key, ['css', 'style', 'stylesheet', 'html', 'script', 'javascript', 'custom_css', 'custom_html'], true)) $this->invalid('Arbitrary markup, scripts, and styles are not allowed in page settings.');
             $value = Str::limit(trim((string) $value), $max, '');
             if (in_array($key, ['background_color', 'border_color', 'overlay_color'], true) && $value !== '' && ! preg_match('/^(?:#[0-9a-fA-F]{6}|canvas|surface|surface_muted|action|brand)$/', $value)) $this->invalid('Page colours must use an approved theme token or six-digit hex value.');
+            $allowedSettings = [
+                'background' => ['transparent', 'canvas', 'surface', 'surface_muted', 'action', 'brand'],
+                'background_overlay' => ['none', 'soft', 'strong'],
+                'border' => ['none', 'subtle', 'strong'],
+                'radius' => ['none', 'small', 'medium', 'large'],
+                'shadow' => ['none', 'small', 'medium'],
+                'grid_preset' => ['one', 'two', 'three', 'four'],
+            ];
+            if (isset($allowedSettings[$key]) && ! in_array($value, $allowedSettings[$key], true)) $this->invalid('Choose an approved page appearance setting.');
+            if ($key === 'background_image' && $value !== '' && ! filter_var($value, FILTER_VALIDATE_URL)) $this->invalid('Choose a valid background image URL.');
             $result[$key] = $value;
         }
         return $result;
@@ -140,7 +157,25 @@ final class PageDocumentService
     private function responsive(mixed $responsive): array
     {
         if (! is_array($responsive)) $this->invalid('Responsive settings must be grouped by breakpoint.'); $result = [];
-        foreach (['desktop', 'tablet', 'mobile'] as $breakpoint) if (array_key_exists($breakpoint, $responsive)) $result[$breakpoint] = $this->settings($responsive[$breakpoint], 120);
+        $allowed = [
+            'visibility' => ['visible', 'hidden'],
+            'alignment' => ['left', 'center', 'right', 'stretch'],
+            'column_count' => ['1', '2', '3', '4'],
+            'stack' => ['inline', 'stack'],
+            'padding' => ['compact', 'regular', 'spacious'],
+            'column_gap' => ['compact', 'regular', 'spacious'],
+            'width' => ['full', 'half', 'third'],
+            'order' => ['1', '2', '3', '4'],
+            'gap' => ['compact', 'regular', 'spacious'],
+        ];
+        foreach (['desktop', 'tablet', 'mobile'] as $breakpoint) {
+            if (! array_key_exists($breakpoint, $responsive)) continue;
+            $settings = $this->settings($responsive[$breakpoint], 40);
+            foreach ($settings as $key => $value) {
+                if (! array_key_exists($key, $allowed) || ! in_array($value, $allowed[$key], true)) $this->invalid('Choose a valid responsive setting.');
+            }
+            $result[$breakpoint] = $settings;
+        }
         return $result;
     }
     private function id(mixed $id): string { return is_string($id) && preg_match('/^[a-zA-Z0-9_-]{1,80}$/', $id) ? $id : (string) Str::uuid(); }

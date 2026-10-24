@@ -68,12 +68,12 @@ Selecting a section opens the section settings panel. Settings are grouped into 
 
 ### 4.2 Style
 
-- Background color using a theme token or approved color value.
-- Border style: none, solid, dashed, dotted.
-- Border width per side or linked value.
-- Border color using a theme token or approved color value.
-- Border radius per corner or linked value.
-- Box shadow from a restrained preset.
+- Background: transparent, canvas, surface, muted surface, action, or brand.
+- Background image selected from the ministry media library, with none, soft, or strong readability overlay.
+- Border: none, subtle, or strong.
+- Corner radius: square, small, medium, or large.
+- Shadow: none, small, or medium.
+- The initial editor never accepts arbitrary CSS values, custom markup, or page-level scripts.
 - Opacity where it does not reduce content readability.
 
 ### 4.3 Spacing
@@ -140,11 +140,12 @@ Selecting a column opens the column settings panel without opening the section s
 
 Elements are placed inside columns. The first supported groups are:
 
-- Text: heading, paragraph, quote, list, accordion.
-- Actions: button, call to action.
+- Text: heading, paragraph, quote, list, accordion, feature list, testimonial, and statistics.
+- Actions: standalone button and call to action.
 - Media: image, gallery, video, audio, file download, media and text.
-- Ministry content: events, service times, groups, locations, giving, prayer, next steps, announcements, volunteer, sermon spotlight, books, and newsletter.
-- Layout helpers: divider and spacer.
+- Ministry content: events, service times, groups, locations, giving, prayer, next steps, announcements, volunteer, sermon spotlight, books, newsletter, and welcome.
+- Feature content: a native carousel with staff-provided slides and an explicit content card.
+- Layout helpers: divider, spacer, and one-, two-, three-, or four-column grid presets.
 
 Each element owns its content, accessibility fields, visibility, alignment, spacing, and approved style settings. An element cannot change its parent section or column settings through its own content form.
 
@@ -212,7 +213,7 @@ The inspector never displays unrelated controls from another hierarchy level.
 
 ## 9. AI behavior
 
-Page planning may propose sections, columns, and approved elements. It cannot invent media URLs, destinations, ministry facts, arbitrary HTML, CSS, or scripts.
+Page planning may propose sections, columns, and approved elements. It cannot invent media URLs, destinations, ministry facts, arbitrary HTML, CSS, or scripts. The application compiles and validates every plan into the same versioned document used by the manual editor before staff can review or apply it; AI output never becomes page markup directly.
 
 Section AI receives the page purpose, neighboring sections, the selected section, and the current theme context. It may change only the selected section after staff approval.
 
@@ -254,6 +255,7 @@ The original document remains available in the page revision history. Migration 
 
 - Keep the editor client-side interaction lightweight and route-scoped.
 - Do not load the full media catalog until the media picker opens.
+- Serve a selected published local asset through a public media route; staff-only library routes must not be stored in a public page document.
 - Use event delegation and clean up observers on navigation.
 - Debounce preview updates where text input is continuous.
 - Keep server-rendered form fallback available.

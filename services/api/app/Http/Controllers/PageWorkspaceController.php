@@ -41,7 +41,7 @@ class PageWorkspaceController extends Controller
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
         $starter = self::STARTERS[$request->string('template')->toString()] ?? self::STARTERS['blank'];
 
-        return view('staff.pages.form', compact('settings', 'starter') + ['user' => $request->user(), 'page' => null, 'blocks' => $this->starterBlocks($request->string('template')->toString(), $starter['body']), 'features' => $this->enabledFeatures(), 'mediaAssets' => $this->pageMediaAssets(), 'aiDraftAvailable' => app(ModuleAvailability::class)->visibleToStaff('ai_page_editor', $request->user()), 'aiDraftRoute' => DB::table('ai_task_routes')->where('task_key', 'page_editor')->first()]);
+        return view('staff.pages.form', compact('settings', 'starter') + ['user' => $request->user(), 'page' => null, 'blocks' => app(\App\Services\PageDocumentService::class)->fromFlat($this->starterBlocks($request->string('template')->toString(), $starter['body']), $this->enabledFeatures()), 'features' => $this->enabledFeatures(), 'aiDraftAvailable' => app(ModuleAvailability::class)->visibleToStaff('ai_page_editor', $request->user()), 'aiDraftRoute' => DB::table('ai_task_routes')->where('task_key', 'page_editor')->first()]);
     }
 
     public function preview(Request $request): View
@@ -50,11 +50,12 @@ class PageWorkspaceController extends Controller
             'title' => ['required', 'string', 'max:200'],
             'blocks' => ['required', 'string', 'max:100000'],
         ]);
-        $blocks = $this->normaliseBlocks($input['blocks'], null);
+        $document = $this->document($input['blocks'], null);
+        $blocks = app(\App\Services\PageDocumentService::class)->flatten($document, $this->enabledFeatures());
         $page = (object) [
             'title' => $input['title'],
             'seo_title' => $input['title'],
-            'blocks' => json_encode($blocks, JSON_THROW_ON_ERROR),
+            'blocks' => json_encode($document, JSON_THROW_ON_ERROR),
             'body' => $this->plainTextFromBlocks($blocks),
         ];
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
@@ -92,7 +93,16 @@ class PageWorkspaceController extends Controller
         $revisions = DB::table('content_revisions')->where('page_id', $page->id)->orderByDesc('revision')->get(['revision', 'created_at']);
         $canPublish = app(PermissionChecker::class)->allows($request->user(), 'content.publish');
 
-        return view('staff.pages.form', compact('settings', 'page', 'revisions', 'canPublish') + ['user' => $request->user(), 'starter' => null, 'blocks' => $this->editorBlocks($page->blocks ?? null, $page->body), 'features' => $this->enabledFeatures(), 'mediaAssets' => $this->pageMediaAssets(), 'aiDraftAvailable' => app(ModuleAvailability::class)->visibleToStaff('ai_page_editor', $request->user()), 'aiDraftRoute' => DB::table('ai_task_routes')->where('task_key', 'page_editor')->first()]);
+        return view('staff.pages.form', compact('settings', 'page', 'revisions', 'canPublish') + ['user' => $request->user(), 'starter' => null, 'blocks' => $this->editorDocument($page->blocks ?? null, $page->body), 'features' => $this->enabledFeatures(), 'aiDraftAvailable' => app(ModuleAvailability::class)->visibleToStaff('ai_page_editor', $request->user()), 'aiDraftRoute' => DB::table('ai_task_routes')->where('task_key', 'page_editor')->first()]);
+    }
+
+    public function mediaCatalog(): JsonResponse
+    {
+        return response()->json(['assets' => $this->pageMediaAssets()->map(fn (object $asset): array => [
+            'url' => $asset->provider_key,
+            'label' => $asset->title,
+            'type' => $asset->media_type,
+        ])->values()]);
     }
 
     public function update(Request $request, string $page): RedirectResponse|JsonResponse
@@ -226,6 +236,22 @@ class PageWorkspaceController extends Controller
         }
 
         return $this->normaliseBlocks(null, $body);
+    }
+
+    /** Return version 2 content to the structured canvas without flattening saved hierarchy. */
+    private function editorDocument(?string $encodedBlocks, ?string $body): array
+    {
+        $service = app(\App\Services\PageDocumentService::class);
+        if ($encodedBlocks) {
+            try {
+                $decoded = json_decode($encodedBlocks, true, 512, JSON_THROW_ON_ERROR);
+                if ($service->isStructured($decoded)) return $service->normalise($decoded, $this->enabledFeatures());
+            } catch (\JsonException) {
+                // Recover legacy text content through the normal editor boundary.
+            }
+        }
+
+        return $service->fromFlat($this->editorBlocks($encodedBlocks, $body), $this->enabledFeatures());
     }
 
     /** @return array<int, array{type: string, data: array<string, string>}> */
@@ -368,11 +394,11 @@ class PageWorkspaceController extends Controller
             ->where('status', 'published')
             ->orderByDesc('published_at')
             ->orderByDesc('created_at')
-            ->limit(24)
+            ->limit(60)
             ->get(['id', 'title', 'provider_key', 'provider', 'library', 'kind', 'file_mime'])
             ->map(function (object $asset): object {
                 if (($asset->provider ?? 'local') === 'local' && ! str_starts_with((string) $asset->provider_key, 'http')) {
-                    $asset->provider_key = route('staff.media-library.file', $asset->id);
+                    $asset->provider_key = route('public.media', $asset->id);
                 }
                 $mime = strtolower((string) ($asset->file_mime ?? ''));
                 $kind = strtolower((string) ($asset->kind ?? ''));

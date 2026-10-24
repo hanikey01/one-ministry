@@ -30,6 +30,7 @@ use App\Http\Controllers\PageWorkspaceController;
 use App\Http\Controllers\PasswordRecoveryController;
 use App\Http\Controllers\PlaybackDiagnosticController;
 use App\Http\Controllers\PublicWorkspaceController;
+use App\Http\Controllers\PublicMediaController;
 use App\Http\Controllers\RegionalPlaybackProbeController;
 use App\Http\Controllers\ServiceChatController;
 use App\Http\Controllers\ServicePollController;
@@ -281,9 +282,11 @@ Route::middleware(['auth', 'permission:content.manage'])->put('/staff/navigation
 Route::middleware(['auth', 'permission:content.manage'])->delete('/staff/navigation/{item}', [NavigationWorkspaceController::class, 'destroy'])->name('staff.navigation.destroy');
 Route::middleware(['auth', 'permission:content.manage'])->get('/staff/pages', [PageWorkspaceController::class, 'index'])->name('staff.pages');
 Route::middleware(['auth', 'permission:content.manage'])->get('/staff/pages/create', [PageWorkspaceController::class, 'create'])->name('staff.pages.create');
+Route::middleware(['auth', 'permission:content.manage'])->get('/staff/pages/media', [PageWorkspaceController::class, 'mediaCatalog'])->name('staff.pages.media');
 Route::middleware(['auth', 'permission:content.manage', 'throttle:60,1'])->post('/staff/pages/preview', [PageWorkspaceController::class, 'preview'])->name('staff.pages.preview');
 Route::middleware(['auth', 'permission:content.manage', 'throttle:5,1'])->post('/staff/pages/ai-draft', AiPageDraftController::class)->name('staff.pages.ai-draft');
 Route::middleware(['auth', 'permission:content.manage', 'throttle:10,1'])->post('/staff/pages/ai-section-revision', [AiPageDraftController::class, 'reviseSection'])->name('staff.pages.ai-section-revision');
+Route::middleware(['auth', 'permission:content.manage', 'throttle:10,1'])->post('/staff/pages/ai-object-revision', [AiPageDraftController::class, 'reviseObject'])->name('staff.pages.ai-object-revision');
 Route::middleware(['auth', 'permission:content.manage'])->post('/staff/pages', [PageWorkspaceController::class, 'store'])->name('staff.pages.store');
 Route::middleware(['auth', 'permission:content.manage'])->get('/staff/pages/{page}/edit', [PageWorkspaceController::class, 'edit'])->name('staff.pages.edit');
 Route::middleware(['auth', 'permission:content.manage'])->put('/staff/pages/{page}', [PageWorkspaceController::class, 'update'])->name('staff.pages.update');
@@ -348,6 +351,7 @@ Route::middleware('auth')->put('/member', [MemberWorkspaceController::class, 'up
 Route::middleware('auth')->post('/member/prayer', [MemberWorkspaceController::class, 'prayer'])->name('member.prayer');
 Route::middleware('auth')->post('/member/next-steps', [MemberWorkspaceController::class, 'journey'])->name('member.journey');
 Route::get('/', [HomepageController::class, 'show'])->name('public.home');
+Route::get('/media/{asset}', [PublicMediaController::class, 'show'])->name('public.media');
 Route::get('/locations', [PublicWorkspaceController::class, 'locations'])->name('public.locations');
 Route::get('/events', [PublicWorkspaceController::class, 'events'])->name('public.events');
 Route::get('/groups', [PublicWorkspaceController::class, 'groups'])->name('public.groups');

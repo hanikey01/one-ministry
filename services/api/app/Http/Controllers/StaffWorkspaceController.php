@@ -480,7 +480,7 @@ class StaffWorkspaceController extends Controller
             'status' => 'published', 'published_at' => now(), 'file_disk' => 'local', 'file_path' => $path, 'file_name' => $file->getClientOriginalName(),
             'file_mime' => $file->getMimeType(), 'file_size_bytes' => $file->getSize(), 'created_at' => now(), 'updated_at' => now(),
             ]);
-            $uploaded[] = ['id' => $id, 'title' => $title, 'url' => route('staff.media-library.file', $id), 'kind' => str($file->getMimeType())->before('/')->toString()];
+            $uploaded[] = ['id' => $id, 'title' => $title, 'url' => route('public.media', $id), 'kind' => str($file->getMimeType())->before('/')->toString()];
         }
 
         if ($request->expectsJson()) {

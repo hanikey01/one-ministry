@@ -643,9 +643,10 @@ document.querySelectorAll('[data-ai-page-draft]').forEach((panel) => {
             explanation.textContent = 'Review the section plan below. Applying it replaces the current canvas; you can undo the change before saving.';
             const outline = document.createElement('ol');
             const labels = { hero: 'Welcome section', heading: 'Heading', paragraph: 'Text', media_text: 'Image and text', image: 'Image', quote: 'Quote', list: 'List', accordion: 'Questions and answers', call_to_action: 'Closing invitation' };
-            proposal.blocks.forEach((block) => {
+            const plannedElements = proposal.document?.sections?.flatMap((section) => section.columns?.flatMap((column) => column.elements ?? []) ?? []) ?? [];
+            plannedElements.forEach((block) => {
                 const item = document.createElement('li');
-                const data = block.data ?? {};
+                const data = block.content ?? {};
                 const title = data.title || data.text || data.label || data.eyebrow || data.image_hint || data.alt || '';
                 item.textContent = [labels[block.type] ?? 'Section', title].filter(Boolean).join(' · ');
                 outline.append(item);
@@ -676,7 +677,7 @@ document.querySelectorAll('[data-ai-page-draft]').forEach((panel) => {
             panel.append(preview);
             preview.focus();
             const route = `${payload.data.provider} · ${payload.data.model}`;
-            const contentSectionCount = proposal.blocks.filter((block) => !['hero', 'call_to_action'].includes(block.type)).length;
+            const contentSectionCount = Math.max(0, (proposal.document?.sections?.length ?? 0) - 2);
             status.textContent = `Page plan prepared with ${contentSectionCount} content sections by ${route}${proposal.fallback_used ? ' (fallback model)' : ''}. Review it before applying.`;
         } catch (error) {
             status.textContent = error instanceof Error ? error.message : 'The page draft could not be generated. Try again.';
