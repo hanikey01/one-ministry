@@ -99,6 +99,12 @@ class MinistryTheme
             '--theme-dark-muted' => $preset['dark_muted'],
             '--theme-dark-line' => $preset['dark_line'],
             '--theme-action-color' => $preset['action'],
+            // Status states are platform-owned semantic tokens. They are not
+            // editable ministry colours, and keeping them here prevents UI
+            // components from carrying their own literal colour fallbacks.
+            '--theme-success-color' => $preset['action'],
+            '--theme-warning-color' => $preset['action'],
+            '--theme-danger-color' => $preset['action'],
             '--theme-chrome-color' => $chrome,
             '--theme-chrome-foreground' => self::bestTextColor($chrome),
         ];
@@ -114,6 +120,9 @@ class MinistryTheme
         $values['--brand-foreground'] = self::bestTextColor($values['--theme-action-color']);
         $values['--accent-foreground'] = $values['--brand-foreground'];
         $values['--action-foreground'] = $values['--brand-foreground'];
+        $values['--success'] = $values['--theme-success-color'];
+        $values['--warning'] = $values['--theme-warning-color'];
+        $values['--danger'] = $values['--theme-danger-color'];
         $values['--theme-brand-text-light'] = self::accessibleBrandText($values['--theme-action-color'], $values['--theme-light-surface-color']);
         $values['--theme-brand-text-dark'] = self::accessibleBrandText($values['--theme-action-color'], $values['--theme-dark-surface-color']);
         $values['--theme-action-text-light'] = $values['--theme-brand-text-light'];

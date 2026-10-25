@@ -14,6 +14,61 @@
         <x-ui.notifications />
         <script data-navigate-once>
             (() => {
+                const setupWorkspaceChrome = () => {
+                    document.querySelectorAll('[data-workspace-shell]').forEach((shell) => {
+                        if (shell.dataset.workspaceChromeReady === 'true') return;
+                        shell.dataset.workspaceChromeReady = 'true';
+
+                        const sidebar = shell.querySelector('[data-workspace-sidebar]');
+                        const toggle = shell.querySelector('[data-workspace-toggle]');
+                        const backdrop = shell.querySelector('.workspace-backdrop');
+                        const themeToggle = shell.querySelector('[data-workspace-theme-toggle]');
+                        const storageKey = 'ministry-theme';
+                        const setNavigation = (open) => {
+                            shell.classList.toggle('navigation-open', open);
+                            sidebar?.classList.toggle('is-open', open);
+                            backdrop?.classList.toggle('is-open', open);
+                            toggle?.setAttribute('aria-expanded', String(open));
+                        };
+                        const setTheme = (theme) => {
+                            const dark = theme === 'dark';
+                            shell.classList.toggle('staff-theme-dark', dark);
+                            if (shell.dataset.workspaceSurface === 'member') shell.classList.toggle('member-theme-dark', dark);
+                            themeToggle?.setAttribute('aria-pressed', String(dark));
+                            themeToggle?.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+                            const label = themeToggle?.querySelector('.workspace-theme-label');
+                            if (label) label.textContent = dark ? 'Dark' : 'Light';
+                        };
+
+                        const legacyTheme = shell.dataset.workspaceSurface === 'member'
+                            ? window.localStorage.getItem('ministry-member-theme')
+                            : window.localStorage.getItem('ministry-staff-theme');
+                        setTheme(window.localStorage.getItem(storageKey) ?? legacyTheme ?? 'light');
+                        toggle?.addEventListener('click', () => setNavigation(!shell.classList.contains('navigation-open')));
+                        shell.querySelectorAll('[data-workspace-close]').forEach((button) => button.addEventListener('click', () => setNavigation(false)));
+                        const toggleTheme = () => {
+                            const theme = shell.classList.contains('staff-theme-dark') ? 'light' : 'dark';
+                            window.localStorage.setItem(storageKey, theme);
+                            setTheme(theme);
+                        };
+                        let themePointerHandled = false;
+                        themeToggle?.addEventListener('pointerup', (event) => {
+                            event.preventDefault();
+                            themePointerHandled = true;
+                            toggleTheme();
+                        });
+                        themeToggle?.addEventListener('click', () => {
+                            if (themePointerHandled) {
+                                themePointerHandled = false;
+                                return;
+                            }
+                            toggleTheme();
+                        });
+                    });
+                };
+                setupWorkspaceChrome();
+                document.addEventListener('livewire:navigated', setupWorkspaceChrome);
+
                 const closeWorkspace = (shell) => {
                     shell.classList.remove('navigation-open', 'public-navigation-open');
                     shell.querySelector('[data-workspace-sidebar], [data-public-sidebar]')?.classList.remove('is-open');

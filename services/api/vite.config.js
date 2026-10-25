@@ -15,8 +15,13 @@ export default defineConfig({
     ],
     server: {
         host: '0.0.0.0',
-        origin: 'http://localhost:5173',
-        hmr: { host: 'localhost' },
+        origin: process.env.VITE_DEV_ORIGIN || 'http://localhost:5173',
+      // Caddy owns the single CORS header for the proxied dev assets.
+      cors: false,
+        hmr: {
+            host: process.env.VITE_HMR_HOST || 'localhost',
+            clientPort: Number(process.env.VITE_HMR_CLIENT_PORT || 5173),
+        },
         watch: {
             ignored: ['**/storage/framework/views/**'],
         },

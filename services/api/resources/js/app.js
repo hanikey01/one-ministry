@@ -1,5 +1,3 @@
-import './bootstrap';
-
 let closeOpenEnhancedSelect = null;
 let enhancedSelectIndex = 0;
 let pageCleanups = [];
@@ -377,6 +375,7 @@ document.querySelectorAll('[data-workspace-shell]').forEach((shell) => {
     const themeToggle = shell.querySelector('[data-workspace-theme-toggle]');
     const storageKey = 'ministry-theme';
     const legacyStorageKey = 'ministry-staff-theme';
+    const chromeAlreadyReady = shell.dataset.workspaceChromeReady === 'true';
 
     const setNavigation = (open) => {
         shell.classList.toggle('navigation-open', open);
@@ -399,16 +398,19 @@ document.querySelectorAll('[data-workspace-shell]').forEach((shell) => {
     const savedTheme = window.localStorage.getItem(storageKey) ?? memberLegacyTheme ?? window.localStorage.getItem(legacyStorageKey);
     if (savedTheme) window.localStorage.setItem(storageKey, savedTheme);
     setTheme(savedTheme === 'dark' ? 'dark' : 'light');
-    toggle?.addEventListener('click', () => setNavigation(!shell.classList.contains('navigation-open')));
-    closers.forEach((button) => button.addEventListener('click', () => setNavigation(false)));
-    sidebar?.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => setNavigation(false)));
-    addPageListener(window, 'keydown', (event) => { if (event.key === 'Escape') setNavigation(false); });
-    themeToggle?.addEventListener('click', () => {
-        const theme = shell.classList.contains('staff-theme-dark') ? 'light' : 'dark';
-        window.localStorage.setItem(storageKey, theme);
-        setTheme(theme);
-    });
-    addPageListener(window, 'storage', (event) => { if (event.key === storageKey) setTheme(event.newValue === 'dark' ? 'dark' : 'light'); });
+    if (!chromeAlreadyReady) {
+        shell.dataset.workspaceChromeReady = 'true';
+        toggle?.addEventListener('click', () => setNavigation(!shell.classList.contains('navigation-open')));
+        closers.forEach((button) => button.addEventListener('click', () => setNavigation(false)));
+        sidebar?.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => setNavigation(false)));
+        addPageListener(window, 'keydown', (event) => { if (event.key === 'Escape') setNavigation(false); });
+        themeToggle?.addEventListener('click', () => {
+            const theme = shell.classList.contains('staff-theme-dark') ? 'light' : 'dark';
+            window.localStorage.setItem(storageKey, theme);
+            setTheme(theme);
+        });
+        addPageListener(window, 'storage', (event) => { if (event.key === storageKey) setTheme(event.newValue === 'dark' ? 'dark' : 'light'); });
+    }
 
     shell.querySelectorAll('[data-service-edit-open]').forEach((trigger) => {
         trigger.addEventListener('click', () => document.getElementById(trigger.dataset.serviceEditOpen)?.showModal());
@@ -1300,7 +1302,6 @@ document.querySelectorAll('form[data-async-form]').forEach((form) => {
 
 document.addEventListener('livewire:navigating', () => { livewireNavigationPending = true; });
 document.addEventListener('livewire:navigated', () => {
-    if (!livewireNavigationPending) return;
     livewireNavigationPending = false;
     initializePage(true);
 });

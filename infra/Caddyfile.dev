@@ -2,9 +2,17 @@
     root * /var/www/html/public
     encode zstd gzip
     @vite_hmr path /@vite/*
+    header @vite_hmr Access-Control-Allow-Origin "*"
     reverse_proxy @vite_hmr vite:5173
     @vite_resources path /resources/*
+    header @vite_resources Access-Control-Allow-Origin "*"
     reverse_proxy @vite_resources vite:5173
+    # Vite serves pre-bundled module dependencies from this path. It must use
+    # the same proxy and CORS treatment as the entry modules or app.js stops
+    # before registering shared shell controls.
+    @vite_dependencies path /node_modules/*
+    header @vite_dependencies Access-Control-Allow-Origin "*"
+    reverse_proxy @vite_dependencies vite:5173
     # Development assets must be revalidated so Vite's watch output appears immediately.
     @dev_assets path /build/* /css/* /js/*
     header @dev_assets Cache-Control "no-store, no-cache, must-revalidate"

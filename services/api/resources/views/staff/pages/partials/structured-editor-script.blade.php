@@ -63,6 +63,22 @@
         document.body.classList.remove('page-library-is-open');
         libraryTrigger?.removeAttribute('hidden');
     };
+    const openLibrary = () => {
+        inspectorPanel?.classList.remove('is-open');
+        inspectorBackdrop?.classList.remove('is-open');
+        inspectorPanel?.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('page-inspector-is-open');
+        libraryPanel?.classList.add('is-open');
+        libraryBackdrop?.classList.add('is-open');
+        document.body.classList.add('page-library-is-open');
+        libraryTrigger?.setAttribute('hidden', '');
+    };
+    const closeLibrary = () => {
+        libraryPanel?.classList.remove('is-open');
+        libraryBackdrop?.classList.remove('is-open');
+        document.body.classList.remove('page-library-is-open');
+        libraryTrigger?.removeAttribute('hidden');
+    };
     const select = (kind, sectionIndex, columnIndex = 0, elementIndex = 0) => { selected = {kind, section:sectionIndex, column:columnIndex, element:elementIndex}; render(); };
     const elementPreview = (item) => { const content = item.content || {}; if (item.type === 'hero') return `<div class="page-canvas-hero"><small>${escape(content.eyebrow)}</small><h1>${escape(content.title)}</h1><p>${escape(content.body)}</p><b>${escape(content.button_label)}</b></div>`; if (item.type === 'heading') return `<h2>${escape(content.text)}</h2>`; if (item.type === 'paragraph') return `<p>${escape(content.text)}</p>`; if (item.type === 'image') return content.url ? `<img src="${escape(content.url)}" alt="${escape(content.alt)}">` : '<div class="page-canvas-image-placeholder">Image</div>'; if (item.type === 'button') return `<div class="page-canvas-cta"><b>${escape(content.label)}</b></div>`; if (item.type === 'testimonial') return `<blockquote class="page-canvas-element-summary">“${escape(content.quote)}”<span>${escape(content.name)}</span></blockquote>`; if (item.type === 'statistics') return `<div class="page-canvas-module"><small>STATISTICS</small><h2>${escape(content.title)}</h2><p>${escape(content.stat_one_value)} · ${escape(content.stat_two_value)} · ${escape(content.stat_three_value)}</p></div>`; if (item.type === 'call_to_action') return `<div class="page-canvas-cta"><h2>${escape(content.title)}</h2><p>${escape(content.body)}</p><b>${escape(content.button_label)}</b></div>`; if (['service_times','events','groups'].includes(item.type)) return `<div class="page-canvas-module"><small>${escape(names[item.type]).toUpperCase()}</small><h2>${escape(content.title)}</h2><p>${escape(content.body)}</p></div>`; return `<div class="page-canvas-element-summary"><strong>${escape(names[item.type] || item.type)}</strong><span>${escape(content.title || content.text || content.label || 'Configure this element')}</span></div>`; };
     const structureButtons = (kind) => `<div class="page-structure-actions" aria-label="${kind} actions"><button type="button" class="page-structure-icon" data-editor-action="move-up" aria-label="Move up" title="Move up"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" aria-hidden="true"><path d="m6 14 6-6 6 6"/></svg></button><button type="button" class="page-structure-icon" data-editor-action="move-down" aria-label="Move down" title="Move down"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" aria-hidden="true"><path d="m6 10 6 6 6-6"/></svg></button><button type="button" class="page-structure-icon" data-editor-action="duplicate" aria-label="Duplicate" title="Duplicate"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="10" height="10" rx="1.5"/><path d="M6 16H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg></button><button type="button" class="page-structure-icon is-danger" data-editor-action="delete" aria-label="Delete" title="Delete"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" aria-hidden="true"><path d="M5 7h14M10 11v6M14 11v6M9 7V5h6v2M7 7l1 13h8l1-13"/></svg></button><button type="button" class="page-structure-icon" data-editor-action="edit" aria-label="Edit" title="Edit"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" aria-hidden="true"><path d="m4 16-.7 4.7L8 20l10.8-10.8a2.1 2.1 0 0 0-3-3Z"/><path d="m14.5 7.5 2 2"/></svg></button></div>`;
@@ -195,6 +211,8 @@
         const target = event.target.closest('[data-select-kind]'); if (target) select(target.dataset.selectKind, Number(target.dataset.section), Number(target.dataset.column || 0), Number(target.dataset.element || 0));
     });
     form.addEventListener('click', (event) => { if (event.target.closest('[data-inspector-close]')) { event.preventDefault(); event.stopPropagation(); closeInspector(); } });
+    libraryTrigger?.addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); openLibrary(); });
+    libraryBackdrop?.addEventListener('click', (event) => { event.preventDefault(); closeLibrary(); });
     document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeInspector(); });
     form.querySelectorAll('[data-add]').forEach((button) => button.addEventListener('click', () => { const type = button.dataset.add; if (type === 'section') return mutate(() => { documentState.sections.push(section()); selected = {kind:'section',section:documentState.sections.length - 1,column:0,element:0}; }); if (type === 'grid') return mutate(() => { documentState.sections.push(gridSection(Number(button.dataset.gridCount || 3))); selected = {kind:'section',section:documentState.sections.length - 1,column:0,element:0}; }); const target = currentColumn() || documentState.sections[0].columns[0]; mutate(() => { target.elements.push(element(type)); selected = {kind:'element',section:selected.section,column:selected.column,element:target.elements.length - 1}; }); }));
     canvas.addEventListener('click', (event) => {
