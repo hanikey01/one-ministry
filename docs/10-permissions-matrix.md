@@ -6,29 +6,22 @@
 
 | Role | Intended scope |
 | --- | --- |
-| Visitor | Public pages and permitted public service actions |
-| Member | Own profile, consent, registrations, groups, and donations |
-| Group leader | Assigned groups and their attendance/tasks |
-| Volunteer coordinator | Assigned teams, shifts, and volunteers |
-| Online host | Assigned services' chat, prayer handoff, and prompts |
-| Service producer | Assigned service planning, live controls, media health |
-| Content editor | Draft and edit public content, not publish unless granted |
-| Content publisher | Approve public content and recordings |
-| People staff | Scoped people directory and routine follow-up |
+| Visitor | Unauthenticated public state; not an assigned role |
+| Member | Standard member access to own profile, consent, registrations, groups, and donations; not a staff role |
+| Ministry administrator | Broad nonrestricted ministry administration, settings, locations, modules, content, people operations, events, departments, services, and reports; never implicitly grants care, finance, audit, or security-role control |
+| Content & media editor | Draft, edit, and publish public pages, media, sermons, announcements, recordings, and communications; cannot change core settings |
+| Ministry operations coordinator | Directly assigned, scope-bound people follow-up, groups, volunteers, departments, events, service planning, and school operations within the granted area |
 | Care staff | Assigned private prayer/care cases |
 | Finance staff | Giving, receipts, reconciliation, and finance reports |
-| Ministry administrator | Settings, locations, nonrestricted staff roles, module configuration |
+| Service & production team | Directly assigned service/meeting production, host, and moderation responsibilities within the granted service or meeting |
+| Children’s team | Feature-gated children access only after the safeguarding specification and dedicated child-team assignment model are accepted |
 | Super administrator | Highest installation role: all installed permission bundles, configuration, and role oversight; requires MFA and verified email for elevated actions |
 | Security administrator | Security settings, elevated role grants, audit and export controls |
-| Site editor | Public branding and location configuration; no module activation, invitations, audit, care, or finance access |
 | System operator | Infrastructure health and deployment; no default access to member records |
-| Department member | Team roster membership; no staff-console access from membership alone |
-| Department coordinator | Add/remove ordinary members within an assigned department |
-| Department executive | Department lead; manages ordinary members within an assigned department |
 
 A user can hold several roles. High-risk roles require multifactor authentication and may require dual approval for bulk export or finance changes. Default roles are templates; an installation can add narrower bundles, but cannot disable core server-side object checks.
 
-Department coordinator and executive are scoped assignments rather than installation-wide role bundles. Only a ministry administrator can create a department or grant/revoke coordinator and executive assignments. Coordinators and executives can only add or remove ordinary members from their own department. A person can hold several department assignments at once.
+The following are contextual assignments, not installation-wide role bundles: department member/coordinator/executive; group member/leader; volunteer team member/team lead/shift lead; and meeting participant/host/moderator. Only a ministry administrator can create a department or grant/revoke coordinator and executive assignments. Coordinators and executives can only add or remove ordinary members from their own department. A person can hold several contextual assignments at once.
 
 ## 2. Permission map
 

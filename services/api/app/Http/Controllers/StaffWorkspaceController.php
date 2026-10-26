@@ -619,7 +619,7 @@ class StaffWorkspaceController extends Controller
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
         $invitations = DB::table('staff_invitations')->join('users', 'users.id', '=', 'staff_invitations.invited_by')->select('staff_invitations.*', 'users.name as invited_by_name')->orderByDesc('staff_invitations.created_at')->paginate(20);
-        $roles = DB::table('roles')->whereIn('key', ['site_editor', 'content_editor', 'care_staff', 'finance_user'])->orderBy('name')->get(['key', 'name']);
+        $roles = DB::table('roles')->whereIn('key', \App\Support\RoleCatalog::ROUTINE_INVITATION_ROLES)->orderBy('name')->get(['key', 'name']);
 
         return view('staff.access', compact('settings', 'invitations', 'roles') + ['user' => $request->user()]);
     }

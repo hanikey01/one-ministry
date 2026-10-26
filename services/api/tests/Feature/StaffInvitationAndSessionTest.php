@@ -32,12 +32,12 @@ class StaffInvitationAndSessionTest extends TestCase
         $this->actingAs($user)->withSession(['mfa_verified_at' => now()->timestamp]);
     }
 
-    public function test_invitation_is_one_time_and_grants_only_site_editor(): void
+    public function test_invitation_is_one_time_and_grants_only_content_media_editor(): void
     {
         $admin = $this->install();
         $this->actingAsSensitive($admin);
         $response = $this->postJson('/api/v1/staff/invitations', [
-            'name' => 'Eli Editor', 'email' => 'eli@example.org',
+            'name' => 'Eli Editor', 'email' => 'eli@example.org', 'role_key' => 'content_media_editor',
         ])->assertCreated();
         $url = $response->json('data.accept_url');
         $token = substr($url, strpos($url, 'token=') + 6);
@@ -50,8 +50,8 @@ class StaffInvitationAndSessionTest extends TestCase
             'password_confirmation' => 'editor-private-password',
         ])->assertCreated();
         $editor = User::query()->where('email', 'eli@example.org')->firstOrFail();
-        $this->assertDatabaseHas('user_role_assignments', ['user_id' => $editor->id, 'role_key' => 'site_editor']);
-        $this->actingAs($editor)->getJson('/api/v1/staff/locations')->assertOk();
+        $this->assertDatabaseHas('user_role_assignments', ['user_id' => $editor->id, 'role_key' => 'content_media_editor']);
+        $this->actingAs($editor)->getJson('/api/v1/staff/locations')->assertForbidden();
         $this->getJson('/api/v1/staff/invitations')->assertForbidden();
         $this->getJson('/api/v1/staff/features')->assertForbidden();
         $this->postJson('/api/v1/auth/invitations/accept', [
@@ -69,7 +69,7 @@ class StaffInvitationAndSessionTest extends TestCase
         ])->assertForbidden();
         $this->actingAsSensitive($admin);
         $response = $this->postJson('/api/v1/staff/invitations', [
-            'name' => 'Another', 'email' => 'another@example.org',
+            'name' => 'Another', 'email' => 'another@example.org', 'role_key' => 'content_media_editor',
         ])->assertCreated();
         $id = $response->json('data.id');
         $url = $response->json('data.accept_url');
@@ -80,6 +80,20 @@ class StaffInvitationAndSessionTest extends TestCase
             'password_confirmation' => 'editor-private-password',
         ])->assertUnprocessable();
         $this->assertDatabaseMissing('users', ['email' => 'another@example.org']);
+    }
+
+    public function test_scope_bound_roles_are_not_available_to_installation_wide_invitations(): void
+    {
+        $admin = $this->install();
+        $this->actingAsSensitive($admin);
+
+        $this->postJson('/api/v1/staff/invitations', [
+            'name' => 'Production Lead',
+            'email' => 'production@example.org',
+            'role_key' => 'service_production_team',
+        ])->assertUnprocessable()->assertJsonValidationErrors('role_key');
+
+        $this->assertDatabaseMissing('staff_invitations', ['email' => 'production@example.org']);
     }
 
     public function test_session_handles_hide_cookie_values_and_enforce_ownership(): void

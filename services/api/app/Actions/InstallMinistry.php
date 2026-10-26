@@ -6,6 +6,7 @@ use App\Models\FeatureSetting;
 use App\Models\Location;
 use App\Models\MinistrySetting;
 use App\Models\User;
+use App\Support\RoleCatalog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -61,12 +62,11 @@ class InstallMinistry
                 'password' => $input['password'],
             ]);
 
-            DB::table('roles')->insertOrIgnore([
-                ['key' => 'ministry_administrator', 'name' => 'Ministry Administrator', 'is_system' => true, 'created_at' => now(), 'updated_at' => now()],
-                ['key' => 'super_administrator', 'name' => 'Super Administrator', 'is_system' => true, 'created_at' => now(), 'updated_at' => now()],
-                ['key' => 'security_administrator', 'name' => 'Security Administrator', 'is_system' => true, 'created_at' => now(), 'updated_at' => now()],
-                ['key' => 'site_editor', 'name' => 'Site Editor', 'is_system' => true, 'created_at' => now(), 'updated_at' => now()],
-            ]);
+            foreach (RoleCatalog::INSTALLATION_ROLES as $key => $name) {
+                DB::table('roles')->insertOrIgnore([
+                    'key' => $key, 'name' => $name, 'is_system' => true, 'created_at' => now(), 'updated_at' => now(),
+                ]);
+            }
 
             foreach (['super_administrator', 'ministry_administrator', 'security_administrator'] as $role) {
                 DB::table('user_role_assignments')->insert([
@@ -100,8 +100,8 @@ class InstallMinistry
                 ]);
             }
 
-            foreach (['settings.read', 'settings.update', 'locations.read', 'locations.manage', 'features.read', 'features.manage', 'ai.manage', 'services.manage', 'departments.manage', 'content.manage', 'content.publish'] as $permission) {
-                if (DB::table('permissions')->where('key', $permission)->exists()) {
+            foreach (DB::table('permissions')->pluck('key') as $permission) {
+                if (! in_array($permission, ['audit.read', 'care.manage', 'care.notes.write', 'finance.view', 'finance.reconcile', 'roles.manage'], true)) {
                     DB::table('role_permissions')->insertOrIgnore(['role_key' => 'ministry_administrator', 'permission_key' => $permission]);
                 }
             }
@@ -114,8 +114,12 @@ class InstallMinistry
                 DB::table('role_permissions')->insertOrIgnore(['role_key' => 'super_administrator', 'permission_key' => $permission]);
             }
 
-            foreach (['settings.read', 'settings.update', 'locations.read', 'locations.manage'] as $permission) {
-                DB::table('role_permissions')->insertOrIgnore(['role_key' => 'site_editor', 'permission_key' => $permission]);
+            foreach (RoleCatalog::PERMISSIONS as $role => $permissions) {
+                foreach ($permissions as $permission) {
+                    if (DB::table('permissions')->where('key', $permission)->exists()) {
+                        DB::table('role_permissions')->insertOrIgnore(['role_key' => $role, 'permission_key' => $permission]);
+                    }
+                }
             }
 
             foreach (['digital_church', 'interactive_meetings', 'people', 'groups', 'giving', 'books_library', 'audio_sermons', 'video_sermons', 'sermon_series'] as $feature) {

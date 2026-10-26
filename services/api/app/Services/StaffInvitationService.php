@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Support\RoleCatalog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -14,8 +15,7 @@ class StaffInvitationService
         $email = Str::lower($email);
 
         return DB::transaction(function () use ($name, $email, $roleKey, $actor, $ip): array {
-            $allowedRoles = ['site_editor', 'content_editor', 'care_staff', 'finance_user'];
-            if (! in_array($roleKey, $allowedRoles, true) || ! DB::table('roles')->where('key', $roleKey)->exists()) {
+            if (! in_array($roleKey, RoleCatalog::ROUTINE_INVITATION_ROLES, true) || ! DB::table('roles')->where('key', $roleKey)->exists()) {
                 throw ValidationException::withMessages(['role_key' => 'Choose one of the available staff roles.']);
             }
             if (User::query()->where('email', $email)->exists()) {

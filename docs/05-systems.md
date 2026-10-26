@@ -10,6 +10,8 @@ AI provider credentials and page-editor model routes are an explicit configurati
 
 Authorization has three checks: action permission, object relationship, and assigned scope. A group leader can see their group, not every person. A care worker can see assigned cases, not all prayer requests. Finance access never grants pastoral access. Admin configuration rights do not silently grant restricted-data reading rights. Direct object URLs and exports follow the same checks as list screens.
 
+The installation catalog is deliberately small: Ministry Administrator, Content & Media Editor, Ministry Operations Coordinator, Care Staff, Finance Staff, Service & Production Team, Children’s Team, Security Administrator, and Super Administrator. Visitor is public state and Member is ordinary account access. Department, group, volunteer, service, and meeting responsibilities are contextual assignments. Roles that must be tied to an assigned service, meeting, department, or team are never granted through an installation-wide invitation workflow.
+
 Department teams use the same scope rule. A person may belong to several department rosters. A coordinator or executive can add and remove ordinary members only in the department where they hold that active role. A ministry administrator may create departments and appoint or remove coordinators and executives. Care and Finance roster membership never grants private care-case or giving-record access; those domains retain their separate permissions, assignment checks, verified-email requirement, MFA requirement, and audit trail.
 
 ## 2. Feature configuration

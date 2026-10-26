@@ -148,3 +148,11 @@ When a question is resolved, record date, decision maker, evidence, alternatives
 **Reason:** Design and performance decisions had accumulated across an audit, implementation notes, and individual feature discussions. A dedicated contract prevents future features from reintroducing inconsistent styling, full-page saves, clipping overlays, duplicate navigation behavior, or deployment assumptions that break shared-host portability.
 
 **Status:** Accepted by user direction, 2026-10-22. It formalizes existing accepted directions and does not claim unverified implementation work as complete.
+
+### D-035 — Consolidated installation roles and contextual assignments
+
+**Decision:** The installation role catalog is limited to Ministry Administrator, Content & Media Editor, Ministry Operations Coordinator, Care Staff, Finance Staff, Service & Production Team, Children’s Team, Security Administrator, and Super Administrator. Visitor is an unauthenticated public state and Member is ordinary account access, not a staff role. Department member/coordinator/executive, group member/leader, volunteer assignment roles, and meeting participant/host/moderator remain contextual assignments rather than installation-wide roles. Care, finance, security, and children permissions stay separate. Service & Production and Operations are granted only through a scoped assignment workflow, never routine installation-wide invitations. Children’s Team receives no data permissions until the safeguarding specification resolves O-005.
+
+**Reason:** User direction, 2026-10-26. A smaller role set is easier for ministries to understand while contextual assignments preserve least privilege for department, group, volunteer, service, and meeting work.
+
+**Status:** Accepted. Legacy site editor, content editor, finance user, and school manager assignments are consolidated by migration. Scope-management screens and child safeguarding remain separate implementation work.
