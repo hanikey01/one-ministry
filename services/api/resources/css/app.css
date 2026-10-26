@@ -2288,6 +2288,55 @@ body.ministry-app .page-media-picker-trigger:focus-visible { border-color: var(-
     .public-page-element { display: var(--page-tablet-element-display, block); order: var(--page-tablet-element-order, initial); text-align: var(--page-tablet-element-align, left); }
 }
 @media (max-width: 760px) {
+    /* Shared record-list transformation: narrow screens show each table row as
+       a bounded card, rather than leaving a wide desktop table to overflow. */
+    .responsive-records,
+    .service-schedule-panel,
+    .module-panel { overflow: visible; }
+
+    .responsive-records :is(table, tbody), .module-panel :is(table, tbody) {
+        display: grid; width: 100%; min-width: 0 !important;
+    }
+    .responsive-records thead, .module-panel thead, .service-schedule-panel thead { display: none; }
+    .responsive-records tbody, .module-panel tbody { gap: 10px; }
+    .responsive-records tr {
+        display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden;
+        border: 1px solid var(--line); border-radius: 13px; background: var(--surface);
+    }
+    .responsive-records td {
+        display: grid; min-width: 0; gap: 5px; border: 0; padding: 11px 12px; overflow-wrap: anywhere;
+    }
+    .responsive-records td::before, .module-panel td::before, .service-schedule-panel td::before {
+        content: attr(data-label); color: var(--muted); font-size: .53rem; font-weight: 820;
+        letter-spacing: .08em; text-transform: uppercase;
+    }
+    .responsive-records td:first-child { grid-column: 1 / -1; border-bottom: 1px solid var(--line); }
+    .responsive-records .empty-cell { display: block; grid-column: 1 / -1; }
+
+    .service-schedule-panel table, .service-schedule-panel tbody,
+    .service-schedule-panel tr, .service-schedule-panel td { display: block; box-sizing: border-box; width: 100%; }
+    .service-schedule-panel table { min-width: 0 !important; }
+    .service-schedule-panel tr { margin: 10px; border: 1px solid var(--line); border-radius: 13px; padding: 4px 0; }
+    .service-schedule-panel td {
+        display: grid; grid-template-columns: minmax(102px, .72fr) minmax(0, 1fr); gap: 11px;
+        border: 0; padding: 9px 13px; overflow-wrap: anywhere;
+    }
+    .service-schedule-panel td:first-child { padding-top: 13px; }
+    .service-schedule-panel td:last-child { padding-bottom: 13px; }
+
+    .module-panel table { table-layout: fixed; }
+    .module-panel tr {
+        display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden;
+        border: 1px solid var(--line); border-radius: 14px; background: var(--surface);
+    }
+    .module-panel td { display: grid; min-width: 0; gap: 5px; border: 0; padding: 12px 14px; overflow-wrap: anywhere; }
+    .module-panel :is(.module-name, .module-control) { grid-column: 1 / -1; }
+    .module-panel .module-name { border-bottom: 1px solid var(--line); padding-top: 14px; }
+    .module-panel .module-control { border-top: 1px solid var(--line); padding-bottom: 14px; }
+    .module-panel .inline-form { display: grid; grid-template-columns: minmax(0, 1fr) 72px; width: 100%; min-width: 0; gap: 9px; }
+    .module-panel .inline-form > * { min-width: 0; width: 100%; }
+    .module-panel .inline-form .button { width: 72px; min-width: 72px; padding-inline: 8px; }
+
     .public-page-structured-section { display: var(--page-mobile-display, block); }
     .public-page-structured-columns { grid-template-columns: repeat(var(--page-mobile-columns, var(--page-tablet-columns, 1)), minmax(0, 1fr)); width: min(100% - 20px, 620px); gap: var(--page-mobile-column-gap, var(--page-tablet-column-gap, 18px)); padding-block: min(var(--page-mobile-padding, var(--page-tablet-padding, 48px)), 34px); }
     .public-page-structured-column { display: var(--page-mobile-column-display, grid); width: min(100%, var(--page-mobile-column-width, var(--page-tablet-column-width, var(--page-column-width, 100%)))); order: var(--page-mobile-column-order, var(--page-tablet-column-order, initial)); justify-items: var(--page-mobile-column-align, var(--page-tablet-column-align, start)); gap: var(--page-mobile-element-gap, var(--page-tablet-element-gap, 18px)); text-align: left; }

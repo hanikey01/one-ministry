@@ -92,6 +92,24 @@ Start the local development profile without rebuilding the API image:
 docker compose -f compose.yaml -f compose.dev.yaml up -d --force-recreate api proxy vite
 ```
 
+For a phone or another device on the same Wi-Fi network, set `DEV_HOST` in the
+Git-ignored `.env` file to the computer's current LAN IPv4 address and recreate
+only the Vite service. This makes the Vite CSS, JavaScript, and HMR URLs point
+to the reachable host instead of the phone's own `localhost`:
+
+```text
+DEV_HOST=192.168.x.x
+DEV_PORT=8080
+```
+
+```text
+docker compose -f compose.yaml -f compose.dev.yaml up -d --force-recreate vite
+```
+
+Use the matching `http://192.168.x.x:8080` address on the phone. This is a
+development-preview setting only. A normal production asset build does not use
+the Vite development server or a `localhost` asset URL.
+
 Run `docker compose -f compose.yaml -f compose.dev.yaml exec api php artisan optimize:clear` after changing routes, configuration, cached views, or when a local page appears stale. Rebuild the API image only after changing the Dockerfile, Composer dependencies, PHP extensions, or the production asset build. The development override is local-only and must not be used for a production deployment.
 
 ### 6.4 Docker storage maintenance

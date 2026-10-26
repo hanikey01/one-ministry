@@ -29,12 +29,11 @@ services:
     ports:
       - "5173:5173"
     environment:
-      # Keep generated asset URLs on the same origin as the browser preview.
-      # The app remains reachable from the LAN through the host URL; absolute
-      # LAN asset URLs break the localhost preview and produce an unstyled page.
-      VITE_DEV_ORIGIN: "http://localhost:8080"
-      VITE_HMR_HOST: "localhost"
-      VITE_HMR_CLIENT_PORT: "8080"
+      # Use localhost by default. Set DEV_HOST to the computer's LAN address
+      # when testing from a phone so the generated Vite asset and HMR URLs are reachable.
+      VITE_DEV_ORIGIN: "http://${DEV_HOST:-localhost}:${DEV_PORT:-8080}"
+      VITE_HMR_HOST: "${DEV_HOST:-localhost}"
+      VITE_HMR_CLIENT_PORT: "${DEV_PORT:-8080}"
     volumes:
       - ./services/api:/var/www/html
       - vite_node_modules:/var/www/html/node_modules
