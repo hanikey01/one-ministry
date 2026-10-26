@@ -1,6 +1,6 @@
 <x-layouts.workspace title="Pages" :ministry-name="$settings->name" :user-name="$user->name" user-role="Staff workspace">
     <x-slot:navigation></x-slot:navigation>
-    <header class="workspace-page-heading staff-page-command"><div><p>PUBLIC SITE</p><h1>Pages</h1><span>Create clear, useful ministry information pages. Drafts stay private until a publisher reviews them.</span></div><div class="page-command-actions"><a class="button" href="{{ route('staff.pages.create') }}"><x-ui.icon name="add" :size="16"/> New page</a></div></header>
+    <header class="workspace-page-heading staff-page-command page-management-heading"><div><p>PUBLIC SITE</p><h1>Pages</h1><span>Create clear, useful ministry information pages. Drafts stay private until a publisher reviews them.</span></div><div class="page-command-actions"><a class="button" href="{{ route('staff.pages.create') }}"><x-ui.icon name="add" :size="16"/> New page</a></div></header>
     @if(session('status'))<div class="workspace-notice workspace-notice-success" role="status">{{ session('status') }}</div>@endif
     <section class="page-starters" aria-labelledby="page-starters-title">
         <div class="page-starters-heading"><div><p>START WITH A STRUCTURE</p><h2 id="page-starters-title">Common ministry pages</h2><span>Choose an editable starting point or begin with a blank page.</span></div><span class="page-starters-count">{{ count($starters) }} starter layouts</span></div>

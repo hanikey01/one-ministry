@@ -3,6 +3,7 @@
 namespace App\Services\Ai;
 
 use App\Contracts\AiTextProvider;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -33,10 +34,16 @@ final class GeminiTextProvider implements AiTextProvider
     {
         $schema = ['type' => 'object', 'properties' => ['ok' => ['type' => 'boolean']], 'required' => ['ok']];
         $started = microtime(true);
-        $payload = Http::baseUrl(self::BASE_URL)->withHeaders(['x-goog-api-key' => $apiKey])->acceptJson()->timeout(20)->post('/models/'.rawurlencode(preg_replace('#^models/#', '', $modelId)).':generateContent', [
-            'contents' => [['parts' => [['text' => 'Return a JSON object with ok set to true.']]]],
-            'generationConfig' => ['responseFormat' => ['text' => ['mimeType' => 'application/json', 'schema' => $schema]], 'maxOutputTokens' => 24, 'temperature' => 0],
-        ])->throw()->json();
+        try {
+            $payload = Http::baseUrl(self::BASE_URL)->withHeaders(['x-goog-api-key' => $apiKey])->acceptJson()->timeout(20)->post('/models/'.rawurlencode(preg_replace('#^models/#', '', $modelId)).':generateContent', [
+                'contents' => [['parts' => [['text' => 'Return a JSON object with ok set to true.']]]],
+                'generationConfig' => ['responseFormat' => ['text' => ['mimeType' => 'APPLICATION_JSON', 'schema' => $schema]], 'maxOutputTokens' => 24, 'temperature' => 0],
+            ])->throw()->json();
+        } catch (RequestException $exception) {
+            $message = (string) ($exception->response?->json('error.message') ?? 'request rejected');
+            $message = substr((string) preg_replace('/[^a-zA-Z0-9 .:_-]/', '', $message), 0, 180);
+            throw new RuntimeException('provider_http_'.($exception->response?->status() ?? 'unknown').': '.$message, previous: $exception);
+        }
         $text = $payload['candidates'][0]['content']['parts'][0]['text'] ?? null;
         $output = is_string($text) ? json_decode($text, true) : null;
         if (! is_array($output) || ($output['ok'] ?? null) !== true) throw new RuntimeException('structured_output_failed');
@@ -50,7 +57,7 @@ final class GeminiTextProvider implements AiTextProvider
         $payload = Http::baseUrl(self::BASE_URL)->withHeaders(['x-goog-api-key' => $apiKey])->acceptJson()->timeout(45)->post('/models/'.rawurlencode(preg_replace('#^models/#', '', $modelId)).':generateContent', [
             'systemInstruction' => ['parts' => [['text' => $systemPrompt]]],
             'contents' => [['parts' => [['text' => $userPrompt]]]],
-            'generationConfig' => ['responseFormat' => ['text' => ['mimeType' => 'application/json', 'schema' => $schema]], 'maxOutputTokens' => $maxOutputTokens, 'temperature' => 0.35],
+            'generationConfig' => ['responseFormat' => ['text' => ['mimeType' => 'APPLICATION_JSON', 'schema' => $schema]], 'maxOutputTokens' => $maxOutputTokens, 'temperature' => 0.35],
         ])->throw()->json();
         $text = $payload['candidates'][0]['content']['parts'][0]['text'] ?? null;
         $output = is_string($text) ? json_decode($text, true) : null;

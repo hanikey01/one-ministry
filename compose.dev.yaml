@@ -20,7 +20,7 @@ services:
       - ./services/api/resources:/var/www/html/resources
       - ./services/api/routes:/var/www/html/routes
       - ./services/api/artisan:/var/www/html/artisan:ro
-      - public_build:/var/www/html/public/build
+      - ./services/api/public/build:/var/www/html/public/build
 
   vite:
     image: node:22-alpine
@@ -37,13 +37,13 @@ services:
     volumes:
       - ./services/api:/var/www/html
       - vite_node_modules:/var/www/html/node_modules
-      - public_build:/var/www/html/public/build
     depends_on:
       - api
 
   proxy:
     volumes:
       - ./infra/Caddyfile.dev:/etc/caddy/Caddyfile:ro
+      - ./services/api/public/build:/var/www/html/public/build:ro
 
 volumes:
   vite_node_modules:

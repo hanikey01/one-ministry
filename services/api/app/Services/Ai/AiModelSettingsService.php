@@ -68,12 +68,7 @@ final class AiModelSettingsService
         $rows = $query->orderBy('provider_key')->orderBy('display_name')->limit(250)->get([
             'provider_key', 'model_id', 'display_name', 'input_modalities', 'output_modalities',
         ]);
-        $eligible = $rows->filter(function ($model): bool {
-            $inputs = json_decode($model->input_modalities ?: '[]', true);
-            $outputs = json_decode($model->output_modalities ?: '[]', true);
-            return is_array($inputs) && in_array('text', $inputs, true)
-                && is_array($outputs) && in_array('text', $outputs, true);
-        })->values();
+        $eligible = $rows->filter(fn ($model): bool => $this->isRecommendedCatalogModel($model))->values();
         $models = $eligible->take($limit)->map(function ($model) use ($labels): array {
             $provider = $labels[$model->provider_key] ?? $model->provider_key;
             return [
@@ -187,18 +182,36 @@ final class AiModelSettingsService
         if (! is_array($fallbacks) || count($fallbacks) < 1 || count($fallbacks) > 2) throw ValidationException::withMessages(['route' => 'Choose one or two fallback models and save the route again.']);
         $choices = [['provider' => $route->primary_provider, 'model_id' => $route->primary_model], ...(is_array($fallbacks) ? $fallbacks : [])];
         $results = [];
-        try {
-            foreach ($choices as $choice) {
+        $failures = [];
+        foreach ($choices as $choice) {
+            try {
                 $connection = DB::table('ai_provider_connections')->where('provider_key', $choice['provider'])->where('enabled', true)->first();
                 if (! $connection || blank($connection->api_key_encrypted)) throw new RuntimeException('provider_not_ready');
-                $results[] = ['provider' => $choice['provider'], ...$this->providers->get($choice['provider'])->validateStructuredOutput(Crypt::decryptString($connection->api_key_encrypted), $choice['model_id'])];
+                $results[] = ['provider' => $choice['provider'], 'model_id' => $choice['model_id'], ...$this->providers->get($choice['provider'])->validateStructuredOutput(Crypt::decryptString($connection->api_key_encrypted), $choice['model_id'])];
+            } catch (Throwable $exception) {
+                $failures[] = [
+                    'provider' => $choice['provider'],
+                    'model' => $choice['model_id'],
+                    'reason' => match ($exception->getMessage()) {
+                        'provider_not_ready' => 'provider is not configured or enabled',
+                        'structured_output_failed' => 'provider did not return the required JSON shape',
+                        str_starts_with($exception->getMessage(), 'provider_http_400:') => 'provider rejected the structured-output request (HTTP 400): '.substr($exception->getMessage(), strlen('provider_http_400: ')),
+                        str_starts_with($exception->getMessage(), 'provider_http_401:') => 'provider rejected the API key (HTTP 401): '.substr($exception->getMessage(), strlen('provider_http_401: ')),
+                        str_starts_with($exception->getMessage(), 'provider_http_403:') => 'provider denied access to this model (HTTP 403): '.substr($exception->getMessage(), strlen('provider_http_403: ')),
+                        str_starts_with($exception->getMessage(), 'provider_http_404:') => 'model was not found or is no longer available (HTTP 404): '.substr($exception->getMessage(), strlen('provider_http_404: ')),
+                        str_starts_with($exception->getMessage(), 'provider_http_429:') => 'provider rate limit reached (HTTP 429): '.substr($exception->getMessage(), strlen('provider_http_429: ')),
+                        default => 'provider error: '.substr((string) preg_replace('/[^a-zA-Z0-9 .:_-]/', '', $exception->getMessage()), 0, 180),
+                    },
+                ];
             }
-        } catch (Throwable $exception) {
+        }
+        if ($failures !== []) {
             DB::transaction(function () use ($actor, $ip): void {
                 DB::table('ai_task_routes')->where('task_key', 'page_editor')->update(['status' => 'unverified', 'last_verified_at' => null, 'updated_at' => now()]);
                 $this->audit($actor, 'ai.page_editor_route.test_failed', 'page_editor', ['failed' => true, 'ip' => $ip]);
             });
-            throw new RuntimeException('At least one selected model failed the structured-output check. The route remains inactive; review the selection and try again.', previous: $exception);
+            $details = collect($failures)->map(fn (array $failure): string => strtoupper($failure['provider']).' / '.$failure['model'].' — '.$failure['reason'])->implode('; ');
+            throw new RuntimeException('Compatibility check failed for: '.$details.'. The route remains inactive.');
         }
         DB::transaction(function () use ($actor, $ip, $results): void {
             DB::table('ai_task_routes')->where('task_key', 'page_editor')->update(['status' => 'verified', 'last_verified_at' => now(), 'updated_at' => now()]);
@@ -243,9 +256,19 @@ final class AiModelSettingsService
     private function isModelRouteCompatible(string $provider, string $modelId): bool
     {
         $model = DB::table('ai_model_catalog')->where('provider_key', $provider)->where('model_id', $modelId)->where('availability', 'available')->first();
-        if (! $model || ! $model->supports_structured_output) return false;
+        if (! $model || ! $this->isRecommendedCatalogModel($model)) return false;
+        return true;
+    }
+
+    private function isRecommendedCatalogModel(object $model): bool
+    {
+        if (! $model->supports_structured_output) return false;
         $inputs = json_decode($model->input_modalities ?: '[]', true);
         $outputs = json_decode($model->output_modalities ?: '[]', true);
+        $identity = mb_strtolower((string) ($model->model_id ?? '').' '.(string) ($model->display_name ?? ''));
+        foreach (['image', 'audio', 'tts', 'transcribe', 'batch'] as $excluded) {
+            if (str_contains($identity, $excluded)) return false;
+        }
 
         return is_array($inputs) && in_array('text', $inputs, true) && is_array($outputs) && in_array('text', $outputs, true);
     }

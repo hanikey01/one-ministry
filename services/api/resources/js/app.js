@@ -29,7 +29,6 @@ const setPageInterval = (callback, delay) => {
 
 const initializePage = (force = false) => {
     const pageUrl = window.location.href;
-    if (!force && initializedPageUrl === pageUrl) return;
     cleanupPage();
     initializedPageUrl = pageUrl;
 
@@ -93,11 +92,17 @@ const initializePage = (force = false) => {
         const toolbar = document.createElement('header');
         toolbar.className = 'page-canvas-header';
         toolbar.dataset.canvasToolbar = '';
-        toolbar.innerHTML = '<div><p>PAGE CANVAS</p><strong>Responsive layout</strong></div><div class="page-canvas-toolbar" role="group" aria-label="Canvas preview size"><button type="button" data-canvas-size="desktop" class="is-active" aria-label="Desktop canvas" title="Desktop canvas"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="1.5"></rect><path d="M8 20h8M12 17v3"></path></svg></button><button type="button" data-canvas-size="tablet" aria-label="Tablet canvas" title="Tablet canvas"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="2"></rect><path d="M10 18h4"></path></svg></button><button type="button" data-canvas-size="mobile" aria-label="Mobile canvas" title="Mobile canvas"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3" width="8" height="18" rx="2"></rect><path d="M11 18h2"></path></svg></button></div>';
+        toolbar.innerHTML = '<div><p>PAGE CANVAS</p><strong>Responsive layout</strong></div><div class="page-canvas-toolbar" role="group" aria-label="Canvas preview size"><button type="button" data-canvas-size="desktop" class="is-active" aria-pressed="true" aria-label="Desktop canvas" title="Desktop canvas"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="1.5"></rect><path d="M8 20h8M12 17v3"></path></svg></button><button type="button" data-canvas-size="tablet" aria-pressed="false" aria-label="Tablet canvas" title="Tablet canvas"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="2"></rect><path d="M10 18h4"></path></svg></button><button type="button" data-canvas-size="mobile" aria-pressed="false" aria-label="Mobile canvas" title="Mobile canvas"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3" width="8" height="18" rx="2"></rect><path d="M11 18h2"></path></svg></button></div>';
         canvasWrap.prepend(toolbar);
         toolbar.querySelectorAll('[data-canvas-size]').forEach((button) => addPageListener(button, 'click', () => {
-            toolbar.querySelectorAll('[data-canvas-size]').forEach((item) => item.classList.toggle('is-active', item === button));
-            canvas.dataset.preview = button.dataset.canvasSize;
+            const size = button.dataset.canvasSize;
+            toolbar.querySelectorAll('[data-canvas-size]').forEach((item) => {
+                const active = item === button;
+                item.classList.toggle('is-active', active);
+                item.setAttribute('aria-pressed', active ? 'true' : 'false');
+            });
+            canvas.dataset.preview = size;
+            canvasWrap.dataset.preview = size;
         }));
     }
 document.querySelectorAll('[data-zoom-meeting]').forEach((room) => {

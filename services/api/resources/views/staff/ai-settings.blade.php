@@ -36,12 +36,11 @@
             $selectedFallbacks = old('fallbacks', $fallbackSelections);
             $hasEnabledProvider = collect($providers)->contains(fn ($provider): bool => (bool) ($provider['enabled'] ?? false));
             $modelOptions = $models->filter(function ($model) use ($providers): bool {
+                $identity = strtolower($model->model_id.' '.$model->display_name);
+                foreach (['image', 'audio', 'tts', 'transcribe', 'batch'] as $excluded) if (str_contains($identity, $excluded)) return false;
                 $inputs = json_decode($model->input_modalities ?: '[]', true);
                 $outputs = json_decode($model->output_modalities ?: '[]', true);
-                return (bool) $model->supports_structured_output
-                    && is_array($inputs) && in_array('text', $inputs, true)
-                    && is_array($outputs) && in_array('text', $outputs, true)
-                    && ($providers[$model->provider_key]['enabled'] ?? false);
+                return (bool) $model->supports_structured_output && is_array($inputs) && in_array('text', $inputs, true) && is_array($outputs) && in_array('text', $outputs, true) && ($providers[$model->provider_key]['enabled'] ?? false);
             });
         @endphp
         <div class="ai-route-state"><span class="status-badge" data-ai-route-status>{{ ucfirst($route->status ?? 'unconfigured') }}</span>@if($route?->last_verified_at)<span>Verified {{ \Illuminate\Support\Carbon::parse($route->last_verified_at)->diffForHumans() }}</span>@elseif(($route->status ?? '') === 'unavailable')<span>A selected model has disappeared or no longer meets the route requirements. Choose a replacement.</span>@else<span data-ai-route-help>The route cannot be used until it passes the live check.</span>@endif</div>

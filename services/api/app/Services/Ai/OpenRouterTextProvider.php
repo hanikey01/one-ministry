@@ -3,6 +3,7 @@
 namespace App\Services\Ai;
 
 use App\Contracts\AiTextProvider;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -38,13 +39,19 @@ final class OpenRouterTextProvider implements AiTextProvider
     {
         $schema = ['type' => 'object', 'properties' => ['ok' => ['type' => 'boolean']], 'required' => ['ok'], 'additionalProperties' => false];
         $started = microtime(true);
-        $payload = Http::baseUrl(self::BASE_URL)->withToken($apiKey)->acceptJson()->timeout(20)->post('/chat/completions', [
-            'model' => $modelId,
-            'messages' => [['role' => 'user', 'content' => 'Return a JSON object with ok set to true.']],
-            'max_tokens' => 24,
-            'temperature' => 0,
-            'response_format' => ['type' => 'json_schema', 'json_schema' => ['name' => 'ai_connection_check', 'strict' => true, 'schema' => $schema]],
-        ])->throw()->json();
+        try {
+            $payload = Http::baseUrl(self::BASE_URL)->withToken($apiKey)->acceptJson()->timeout(20)->post('/chat/completions', [
+                'model' => $modelId,
+                'messages' => [['role' => 'user', 'content' => 'Return a JSON object with ok set to true.']],
+                'max_tokens' => 24,
+                'temperature' => 0,
+                'response_format' => ['type' => 'json_schema', 'json_schema' => ['name' => 'ai_connection_check', 'strict' => true, 'schema' => $schema]],
+            ])->throw()->json();
+        } catch (RequestException $exception) {
+            $message = (string) ($exception->response?->json('error.message') ?? 'request rejected');
+            $message = substr((string) preg_replace('/[^a-zA-Z0-9 .:_-]/', '', $message), 0, 180);
+            throw new RuntimeException('provider_http_'.($exception->response?->status() ?? 'unknown').': '.$message, previous: $exception);
+        }
         $content = $payload['choices'][0]['message']['content'] ?? null;
         $output = is_string($content) ? json_decode($content, true) : null;
         if (! is_array($output) || ($output['ok'] ?? null) !== true) throw new RuntimeException('structured_output_failed');
