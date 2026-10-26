@@ -2289,6 +2289,8 @@ html body.ministry-app .workspace-content .page-editor-actions .button-secondary
     color: var(--ink) !important;
     box-shadow: none !important;
 }
+html body.ministry-app .workspace-content .page-editor-actions .page-editor-icon-button { display: inline-grid; width: 40px; min-width: 40px; height: 40px; min-height: 40px; padding: 0 !important; place-items: center; }
+html body.ministry-app .workspace-content .page-editor-actions .page-editor-icon-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
 @media (max-width: 800px) {
     html body.ministry-app .workspace-content :is(.page-starters-heading, .pages-records-panel > header) { align-items: flex-start; flex-direction: column; }
     html body.ministry-app .workspace-content .page-starter-grid { grid-template-columns: 1fr; }
