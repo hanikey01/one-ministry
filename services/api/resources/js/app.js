@@ -86,6 +86,38 @@ const initializePage = (force = false) => {
     });
     const canvasWrap = document.querySelector('.page-block-canvas-wrap');
     const canvas = canvasWrap?.querySelector('[data-canvas]');
+    if (canvas && !canvas.dataset.preview) canvas.dataset.preview = 'desktop';
+    if (canvasWrap && !canvasWrap.dataset.preview) canvasWrap.dataset.preview = canvas?.dataset.preview || 'desktop';
+    let canvasStage = canvasWrap?.querySelector('.page-block-canvas-stage');
+    if (canvas && !canvasStage) {
+        canvasStage = document.createElement('div');
+        canvasStage.className = 'page-block-canvas-stage';
+        canvas.before(canvasStage);
+        canvasStage.append(canvas);
+    }
+    if (canvasWrap && canvas && canvasStage) {
+        const syncCanvasPreview = () => {
+            const targetWidth = { desktop: 1180, tablet: 768 }[canvas.dataset.preview] || 0;
+            const scale = targetWidth ? Math.min(1, canvasWrap.clientWidth / targetWidth) : 1;
+            const scaled = scale < .999;
+            canvasWrap.classList.toggle('is-scaled-preview', scaled);
+            if (!scaled) {
+                canvasWrap.style.removeProperty('--canvas-preview-scale');
+                canvasStage.style.removeProperty('height');
+                return;
+            }
+            canvasWrap.style.setProperty('--canvas-preview-scale', String(scale));
+            canvasStage.style.height = `${Math.ceil(canvas.scrollHeight * scale)}px`;
+        };
+        const scheduleCanvasPreviewSync = () => window.requestAnimationFrame(syncCanvasPreview);
+        const canvasResizeObserver = new ResizeObserver(scheduleCanvasPreviewSync);
+        const canvasPreviewObserver = new MutationObserver(scheduleCanvasPreviewSync);
+        canvasResizeObserver.observe(canvas);
+        canvasPreviewObserver.observe(canvas, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'data-preview'] });
+        addPageListener(window, 'resize', scheduleCanvasPreviewSync);
+        pageCleanups.push(() => { canvasResizeObserver.disconnect(); canvasPreviewObserver.disconnect(); });
+        scheduleCanvasPreviewSync();
+    }
     const floatingLibraryOpen = document.querySelector('.page-block-library-trigger');
     if (canvasWrap && floatingLibraryOpen && floatingLibraryOpen.parentElement !== canvasWrap) canvasWrap.prepend(floatingLibraryOpen);
     if (canvasWrap && canvas && !canvasWrap.querySelector('[data-canvas-toolbar]')) {

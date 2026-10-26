@@ -453,10 +453,10 @@ class StaffWorkspaceController extends Controller
                 $inner->where('title', 'like', "%{$query}%")->orWhere('file_name', 'like', "%{$query}%");
             }))->when($type !== '', fn ($q) => $q->where('file_mime', 'like', $type.'/%'))
             ->when($status !== '', fn ($q) => $q->where('status', $status))
-            ->when($sort === 'oldest', fn ($q) => $q->oldest('created_at'))
-            ->when($sort === 'name', fn ($q) => $q->orderBy('title'))
-            ->when($sort === 'size', fn ($q) => $q->orderByDesc('file_size_bytes'))
-            ->when($sort === 'newest', fn ($q) => $q->latest('created_at'))
+            ->when($sort === 'oldest', fn ($q) => $q->orderBy('created_at')->orderBy('published_at')->orderBy('id'))
+            ->when($sort === 'name', fn ($q) => $q->orderBy('title')->orderBy('id'))
+            ->when($sort === 'size', fn ($q) => $q->orderByDesc('file_size_bytes')->orderByDesc('created_at')->orderBy('id'))
+            ->when($sort === 'newest', fn ($q) => $q->orderByDesc('created_at')->orderByDesc('published_at')->orderByDesc('id'))
             ->paginate(24)->withQueryString();
 
         return view('staff.media-library', compact('settings', 'assets', 'query', 'view', 'type', 'status', 'sort') + ['user' => $request->user()]);

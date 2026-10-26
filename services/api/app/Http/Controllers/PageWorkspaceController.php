@@ -394,6 +394,7 @@ class PageWorkspaceController extends Controller
             ->where('status', 'published')
             ->orderByDesc('published_at')
             ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->limit(60)
             ->get(['id', 'title', 'provider_key', 'provider', 'library', 'kind', 'file_mime'])
             ->map(function (object $asset): object {
