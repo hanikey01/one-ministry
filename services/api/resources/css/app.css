@@ -2316,7 +2316,7 @@ body.ministry-app .page-media-picker-trigger:focus-visible { border-color: var(-
     .service-schedule-panel table, .service-schedule-panel tbody,
     .service-schedule-panel tr, .service-schedule-panel td { display: block; box-sizing: border-box; width: 100%; }
     .service-schedule-panel table { min-width: 0 !important; }
-    .service-schedule-panel tr { margin: 10px; border: 1px solid var(--line); border-radius: 13px; padding: 4px 0; }
+    .service-schedule-panel tr { width: calc(100% - 20px); margin: 10px; border: 1px solid var(--line); border-radius: 13px; padding: 4px 0; }
     .service-schedule-panel td {
         display: grid; grid-template-columns: minmax(102px, .72fr) minmax(0, 1fr); gap: 11px;
         border: 0; padding: 9px 13px; overflow-wrap: anywhere;
