@@ -54,7 +54,10 @@ class PublicWorkspaceController extends Controller
         $page = DB::table('pages')->where('slug', $slug)->where('status', 'published')->whereNotNull('published_at')->where('published_at', '<=', now())->first();
         abort_unless($page, 404);
 
-        return $this->view('public.page', compact('page'));
+        $blocks = json_decode($page->blocks ?: '[]', true);
+        $features = FeatureSetting::query()->where('state', 'enabled')->pluck('key')->all();
+
+        return $this->view('public.page', ['page' => $page, 'pageElementData' => $this->pageElementData(is_array($blocks) ? $blocks : [], $features)]);
     }
 
     public function worship(ServiceOccurrence $service, LiveStreamService $streams): View
@@ -82,5 +85,29 @@ class PublicWorkspaceController extends Controller
     private function enabled(string $key): void
     {
         abort_unless(FeatureSetting::query()->where(['key' => $key, 'state' => 'enabled'])->exists(), 404);
+    }
+
+    /** @param array<string, mixed> $blocks @param array<int, string> $features */
+    private function pageElementData(array $blocks, array $features): array
+    {
+        $types = collect($blocks['sections'] ?? [])->flatMap(fn ($section) => collect($section['columns'] ?? [])->flatMap(fn ($column) => collect($column['elements'] ?? [])->pluck('type')))->filter()->unique();
+        $data = [];
+
+        if ($types->contains('events')) $data['events'] = DB::table('events')->whereNull('cancelled_at')->where('starts_at', '>=', now())->orderBy('starts_at')->limit(3)->get(['id', 'title', 'description', 'starts_at', 'location']);
+        if ($types->contains('locations')) $data['locations'] = Location::query()->where('is_public', true)->orderByDesc('is_primary')->orderBy('name')->limit(3)->get(['id', 'name', 'address']);
+        if ($types->contains('announcements')) $data['announcements'] = DB::table('announcements')->where('published', true)->where(fn ($query) => $query->whereNull('publish_at')->orWhere('publish_at', '<=', now()))->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))->latest()->limit(3)->get(['id', 'title', 'body']);
+        if ($types->contains('groups') && in_array('groups', $features, true)) $data['groups'] = DB::table('groups')->where('status', 'active')->orderBy('name')->limit(3)->get(['id', 'name', 'description']);
+        if ($types->contains('service_times')) $data['services'] = DB::table('service_occurrences')->leftJoin('locations', 'locations.id', '=', 'service_occurrences.location_id')->where('service_occurrences.rehearsal_mode', false)->whereIn('service_occurrences.state', ['scheduled', 'ready'])->where('service_occurrences.starts_at', '>=', now())->orderBy('service_occurrences.starts_at')->limit(24)->get(['service_occurrences.id', 'service_occurrences.service_schedule_id', 'service_occurrences.title', 'service_occurrences.starts_at', 'service_occurrences.timezone', 'locations.name as location_name'])->unique(fn (object $service): string => $service->service_schedule_id ?: $service->id)->take(3)->values();
+        if ($types->contains('live_service') && in_array('digital_church', $features, true)) $data['liveService'] = DB::table('service_occurrences')->where('rehearsal_mode', false)->whereIn('state', ['live', 'interrupted'])->orderByDesc('starts_at')->first(['id', 'title', 'state']);
+        if ($types->contains('giving') && in_array('giving', $features, true)) $data['funds'] = DB::table('giving_funds')->where('active', true)->orderBy('name')->limit(3)->get(['id', 'name', 'description']);
+
+        $resourceLibraries = array_values(array_intersect($features, ['books_library', 'audio_sermons', 'video_sermons']));
+        if (($types->contains('books') || $types->contains('sermon_spotlight')) && $resourceLibraries !== []) {
+            $resources = DB::table('media_assets')->where('status', 'published')->whereIn('library', $resourceLibraries)->orderByDesc('published_at')->limit(3)->get(['id', 'title', 'description', 'library', 'speaker']);
+            if ($types->contains('books')) $data['books'] = $resources->where('library', 'books_library')->values();
+            if ($types->contains('sermon_spotlight')) $data['sermon'] = $resources->first(fn (object $resource): bool => in_array($resource->library, ['audio_sermons', 'video_sermons'], true));
+        }
+
+        return $data;
     }
 }

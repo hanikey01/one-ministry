@@ -18,6 +18,8 @@ final class PageDocumentService
     private const ELEMENT_FIELDS = [
         'hero' => ['eyebrow', 'title', 'body', 'button_label', 'button_url'],
         'heading' => ['text'], 'paragraph' => ['text'], 'button' => ['label', 'url'], 'feature_list' => ['title', 'items'], 'testimonial' => ['quote', 'name', 'role'], 'statistics' => ['title', 'stat_one_value', 'stat_one_label', 'stat_two_value', 'stat_two_label', 'stat_three_value', 'stat_three_label'], 'image' => ['url', 'alt', 'caption', 'image_hint'],
+        'rich_text' => ['title', 'text'], 'icon' => ['icon', 'label'], 'icon_box' => ['icon', 'title', 'body', 'button_label', 'button_url'], 'icon_list' => ['title', 'items'], 'image_card' => ['url', 'alt', 'title', 'body', 'button_label', 'button_url'], 'tabs' => ['title', 'tab_one_label', 'tab_one_content', 'tab_two_label', 'tab_two_content', 'tab_three_label', 'tab_three_content'], 'social_links' => ['title', 'facebook_url', 'instagram_url', 'youtube_url'],
+        'contact_form' => ['title', 'body', 'submit_label'], 'map_directions' => ['title', 'address', 'directions_url', 'button_label'],
         'gallery' => ['images', 'columns', 'caption'], 'video_embed' => ['url', 'title', 'caption'],
         'audio' => ['url', 'title', 'caption'], 'file' => ['url', 'label', 'description'],
         'media_text' => ['media_url', 'media_alt', 'placement', 'title', 'body', 'button_label', 'button_url'],
@@ -118,12 +120,13 @@ final class PageDocumentService
     }
     private function validateContent(string $type, array $content): void
     {
-        foreach (['url', 'media_url'] as $field) if (($type !== 'button' || $field !== 'url') && ($content[$field] ?? '') !== '' && ! preg_match('#^https?://#i', $content[$field])) $this->invalid('Media links must use an HTTP or HTTPS URL.');
+        foreach (['url', 'media_url', 'facebook_url', 'instagram_url', 'youtube_url', 'directions_url'] as $field) if (($type !== 'button' || $field !== 'url') && ($content[$field] ?? '') !== '' && ! preg_match('#^https?://#i', $content[$field])) $this->invalid('Media, social, and directions links must use an HTTP or HTTPS URL.');
         if (($content['button_url'] ?? '') !== '' && ! preg_match('#^(?:https?://|/)#i', $content['button_url'])) $this->invalid('Button destinations must use an HTTP(S) link or an internal path.');
         if ($type === 'button' && ($content['url'] ?? '') !== '' && ! preg_match('#^(?:https?://|/)#i', $content['url'])) $this->invalid('Button destinations must use an HTTP(S) link or an internal path.');
         if ($type === 'video_embed' && ($content['url'] ?? '') !== '' && ! $this->isSupportedVideoUrl($content['url'])) $this->invalid('Video embeds support YouTube, Vimeo, or a published ministry video.');
         if ($type === 'gallery') { $images = array_values(array_filter(preg_split('/\R/', $content['images']) ?: [])); if (count($images) > 12 || collect($images)->contains(fn ($url) => ! preg_match('#^https?://#i', trim($url)))) $this->invalid('A gallery accepts up to 12 HTTP or HTTPS image links.'); if (! in_array($content['columns'], ['two', 'three', 'four'], true)) $this->invalid('Choose a valid gallery column layout.'); }
         if ($type === 'media_text' && ! in_array($content['placement'], ['left', 'right'], true)) $this->invalid('Choose a valid media placement.'); if ($type === 'list' && ! in_array($content['ordered'], ['yes', 'no'], true)) $this->invalid('Choose a valid list style.'); if ($type === 'spacer' && ! in_array($content['height'], ['small', 'medium', 'large'], true)) $this->invalid('Choose a valid spacer height.');
+        if (in_array($type, ['icon', 'icon_box'], true) && ! in_array($content['icon'], ['heart', 'people', 'calendar', 'location', 'message', 'book', 'star', 'check', 'hand-heart', 'globe'], true)) $this->invalid('Choose an approved icon.');
     }
 
     private function isSupportedVideoUrl(string $url): bool

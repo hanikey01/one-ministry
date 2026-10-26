@@ -133,11 +133,29 @@ Complete these in order. Keep migrations, validation, rendering, client controls
 - Selecting or uploading an item in the picker must immediately update the picker list and selected edit field without a browser reload.
 - Media cards need a working thumbnail/preview, edit popup, and delete action.
 
-## Local environment and rebuild notes
+## Local environment and live-preview notes
 
 Current local preview: `http://localhost:8080/`
 
-Compose services are API, worker, scheduler, PostgreSQL, Redis, and Caddy. The project currently responds with HTTP 200 after the latest rebuild.
+For active development, use the source-mounted overlay rather than the production-only Compose profile:
+
+```powershell
+docker compose -f compose.yaml -f compose.dev.yaml up -d --force-recreate api proxy vite
+```
+
+This is the verified fast-preview setup. `compose.dev.yaml` mounts the API source into the PHP container, mounts `services/api` into the Vite container, keeps dependencies in the persistent `vite_node_modules` volume, and runs Vite in watch/HMR mode. Caddy proxies the Vite development assets and HMR connection through port `8080`, so CSS and JavaScript changes appear without rebuilding the API image or downloading dependencies again. Blade, PHP, route, and resource changes are picked up from the bind mounts; refresh the browser after those changes.
+
+Do not delete `vite_node_modules`, `postgres_data`, `redis_data`, or `public_build` during ordinary cleanup. Do not use `docker compose down -v` for routine development.
+
+If routes, configuration, or cached Blade output appear stale, run:
+
+```powershell
+docker compose -f compose.yaml -f compose.dev.yaml exec api php artisan optimize:clear
+```
+
+Rebuild only after changing Dockerfiles, Composer/PHP dependencies or extensions, Node dependencies, or when validating the production asset bundle. The production-only Compose profile still uses copied compiled assets and is not the live-preview workflow.
+
+For phone preview, set `DEV_HOST` to the computer's LAN IPv4 address and `DEV_PORT=8080` in the Git-ignored root `.env`, recreate only Vite, and open `http://<LAN-IP>:8080` on the phone while both devices share the same network.
 
 The PHP Redis PECL extension cannot currently be installed from the upstream PECL endpoint during the image build. The successful local rebuild command was:
 

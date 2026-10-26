@@ -4,19 +4,25 @@ namespace App\Http\Controllers;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class StaffPeopleController extends Controller
 {
-    public function visitor(Request $r): JsonResponse
+    public function visitor(Request $r): JsonResponse|RedirectResponse
     {
         $d = $r->validate(['first_name' => ['required', 'string', 'max:100'], 'last_name' => ['nullable', 'string', 'max:100'], 'email' => ['nullable', 'email', 'max:254'], 'phone' => ['nullable', 'string', 'max:40'], 'consent_to_contact' => ['accepted']]);
         $id = (string) Str::uuid();
         DB::table('people')->insert(array_merge($d, ['id' => $id, 'status' => 'visitor', 'consent_to_contact' => true, 'created_at' => now(), 'updated_at' => now()]));
         $task = (string) Str::uuid();
         DB::table('follow_up_tasks')->insert(['id' => $task, 'person_id' => $id, 'kind' => 'visitor_follow_up', 'summary' => 'Follow up with new visitor', 'created_at' => now(), 'updated_at' => now()]);
+
+        if (! $r->expectsJson()) {
+            $previous = url()->previous() ?: url('/');
+            return redirect()->to($previous.(str_contains($previous, '?') ? '&' : '?').'contact=received');
+        }
 
         return response()->json(['data' => ['person_id' => $id, 'follow_up_task_id' => $task, 'status' => 'received']], 201);
     }

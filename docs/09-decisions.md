@@ -156,3 +156,11 @@ When a question is resolved, record date, decision maker, evidence, alternatives
 **Reason:** User direction, 2026-10-26. A smaller role set is easier for ministries to understand while contextual assignments preserve least privilege for department, group, volunteer, service, and meeting work.
 
 **Status:** Accepted. Legacy site editor, content editor, finance user, and school manager assignments are consolidated by migration. Scope-management screens and child safeguarding remain separate implementation work.
+
+### D-036 — Advanced page-editor code and embed elements
+
+**Decision:** Proposed for review. The page-editor roadmap will include custom CSS, custom JavaScript, raw HTML, and iframe/embed elements, but they are not part of the ordinary approved-element allowlist. Before any of them is enabled, the product must define a separate privileged capability with explicit permissions, draft-only preview isolation, content-security-policy rules, sanitisation or sandboxing, audited publication, and an AI response schema that can emit only the approved representation for that capability. AI must never return executable code directly into a published page without staff review and the same server validation applied to manual input.
+
+**Reason:** User direction, 2026-10-26. Advanced escape hatches can be useful for expert page authors and AI-assisted composition, but unrestricted code would bypass the current portable renderer, semantic theme tokens, privacy controls, and page-document validation.
+
+**Status:** Proposed. This supersedes the previous blanket exclusion only after the required security and operational contract is approved; the existing allowlist and validator remain in force meanwhile.

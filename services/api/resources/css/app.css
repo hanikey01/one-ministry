@@ -2585,12 +2585,38 @@ body.ministry-app .page-media-picker-trigger:focus-visible { border-color: var(-
 .public-page-structured-column > * { min-width: 0; }
 .public-page-element { display: var(--page-element-display, block); min-width: 0; order: var(--page-element-order, initial); overflow: clip; text-align: var(--page-element-align, left); border: var(--page-element-border-width, 0) solid var(--page-element-border-color, transparent); border-radius: var(--page-element-radius, 0); background-color: var(--page-element-bg, transparent); background-image: linear-gradient(var(--page-element-overlay, transparent), var(--page-element-overlay, transparent)), var(--page-element-image, none); background-position: center; background-size: cover; box-shadow: var(--page-element-shadow, none); }
 .public-page-button { display: flex; }
-.public-page-feature-list, .public-page-testimonial, .public-page-statistics, .public-page-carousel { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
-.public-page-feature-list, .public-page-testimonial, .public-page-statistics { padding: clamp(20px, 3vw, 32px); }
+.public-page-feature-list, .public-page-testimonial, .public-page-statistics, .public-page-carousel, .public-page-icon-box, .public-page-image-card, .public-page-tabs, .public-page-social-links { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.public-page-feature-list, .public-page-testimonial, .public-page-statistics, .public-page-icon-box, .public-page-tabs, .public-page-social-links { padding: clamp(20px, 3vw, 32px); }
 .public-page-feature-list h2, .public-page-statistics h2 { margin: 0 0 14px; color: var(--ink); font-size: clamp(1.25rem, 2.5vw, 1.8rem); }
 .public-page-feature-list ul { display: grid; gap: 9px; margin: 0; padding: 0; color: var(--muted); list-style: none; }
 .public-page-feature-list li { display: flex; gap: 9px; align-items: flex-start; }
 .public-page-feature-list li::before { width: 7px; height: 7px; flex: 0 0 auto; margin-top: .52em; border-radius: 999px; background: var(--action); content: ''; }
+.public-page-icon { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 750; }
+.public-page-icon .ui-icon, .public-page-icon-box .ui-icon, .public-page-icon-list .ui-icon { color: var(--action); }
+.public-page-icon-box { display: grid; gap: 10px; }
+.public-page-icon-box h2, .public-page-image-card h2, .public-page-tabs h2, .public-page-social-links h2, .public-page-icon-list h2, .public-page-rich-text h2 { margin: 0; color: var(--ink); }
+.public-page-icon-box p, .public-page-image-card p, .public-page-tabs p, .public-page-social-links p, .public-page-rich-text p { margin: 0; color: var(--muted); line-height: 1.65; }
+.public-page-icon-list ul { display: grid; gap: 10px; margin: 14px 0 0; padding: 0; list-style: none; }
+.public-page-icon-list li { display: flex; align-items: flex-start; gap: 9px; color: var(--muted); }
+.public-page-image-card { overflow: hidden; }
+.public-page-image-card > img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+.public-page-image-card > div { display: grid; gap: 10px; padding: clamp(18px, 3vw, 28px); }
+.public-page-tabs > div { display: grid; gap: 0; margin-top: 14px; border-top: 1px solid var(--line); }
+.public-page-tabs details { border-bottom: 1px solid var(--line); }
+.public-page-tabs summary { padding: 12px 0; color: var(--ink); font-weight: 720; cursor: pointer; }
+.public-page-tabs details p { padding: 0 0 12px; }
+.public-page-social-links > div { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
+.public-page-contact-form, .public-page-map-directions { display: grid; gap: 18px; padding: clamp(20px, 3vw, 32px); border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.public-page-contact-form > div, .public-page-map-directions > div { display: grid; gap: 8px; }
+.public-page-contact-form h2, .public-page-map-directions h2 { margin: 0; color: var(--ink); }
+.public-page-contact-form p, .public-page-map-directions p { margin: 0; color: var(--muted); line-height: 1.65; }
+.public-page-contact-form form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.public-page-contact-form label { display: grid; gap: 6px; color: var(--ink); font-size: .82rem; font-weight: 700; }
+.public-page-contact-form .public-page-consent { grid-column: 1 / -1; grid-template-columns: auto 1fr; align-items: start; color: var(--muted); font-weight: 500; }
+.public-page-contact-form .button { width: max-content; }
+.public-page-form-success { border: 1px solid var(--success); border-radius: 10px; padding: 10px 12px; background: color-mix(in srgb, var(--success) 12%, var(--surface)); color: var(--ink) !important; }
+.public-page-map-directions { grid-template-columns: auto minmax(0, 1fr); align-items: start; }
+.public-page-map-directions > .ui-icon { color: var(--action); }
 .public-page-testimonial { margin: 0; }
 .public-page-testimonial blockquote { margin: 0; color: var(--ink); font-size: clamp(1.15rem, 2.4vw, 1.65rem); font-weight: 650; line-height: 1.5; }
 .public-page-testimonial figcaption { display: grid; gap: 2px; margin-top: 18px; color: var(--muted); font-size: .9rem; }
@@ -2610,6 +2636,9 @@ body.ministry-app .page-media-picker-trigger:focus-visible { border-color: var(-
 .public-page-gallery img { display: block; width: 100%; aspect-ratio: 4 / 3; border-radius: 12px; object-fit: cover; }
 .public-page-divider { width: 100%; border: 0; border-top: 1px solid var(--line); }
 .public-page-file, .public-page-callout { display: grid; gap: 8px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-muted); color: var(--ink); }
+.public-page-dynamic-list > article { display: grid; gap: 3px; padding: 10px 0; border-top: 1px solid var(--line); }
+.public-page-dynamic-list > article strong { color: var(--ink); }
+.public-page-dynamic-list > article span { color: var(--muted); font-size: .9rem; line-height: 1.5; }
 .public-page-copy, .public-page-list, .public-page-quote { color: var(--muted); line-height: 1.7; }
 .public-page-quote { margin: 0; padding-left: 16px; border-left: 3px solid var(--action); font-size: 1.1rem; font-style: italic; }
 .public-page-blocks, .public-page-columns { display: grid; gap: var(--page-element-gap, 18px); }
@@ -2723,7 +2752,8 @@ body.ministry-app .page-media-picker-trigger:focus-visible { border-color: var(-
     .public-page-structured-columns { grid-template-columns: repeat(var(--page-mobile-columns, var(--page-tablet-columns, 1)), minmax(0, 1fr)); width: min(100% - 20px, 620px); gap: var(--page-mobile-column-gap, var(--page-tablet-column-gap, 18px)); padding-block: min(var(--page-mobile-padding, var(--page-tablet-padding, 48px)), 34px); }
     .public-page-structured-column { display: var(--page-mobile-column-display, grid); width: min(100%, var(--page-mobile-column-width, var(--page-tablet-column-width, var(--page-column-width, 100%)))); order: var(--page-mobile-column-order, var(--page-tablet-column-order, initial)); justify-items: var(--page-mobile-column-align, var(--page-tablet-column-align, start)); gap: var(--page-mobile-element-gap, var(--page-tablet-element-gap, 18px)); text-align: left; }
     .public-page-element { display: var(--page-mobile-element-display, var(--page-tablet-element-display, block)); order: var(--page-mobile-element-order, var(--page-tablet-element-order, initial)); text-align: var(--page-mobile-element-align, var(--page-tablet-element-align, left)); }
-    .public-page-statistics > div, .public-page-gallery { grid-template-columns: 1fr; }
+    .public-page-statistics > div, .public-page-gallery, .public-page-contact-form form { grid-template-columns: 1fr; }
+    .public-page-map-directions { grid-template-columns: 1fr; }
     .worship-room { grid-template-columns: 1fr; }
     .service-schedule-intro { align-items: start; padding: 16px 12px; }
     .security-sessions-panel { overflow: visible; }
