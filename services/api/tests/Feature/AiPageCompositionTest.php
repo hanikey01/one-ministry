@@ -78,6 +78,13 @@ class AiPageCompositionTest extends TestCase
                     }
                     return ['model' => $modelId, 'latency_ms' => 2, 'output' => $revision];
                 }
+                if ($schemaName === 'ministry_public_page_object_revision') {
+                    $revision = [];
+                    foreach ($schema['properties'] as $target => $definition) {
+                        $revision[$target] = array_fill_keys(array_keys($definition['properties']), '<b>'.str_repeat('A', 700).'</b>');
+                    }
+                    return ['model' => $modelId, 'latency_ms' => 2, 'output' => $revision];
+                }
                 return ['model' => $modelId, 'latency_ms' => 1, 'output' => $this->output];
             }
         };
@@ -88,42 +95,27 @@ class AiPageCompositionTest extends TestCase
             'title' => null, 'public_details' => null,
         ], $admin, '127.0.0.1');
 
-        $this->assertSame(['hero', 'section', 'media_text', 'image', 'quote', 'list', 'accordion', 'call_to_action'], array_column($draft['blocks'], 'type'));
-        $this->assertSame('', $draft['blocks'][2]['data']['media_url']);
-        $this->assertSame('A welcoming community gathering', $draft['blocks'][3]['data']['image_hint']);
-        $this->assertSame('', $draft['blocks'][7]['data']['button_url']);
+        $sections = $draft['document']['sections'];
+        $this->assertSame(['hero', 'heading', 'media_text', 'image', 'quote', 'list', 'accordion', 'call_to_action'], [
+            $sections[0]['columns'][0]['elements'][0]['type'], $sections[1]['columns'][0]['elements'][0]['type'],
+            $sections[2]['columns'][0]['elements'][0]['type'], $sections[3]['columns'][0]['elements'][0]['type'],
+            $sections[4]['columns'][0]['elements'][0]['type'], $sections[5]['columns'][0]['elements'][0]['type'],
+            $sections[6]['columns'][0]['elements'][0]['type'], $sections[7]['columns'][0]['elements'][0]['type'],
+        ]);
+        $this->assertSame('', $sections[2]['columns'][0]['elements'][0]['content']['media_url']);
+        $this->assertSame('A welcoming community gathering', $sections[3]['columns'][0]['elements'][0]['content']['image_hint']);
+        $this->assertSame('', $sections[7]['columns'][0]['elements'][0]['content']['button_url']);
 
-        $originalBefore = $draft['blocks'][3];
-        $originalAfter = $draft['blocks'][5];
-        $revision = app(AiPageDraftService::class)->reviseSection([
-            'title' => $draft['title'], 'instruction' => 'Make this quote warmer and clearer for a first-time visitor.',
-            'page_purpose' => 'Help first-time visitors prepare for a visit.',
-            'blocks' => $draft['blocks'], 'selected_index' => 4,
+        $revision = app(AiPageDraftService::class)->reviseObject([
+            'title' => $draft['title'], 'instruction' => 'Make the hero clearer.', 'page_purpose' => null,
+            'document' => $draft['document'], 'kind' => 'element', 'section' => 0, 'column' => 0, 'element' => 0,
         ], $admin, '127.0.0.1');
-        $this->assertSame('Revised welcome copy with consistent page voice.', $revision['data']['text']);
-        $this->assertSame($originalBefore, $draft['blocks'][3]);
-        $this->assertSame($originalAfter, $draft['blocks'][5]);
-        $this->assertStringContainsString('Full ordered page context', $provider->lastPrompt);
-        $this->assertStringContainsString('Help first-time visitors prepare for a visit.', $provider->lastPrompt);
-        $this->assertStringContainsString('selected', $provider->lastPrompt);
-        $mediaRevision = app(AiPageDraftService::class)->reviseSection([
-            'title' => $draft['title'], 'instruction' => 'Improve the copy while keeping this layout.',
-            'blocks' => $draft['blocks'], 'selected_index' => 2,
-        ], $admin, '127.0.0.1');
-        $this->assertSame('', $mediaRevision['data']['media_url']);
-        $this->assertSame('', $mediaRevision['data']['button_url']);
-        $this->actingAs($admin)->postJson('/staff/pages/ai-section-revision', [
-            'title' => $draft['title'], 'instruction' => 'Make this quote warmer and clearer for a first-time visitor.',
-            'page_purpose' => 'Help first-time visitors prepare for a visit.',
-            'selected_index' => 4, 'blocks' => json_encode($draft['blocks'], JSON_THROW_ON_ERROR),
-        ])->assertOk()->assertJsonPath('data.data.text', 'Revised welcome copy with consistent page voice.');
-
-        $this->actingAs($admin)->post('/staff/pages/preview', [
-            'title' => $draft['title'], 'blocks' => json_encode($draft['blocks'], JSON_THROW_ON_ERROR),
-        ])->assertOk()->assertSee('public-page-hero')->assertSee('public-page-accordion')->assertSee('public-page-quote');
+        $this->assertSame(str_repeat('A', 500), $revision['edits']['c0e0']['eyebrow']);
+        $this->assertSame(str_repeat('A', 700), $revision['edits']['c0e0']['body']);
+        $this->assertSame('WELCOME', $draft['document']['sections'][0]['columns'][0]['elements'][0]['content']['eyebrow']);
         $this->assertSame(0, DB::table('pages')->count());
         $this->assertDatabaseHas('audit_events', ['action' => 'content.page_ai_draft_generated']);
-        $this->assertDatabaseHas('audit_events', ['action' => 'content.page_ai_section_revision_generated']);
+        $this->assertDatabaseHas('audit_events', ['action' => 'content.page_ai_object_revision_generated']);
     }
 
     /** @param array<string,string> $values

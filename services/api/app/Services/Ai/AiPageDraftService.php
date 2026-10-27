@@ -262,6 +262,7 @@ PROMPT;
                         $edits[$key][$field] = Str::limit(trim(strip_tags($resultFields[$field])), 5000, '');
                     }
                 }
+                $edits = $this->normaliseObjectEdits($input['document'], $input['section'], $edits);
                 $response = ['edits' => $edits, 'provider' => $choice['provider'], 'model' => $choice['model_id'], 'fallback_used' => $index > 0];
                 DB::table('audit_events')->insert([
                     'id' => (string) Str::uuid(), 'actor_user_id' => $actor->id,
@@ -326,13 +327,62 @@ PROMPT;
         return $context;
     }
 
+    /**
+     * Run every proposed scoped edit through the same version-2 document boundary
+     * as a manual save, then return only the canonical selected fields for review.
+     *
+     * @param array<string,mixed> $document
+     * @param array<string,array<string,string>> $edits
+     * @return array<string,array<string,string>>
+     */
+    private function normaliseObjectEdits(array $document, int $sectionIndex, array $edits): array
+    {
+        foreach ($edits as $target => $fields) {
+            if (! preg_match('/^c(\d+)e(\d+)$/', $target, $matches)) {
+                throw new RuntimeException('invalid_object_revision');
+            }
+            $columnIndex = (int) $matches[1];
+            $elementIndex = (int) $matches[2];
+            $element =& $document['sections'][$sectionIndex]['columns'][$columnIndex]['elements'][$elementIndex];
+            if (! is_array($element) || ! is_array($element['content'] ?? null)) {
+                throw new RuntimeException('invalid_object_revision');
+            }
+            foreach ($fields as $field => $value) {
+                if (! is_string($field) || ! is_string($value) || ! array_key_exists($field, $element['content'])) {
+                    throw new RuntimeException('invalid_object_revision');
+                }
+                $element['content'][$field] = $value;
+            }
+            unset($element);
+        }
+
+        $features = FeatureSetting::query()->where('state', 'enabled')->pluck('key')->all();
+        $canonical = $this->documents->normalise($document, $features);
+        $normalisedEdits = [];
+        foreach ($edits as $target => $fields) {
+            preg_match('/^c(\d+)e(\d+)$/', $target, $matches);
+            $content = $canonical['sections'][$sectionIndex]['columns'][(int) $matches[1]]['elements'][(int) $matches[2]]['content'] ?? null;
+            if (! is_array($content)) {
+                throw new RuntimeException('invalid_object_revision');
+            }
+            foreach (array_keys($fields) as $field) {
+                if (! is_string($content[$field] ?? null)) {
+                    throw new RuntimeException('invalid_object_revision');
+                }
+                $normalisedEdits[$target][$field] = $content[$field];
+            }
+        }
+
+        return $normalisedEdits;
+    }
+
     /** @param array{brief:string,title:?string,public_details:?string} $input */
     private function userPrompt(array $input): string
     {
         $parts = ['Staff brief:', trim($input['brief'])];
         if (filled($input['title'] ?? null)) $parts[] = "Requested page title:\n".trim((string) $input['title']);
         if (filled($input['public_details'] ?? null)) $parts[] = "Public ministry details explicitly supplied for this draft:\n".trim((string) $input['public_details']);
-        $parts[] = 'Create a complete page plan with one hero, two to six useful sections, search title and description, and an optional closing call to action. Choose section kinds to fit the brief: story (heading and paragraph), split (image beside text), image (an image placeholder with a useful search hint and alt text), quote, list, or faq (up to three questions). Vary the composition where it helps the page; do not repeat headings and paragraphs for every section. Never invent image URLs, button destinations, facts, event details, or service times. Leave media URLs and button destinations empty for staff to choose.';
+        $parts[] = 'Create a complete page plan with one hero, two to six useful sections, search title and description, and an optional closing call to action. Choose section kinds to fit the brief: story (heading and paragraph), split (image beside text), image (an image placeholder with a useful search hint and alt text), quote, list, faq (up to three questions), or custom_code only when no approved native element can meet the stated design. A custom_code section must include accessible fallback text and use self-contained HTML, CSS, and JavaScript without external requests, forms, navigation, or sensitive data. Vary the composition where it helps the page; do not repeat headings and paragraphs for every section. Never invent image URLs, button destinations, facts, event details, or service times. Leave media URLs and button destinations empty for staff to choose.';
 
         return implode("\n\n", $parts);
     }
@@ -344,12 +394,13 @@ PROMPT;
         $section = [
             'type' => 'object',
             'properties' => [
-                'kind' => ['type' => 'string', 'enum' => ['story', 'split', 'image', 'quote', 'list', 'faq']],
+                'kind' => ['type' => 'string', 'enum' => ['story', 'split', 'image', 'quote', 'list', 'faq', 'custom_code']],
                 'heading' => $text, 'body' => $text, 'items' => $text,
                 'image_hint' => $text, 'image_alt' => $text, 'attribution' => $text,
                 'question_one' => $text, 'answer_one' => $text,
                 'question_two' => $text, 'answer_two' => $text,
                 'question_three' => $text, 'answer_three' => $text,
+                'html' => $text, 'css' => $text, 'javascript' => $text, 'fallback' => $text,
             ],
             'required' => ['kind', 'heading', 'body', 'items', 'image_hint', 'image_alt', 'attribution', 'question_one', 'answer_one', 'question_two', 'answer_two', 'question_three', 'answer_three'],
             'additionalProperties' => false,
@@ -393,15 +444,16 @@ PROMPT;
             throw new RuntimeException('incomplete_draft');
         }
         $proposal['sections'] = [];
-        $sectionLimits = ['heading' => 160, 'body' => 1800, 'items' => 1800, 'image_hint' => 240, 'image_alt' => 240, 'attribution' => 160, 'question_one' => 180, 'answer_one' => 800, 'question_two' => 180, 'answer_two' => 800, 'question_three' => 180, 'answer_three' => 800];
+        $sectionLimits = ['heading' => 160, 'body' => 1800, 'items' => 1800, 'image_hint' => 240, 'image_alt' => 240, 'attribution' => 160, 'question_one' => 180, 'answer_one' => 800, 'question_two' => 180, 'answer_two' => 800, 'question_three' => 180, 'answer_three' => 800, 'html' => 50000, 'css' => 50000, 'javascript' => 50000, 'fallback' => 500];
         foreach ($output['sections'] as $section) {
-            if (! is_array($section) || ! in_array($section['kind'] ?? null, ['story', 'split', 'image', 'quote', 'list', 'faq'], true)) {
+            if (! is_array($section) || ! in_array($section['kind'] ?? null, ['story', 'split', 'image', 'quote', 'list', 'faq', 'custom_code'], true)) {
                 throw new RuntimeException('invalid_draft_section');
             }
             $clean = ['kind' => $section['kind']];
             foreach ($sectionLimits as $key => $limit) {
-                if (! is_string($section[$key] ?? null)) throw new RuntimeException('invalid_draft_section');
-                $clean[$key] = Str::limit(trim(strip_tags($section[$key])), $limit, '');
+                if (! is_string($section[$key] ?? '') && ! in_array($key, ['html', 'css', 'javascript', 'fallback'], true)) throw new RuntimeException('invalid_draft_section');
+                $rawValue = (string) ($section[$key] ?? '');
+                $clean[$key] = Str::limit(trim(in_array($key, ['html', 'css', 'javascript'], true) ? $rawValue : strip_tags($rawValue)), $limit, '');
             }
             $kind = $clean['kind'];
             if (($kind === 'story' && ($clean['heading'] === '' || $clean['body'] === ''))
@@ -409,7 +461,8 @@ PROMPT;
                 || ($kind === 'image' && ($clean['image_alt'] === '' || $clean['image_hint'] === ''))
                 || ($kind === 'quote' && $clean['body'] === '')
                 || ($kind === 'list' && ($clean['heading'] === '' || $clean['items'] === ''))
-                || ($kind === 'faq' && ($clean['heading'] === '' || $clean['question_one'] === '' || $clean['answer_one'] === ''))) {
+                || ($kind === 'faq' && ($clean['heading'] === '' || $clean['question_one'] === '' || $clean['answer_one'] === ''))
+                || ($kind === 'custom_code' && ($clean['html'] === '' || $clean['fallback'] === ''))) {
                 throw new RuntimeException('incomplete_draft_section');
             }
             $proposal['sections'][] = $clean;
@@ -432,6 +485,7 @@ PROMPT;
                 'quote' => [['type' => 'quote', 'data' => ['text' => $section['body'], 'attribution' => $section['attribution']]]],
                 'list' => [['type' => 'list', 'data' => ['title' => $section['heading'], 'items' => $section['items'], 'ordered' => 'no']]],
                 'faq' => [['type' => 'accordion', 'data' => ['title' => $section['heading'], 'question_one' => $section['question_one'], 'answer_one' => $section['answer_one'], 'question_two' => $section['question_two'], 'answer_two' => $section['answer_two'], 'question_three' => $section['question_three'], 'answer_three' => $section['answer_three']]]],
+                'custom_code' => [['type' => 'custom_code', 'data' => ['html' => $section['html'], 'css' => $section['css'], 'javascript' => $section['javascript'], 'fallback' => $section['fallback']]]],
             }];
         }
         if ($proposal['call_to_action_title'] !== '' || $proposal['call_to_action_body'] !== '') {

@@ -1,5 +1,6 @@
 @php($content = $element['content'] ?? $element['data'] ?? [])
 @switch($element['type'] ?? '')
+    @case('custom_code')@case('html')@php($customSource = '<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; script-src \'unsafe-inline\'; img-src data:; media-src data:; connect-src \'none\'; form-action \'none\'; base-uri \'none\';"><style>'.($content['css'] ?? '').'</style></head><body>'.($content['html'] ?? '').'<script>'.str_ireplace('</script', '<\\/script', (string) ($content['javascript'] ?? '')).'</script></body></html>')<section class="public-page-custom-code"><iframe sandbox="allow-scripts" title="Custom page content" srcdoc="{{ $customSource }}"></iframe></section>@break
     @case('hero')<section class="public-page-hero"><small>{{ $content['eyebrow'] ?? '' }}</small><h1>{{ $content['title'] ?? '' }}</h1><p>{{ $content['body'] ?? '' }}</p>@if(!empty($content['button_label']) && !empty($content['button_url']))<a class="button" href="{{ $content['button_url'] }}">{{ $content['button_label'] }}</a>@endif</section>@break
     @case('heading')<section class="public-page-copy"><h2>{{ $content['text'] ?? '' }}</h2></section>@break
     @case('paragraph')<section class="public-page-copy"><p>{!! nl2br(e($content['text'] ?? '')) !!}</p></section>@break
@@ -8,6 +9,20 @@
     @case('feature_list')<section class="public-page-feature-list"><h2>{{ $content['title'] ?? '' }}</h2>@php($featureItems = array_slice(array_values(array_filter(preg_split('/\R/', (string) ($content['items'] ?? '')) ?: [])), 0, 12))<ul>@foreach($featureItems as $item)<li>{{ trim($item) }}</li>@endforeach</ul></section>@break
     @case('testimonial')<figure class="public-page-testimonial"><blockquote>“{{ $content['quote'] ?? '' }}”</blockquote><figcaption><strong>{{ $content['name'] ?? '' }}</strong>@if(!empty($content['role']))<span>{{ $content['role'] }}</span>@endif</figcaption></figure>@break
     @case('statistics')<section class="public-page-statistics"><h2>{{ $content['title'] ?? '' }}</h2><div>@foreach(['one','two','three'] as $slot)@if(!empty($content['stat_'.$slot.'_value']))<article><strong>{{ $content['stat_'.$slot.'_value'] }}</strong><span>{{ $content['stat_'.$slot.'_label'] ?? '' }}</span></article>@endif@endforeach</div></section>@break
+    @case('alert')<section class="public-page-alert public-page-alert-{{ in_array($content['tone'] ?? '', ['info', 'success', 'warning'], true) ? $content['tone'] : 'info' }}" role="note"><strong>{{ $content['title'] ?? '' }}</strong><p>{{ $content['body'] ?? '' }}</p></section>@break
+    @case('progress')@php($progressValue = min(100, max(0, (int) ($content['value'] ?? 0))))<section class="public-page-progress"><div><strong>{{ $content['title'] ?? '' }}</strong><span>{{ $content['label'] ?? '' }}</span></div><progress max="100" value="{{ $progressValue }}">{{ $progressValue }}%</progress><small>{{ $progressValue }}%</small></section>@break
+    @case('table')
+        @php
+            $tableHeaders = array_values(array_filter(array_map('trim', explode('|', (string) ($content['headers'] ?? '')))));
+            $tableRows = array_values(array_filter(preg_split('/\R/', (string) ($content['rows'] ?? '')) ?: []));
+        @endphp
+        <section class="public-page-table">
+            @if(!empty($content['title']))<h2>{{ $content['title'] }}</h2>@endif
+            @if($tableHeaders)
+                <div><table><thead><tr>@foreach($tableHeaders as $header)<th scope="col">{{ $header }}</th>@endforeach</tr></thead><tbody>@foreach($tableRows as $row)<tr>@foreach(explode('|', $row) as $cell)<td>{{ trim($cell) }}</td>@endforeach</tr>@endforeach</tbody></table></div>
+            @endif
+        </section>
+    @break
     @case('icon')@php($iconName = in_array($content['icon'] ?? '', ['heart', 'people', 'calendar', 'location', 'message', 'book', 'star', 'check', 'hand-heart', 'globe'], true) ? $content['icon'] : 'star')<div class="public-page-icon" aria-label="{{ $content['label'] ?? '' }}"><x-ui.icon :name="$iconName" :size="28"/><span>{{ $content['label'] ?? '' }}</span></div>@break
     @case('icon_box')@php($iconName = in_array($content['icon'] ?? '', ['heart', 'people', 'calendar', 'location', 'message', 'book', 'star', 'check', 'hand-heart', 'globe'], true) ? $content['icon'] : 'star')<section class="public-page-icon-box"><x-ui.icon :name="$iconName" :size="28"/><h2>{{ $content['title'] ?? '' }}</h2><p>{{ $content['body'] ?? '' }}</p>@if(!empty($content['button_label']) && !empty($content['button_url']))<a class="button" href="{{ $content['button_url'] }}">{{ $content['button_label'] }}</a>@endif</section>@break
     @case('icon_list')@php($iconItems = array_slice(array_values(array_filter(preg_split('/\R/', (string) ($content['items'] ?? '')) ?: [])), 0, 12))<section class="public-page-icon-list"><h2>{{ $content['title'] ?? '' }}</h2><ul>@foreach($iconItems as $item)<li><x-ui.icon name="check" :size="17"/><span>{{ trim($item) }}</span></li>@endforeach</ul></section>@break

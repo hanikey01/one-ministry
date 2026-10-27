@@ -60,4 +60,35 @@ class PagePublishingTest extends TestCase
         $this->getJson('/api/v1/staff/pages')->assertUnauthorized();
         $this->postJson('/api/v1/staff/pages', ['title' => 'About', 'slug' => 'about'])->assertUnauthorized();
     }
+
+    public function test_publishing_rejects_a_standalone_button_without_a_destination(): void
+    {
+        $admin = app(InstallMinistry::class)->execute([
+            'name' => 'Hope Community', 'domain' => 'hope.example.org', 'timezone' => 'Africa/Lagos',
+            'location' => 'Main Campus', 'admin_name' => 'Ada Admin', 'admin_email' => 'ada@example.org',
+            'password' => 'long-private-password',
+        ]);
+        $admin->forceFill(['email_verified_at' => now()])->save();
+        DB::table('mfa_credentials')->insert([
+            'user_id' => $admin->id, 'secret' => Crypt::encryptString('JBSWY3DPEHPK3PXP'),
+            'recovery_code_hashes' => '[]', 'enabled_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->actingAs($admin)->withSession(['mfa_verified_at' => now()->timestamp]);
+
+        $id = $this->postJson('/api/v1/staff/pages', ['title' => 'About us', 'slug' => 'about-us', 'body' => 'Welcome.'])
+            ->assertCreated()->json('data.id');
+        DB::table('pages')->where('id', $id)->update(['blocks' => json_encode([
+            'version' => 2,
+            'sections' => [[
+                'id' => 'section-main', 'type' => 'section', 'settings' => [], 'responsive' => [],
+                'columns' => [[
+                    'id' => 'column-main', 'settings' => [], 'responsive' => [],
+                    'elements' => [['id' => 'button-main', 'type' => 'button', 'content' => ['label' => 'Learn more', 'url' => ''], 'settings' => [], 'responsive' => []]],
+                ]],
+            ]],
+        ])]);
+
+        $this->post("/staff/pages/{$id}/publish")->assertSessionHasErrors('blocks');
+        $this->assertDatabaseHas('pages', ['id' => $id, 'status' => 'draft']);
+    }
 }

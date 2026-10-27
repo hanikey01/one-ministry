@@ -17,8 +17,9 @@ final class PageDocumentService
     /** @var array<string, array<int, string>> */
     private const ELEMENT_FIELDS = [
         'hero' => ['eyebrow', 'title', 'body', 'button_label', 'button_url'],
-        'heading' => ['text'], 'paragraph' => ['text'], 'button' => ['label', 'url'], 'feature_list' => ['title', 'items'], 'testimonial' => ['quote', 'name', 'role'], 'statistics' => ['title', 'stat_one_value', 'stat_one_label', 'stat_two_value', 'stat_two_label', 'stat_three_value', 'stat_three_label'], 'image' => ['url', 'alt', 'caption', 'image_hint'],
-        'rich_text' => ['title', 'text'], 'icon' => ['icon', 'label'], 'icon_box' => ['icon', 'title', 'body', 'button_label', 'button_url'], 'icon_list' => ['title', 'items'], 'image_card' => ['url', 'alt', 'title', 'body', 'button_label', 'button_url'], 'tabs' => ['title', 'tab_one_label', 'tab_one_content', 'tab_two_label', 'tab_two_content', 'tab_three_label', 'tab_three_content'], 'social_links' => ['title', 'facebook_url', 'instagram_url', 'youtube_url'],
+        'html' => ['html', 'css', 'javascript'], 'custom_code' => ['html', 'css', 'javascript'],
+        'heading' => ['text'], 'paragraph' => ['text'], 'rich_text' => ['title', 'text'], 'button' => ['label', 'url'], 'feature_list' => ['title', 'items'], 'testimonial' => ['quote', 'name', 'role'], 'statistics' => ['title', 'stat_one_value', 'stat_one_label', 'stat_two_value', 'stat_two_label', 'stat_three_value', 'stat_three_label'], 'alert' => ['tone', 'title', 'body'], 'progress' => ['title', 'label', 'value'], 'table' => ['title', 'headers', 'rows'], 'image' => ['url', 'alt', 'caption', 'image_hint'],
+        'icon' => ['icon', 'label'], 'icon_box' => ['icon', 'title', 'body', 'button_label', 'button_url'], 'icon_list' => ['title', 'items'], 'image_card' => ['url', 'alt', 'title', 'body', 'button_label', 'button_url'], 'tabs' => ['title', 'tab_one_label', 'tab_one_content', 'tab_two_label', 'tab_two_content', 'tab_three_label', 'tab_three_content'], 'social_links' => ['title', 'facebook_url', 'instagram_url', 'youtube_url'],
         'contact_form' => ['title', 'body', 'submit_label'], 'map_directions' => ['title', 'address', 'directions_url', 'button_label'],
         'gallery' => ['images', 'columns', 'caption'], 'video_embed' => ['url', 'title', 'caption'],
         'audio' => ['url', 'title', 'caption'], 'file' => ['url', 'label', 'description'],
@@ -115,7 +116,7 @@ final class PageDocumentService
     private function content(string $type, mixed $content): array
     {
         if (! is_array($content)) $this->invalid('Element content must be an object.'); $result = [];
-        foreach (self::ELEMENT_FIELDS[$type] as $key) { $value = $content[$key] ?? ''; if (! is_scalar($value)) $this->invalid('Element fields must contain plain text.'); $result[$key] = Str::limit(trim((string) $value), in_array($key, ['body', 'text', 'items', 'images'], true) ? 12000 : 500, ''); }
+        foreach (self::ELEMENT_FIELDS[$type] as $key) { $value = $content[$key] ?? ''; if (! is_scalar($value)) $this->invalid('Element fields must contain plain text.'); $limit = $type === 'custom_code' ? 50000 : (in_array($key, ['body', 'text', 'items', 'images'], true) ? 12000 : 500); $result[$key] = Str::limit(trim((string) $value), $limit, ''); }
         $this->validateContent($type, $result); return $result;
     }
     private function validateContent(string $type, array $content): void
@@ -126,6 +127,9 @@ final class PageDocumentService
         if ($type === 'video_embed' && ($content['url'] ?? '') !== '' && ! $this->isSupportedVideoUrl($content['url'])) $this->invalid('Video embeds support YouTube, Vimeo, or a published ministry video.');
         if ($type === 'gallery') { $images = array_values(array_filter(preg_split('/\R/', $content['images']) ?: [])); if (count($images) > 12 || collect($images)->contains(fn ($url) => ! preg_match('#^https?://#i', trim($url)))) $this->invalid('A gallery accepts up to 12 HTTP or HTTPS image links.'); if (! in_array($content['columns'], ['two', 'three', 'four'], true)) $this->invalid('Choose a valid gallery column layout.'); }
         if ($type === 'media_text' && ! in_array($content['placement'], ['left', 'right'], true)) $this->invalid('Choose a valid media placement.'); if ($type === 'list' && ! in_array($content['ordered'], ['yes', 'no'], true)) $this->invalid('Choose a valid list style.'); if ($type === 'spacer' && ! in_array($content['height'], ['small', 'medium', 'large'], true)) $this->invalid('Choose a valid spacer height.');
+        if ($type === 'alert' && ! in_array($content['tone'], ['info', 'success', 'warning'], true)) $this->invalid('Choose a valid alert tone.');
+        if ($type === 'progress' && (! ctype_digit($content['value']) || (int) $content['value'] > 100)) $this->invalid('Progress must be a whole number from 0 to 100.');
+        if ($type === 'table') { $headers = array_values(array_filter(array_map('trim', explode('|', $content['headers'])))); $rows = array_values(array_filter(preg_split('/\R/', $content['rows']) ?: [])); if (count($headers) < 2 || count($headers) > 6 || count($rows) > 20 || collect($rows)->contains(fn (string $row): bool => count(explode('|', $row)) !== count($headers))) $this->invalid('A table needs two to six headers and up to 20 rows with matching columns.'); }
         if (in_array($type, ['icon', 'icon_box'], true) && ! in_array($content['icon'], ['heart', 'people', 'calendar', 'location', 'message', 'book', 'star', 'check', 'hand-heart', 'globe'], true)) $this->invalid('Choose an approved icon.');
     }
 
@@ -138,18 +142,34 @@ final class PageDocumentService
     {
         if (! is_array($settings)) $this->invalid('Page settings must be an object.'); $result = [];
         foreach ($settings as $key => $value) {
-            if (! is_string($key) || ! preg_match('/^[a-zA-Z][a-zA-Z0-9_-]{0,79}$/', $key) || ! is_scalar($value)) $this->invalid('Page settings must contain named scalar values.');
+            if (! is_string($key) || ! preg_match('/^[a-zA-Z][a-zA-Z0-9_-]{0,79}$/', $key)) $this->invalid('Page settings must contain named scalar values.');
             $key = Str::snake($key);
-            if (in_array($key, ['css', 'style', 'stylesheet', 'html', 'script', 'javascript', 'custom_css', 'custom_html'], true)) $this->invalid('Arbitrary markup, scripts, and styles are not allowed in page settings.');
-            $value = Str::limit(trim((string) $value), $max, '');
+            if (in_array($key, ['padding', 'margin'], true) && is_array($value)) {
+                $normalisedBox = [];
+                foreach (['top', 'right', 'bottom', 'left'] as $side) {
+                    $sideValue = $value[$side] ?? '';
+                    if (! is_string($sideValue) || ($sideValue !== '' && ! preg_match('/^-?(?:\d+(?:\.\d+)?)(?:px|%|em|rem|vw|vh)$/', trim($sideValue))) || ($key === 'padding' && str_starts_with(trim($sideValue), '-'))) $this->invalid('Spacing values must use px, %, em, rem, vw, or vh units.');
+                    $normalisedBox[$side] = trim($sideValue);
+                }
+                $result[$key] = $normalisedBox;
+                continue;
+            }
+            if (! is_scalar($value)) $this->invalid('Page settings must contain named scalar values.');
+            if (in_array($key, ['css', 'style', 'stylesheet', 'html', 'script', 'javascript', 'custom_html'], true)) $this->invalid('Arbitrary markup, scripts, and styles are not allowed in page settings.');
+            $value = Str::limit(trim((string) $value), in_array($key, ['custom_css', 'custom_js'], true) ? 50000 : $max, '');
+            if ($key === 'custom_id' && $value !== '' && ! preg_match('/^[A-Za-z][A-Za-z0-9_-]{0,79}$/', $value)) $this->invalid('Custom CSS IDs must start with a letter and contain only letters, numbers, hyphens, or underscores.');
+            if ($key === 'custom_class' && $value !== '' && ! preg_match('/^[A-Za-z][A-Za-z0-9_-]*(?:\s+[A-Za-z][A-Za-z0-9_-]*)*$/', $value)) $this->invalid('Custom CSS classes must contain only safe class names separated by spaces.');
             if (in_array($key, ['background_color', 'border_color', 'overlay_color'], true) && $value !== '' && ! preg_match('/^(?:#[0-9a-fA-F]{6}|canvas|surface|surface_muted|action|brand)$/', $value)) $this->invalid('Page colours must use an approved theme token or six-digit hex value.');
+            if (in_array($key, ['border_width', 'radius_top_left', 'radius_top_right', 'radius_bottom_right', 'radius_bottom_left', 'shadow_x', 'shadow_y', 'shadow_blur', 'shadow_spread'], true) && $value !== '' && ! preg_match('/^(?:0|\d+(?:\.\d+)?)(?:px|%|em|rem|vw|vh)$/', $value)) $this->invalid('Style dimensions must use px, %, em, rem, vw, or vh units.');
             $allowedSettings = [
                 'background' => ['transparent', 'canvas', 'surface', 'surface_muted', 'action', 'brand'],
                 'background_overlay' => ['none', 'soft', 'strong'],
                 'border' => ['none', 'subtle', 'strong'],
                 'radius' => ['none', 'small', 'medium', 'large'],
                 'shadow' => ['none', 'small', 'medium'],
+                'overflow' => ['visible', 'hidden'],
                 'grid_preset' => ['one', 'two', 'three', 'four'],
+                'border_style' => ['none', 'solid', 'dashed', 'dotted'],
             ];
             if (isset($allowedSettings[$key]) && ! in_array($value, $allowedSettings[$key], true)) $this->invalid('Choose an approved page appearance setting.');
             if ($key === 'background_image' && $value !== '' && ! filter_var($value, FILTER_VALIDATE_URL)) $this->invalid('Choose a valid background image URL.');
@@ -166,6 +186,7 @@ final class PageDocumentService
             'column_count' => ['1', '2', '3', '4'],
             'stack' => ['inline', 'stack'],
             'padding' => ['compact', 'regular', 'spacious'],
+            'margin' => ['none', 'compact', 'regular', 'spacious'],
             'column_gap' => ['compact', 'regular', 'spacious'],
             'width' => ['full', 'half', 'third'],
             'order' => ['1', '2', '3', '4'],

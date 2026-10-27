@@ -140,11 +140,12 @@ Selecting a column opens the column settings panel without opening the section s
 
 Elements are placed inside columns. The first supported groups are:
 
-- Text: heading, paragraph, quote, list, accordion, feature list, testimonial, and statistics.
+- Text: heading, paragraph, rich text, quote, list, accordion, tabs, feature list, testimonial, statistics, alert/callout, progress, and accessible table.
 - Actions: standalone button and call to action.
 - Media: image, gallery, video, audio, file download, media and text.
 - Ministry content: events, service times, groups, locations, giving, prayer, next steps, announcements, volunteer, sermon spotlight, books, newsletter, and welcome.
 - Feature content: a native carousel with staff-provided slides and an explicit content card.
+- Advanced content: a distinct HTML widget plus a custom-code element with bounded HTML, CSS, and JavaScript. Their code runs only in the documented opaque-origin sandbox, never in the ministry application document. Every ordinary element may also carry bounded element-scoped Custom CSS and Custom JavaScript in Advanced.
 - Layout helpers: divider, spacer, and one-, two-, three-, or four-column grid presets.
 
 Each element owns its content, accessibility fields, visibility, alignment, spacing, and approved style settings. An element cannot change its parent section or column settings through its own content form.
@@ -236,7 +237,7 @@ The server validates the complete document recursively:
 - Element/media type compatibility.
 - Safe internal and HTTP(S) destinations.
 - Module and permission availability.
-- No arbitrary markup, scripts, stylesheets, or unsafe URLs.
+- No arbitrary markup, scripts, stylesheets, or unsafe URLs outside the bounded `custom_code` element. That element renders only in an opaque-origin sandboxed iframe with a restrictive CSP; it cannot access the parent document, staff sessions, forms, navigation, popups, or network connections.
 
 Disabled modules remain hidden and server-blocked even if a stale document contains their elements.
 

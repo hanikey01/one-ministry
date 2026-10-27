@@ -184,7 +184,8 @@ class PageWorkspaceController extends Controller
                 ) {
                 throw ValidationException::withMessages(['blocks' => 'Choose an image for every image section, or remove sections you do not need.']);
             }
-            if (in_array($block['type'], ['hero', 'call_to_action', 'media_text', 'carousel', 'live_service', 'locations', 'giving', 'prayer', 'sermon_spotlight', 'books', 'announcements', 'volunteer', 'newsletter', 'next_steps', 'welcome', 'custom'], true) && filled($data['button_label'] ?? '') && blank($data['button_url'] ?? '')) {
+            if ((filled($data['button_label'] ?? '') && blank($data['button_url'] ?? ''))
+                || (filled($data['label'] ?? '') && $block['type'] === 'button' && blank($data['url'] ?? ''))) {
                 throw ValidationException::withMessages(['blocks' => 'Choose a destination for every button, or remove its label before publishing.']);
             }
         }
