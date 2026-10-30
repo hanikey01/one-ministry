@@ -85,58 +85,8 @@ const initializePage = (force = false) => {
         setLibraryOpen(false);
     });
     const canvasWrap = document.querySelector('.page-block-canvas-wrap');
-    const canvas = canvasWrap?.querySelector('[data-canvas]');
-    if (canvas && !canvas.dataset.preview) canvas.dataset.preview = 'desktop';
-    if (canvasWrap && !canvasWrap.dataset.preview) canvasWrap.dataset.preview = canvas?.dataset.preview || 'desktop';
-    let canvasStage = canvasWrap?.querySelector('.page-block-canvas-stage');
-    if (canvas && !canvasStage) {
-        canvasStage = document.createElement('div');
-        canvasStage.className = 'page-block-canvas-stage';
-        canvas.before(canvasStage);
-        canvasStage.append(canvas);
-    }
-    if (canvasWrap && canvas && canvasStage) {
-        const syncCanvasPreview = () => {
-            const targetWidth = { desktop: 1180, tablet: 768 }[canvas.dataset.preview] || 0;
-            const scale = targetWidth ? Math.min(1, canvasWrap.clientWidth / targetWidth) : 1;
-            const scaled = scale < .999;
-            canvasWrap.classList.toggle('is-scaled-preview', scaled);
-            if (!scaled) {
-                canvasWrap.style.removeProperty('--canvas-preview-scale');
-                canvasStage.style.removeProperty('height');
-                return;
-            }
-            canvasWrap.style.setProperty('--canvas-preview-scale', String(scale));
-            canvasStage.style.height = `${Math.ceil(canvas.scrollHeight * scale)}px`;
-        };
-        const scheduleCanvasPreviewSync = () => window.requestAnimationFrame(syncCanvasPreview);
-        const canvasResizeObserver = new ResizeObserver(scheduleCanvasPreviewSync);
-        const canvasPreviewObserver = new MutationObserver(scheduleCanvasPreviewSync);
-        canvasResizeObserver.observe(canvas);
-        canvasPreviewObserver.observe(canvas, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'data-preview'] });
-        addPageListener(window, 'resize', scheduleCanvasPreviewSync);
-        pageCleanups.push(() => { canvasResizeObserver.disconnect(); canvasPreviewObserver.disconnect(); });
-        scheduleCanvasPreviewSync();
-    }
     const floatingLibraryOpen = document.querySelector('.page-block-library-trigger');
     if (canvasWrap && floatingLibraryOpen && floatingLibraryOpen.parentElement !== canvasWrap) canvasWrap.prepend(floatingLibraryOpen);
-    if (canvasWrap && canvas && !canvasWrap.querySelector('[data-canvas-toolbar]')) {
-        const toolbar = document.createElement('header');
-        toolbar.className = 'page-canvas-header';
-        toolbar.dataset.canvasToolbar = '';
-        toolbar.innerHTML = '<div><p>PAGE CANVAS</p><strong>Responsive layout</strong></div><div class="page-canvas-toolbar" role="group" aria-label="Canvas preview size"><button type="button" data-canvas-size="desktop" class="is-active" aria-pressed="true" aria-label="Desktop canvas" title="Desktop canvas"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="1.5"></rect><path d="M8 20h8M12 17v3"></path></svg></button><button type="button" data-canvas-size="tablet" aria-pressed="false" aria-label="Tablet canvas" title="Tablet canvas"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="2"></rect><path d="M10 18h4"></path></svg></button><button type="button" data-canvas-size="mobile" aria-pressed="false" aria-label="Mobile canvas" title="Mobile canvas"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3" width="8" height="18" rx="2"></rect><path d="M11 18h2"></path></svg></button></div>';
-        canvasWrap.prepend(toolbar);
-        toolbar.querySelectorAll('[data-canvas-size]').forEach((button) => addPageListener(button, 'click', () => {
-            const size = button.dataset.canvasSize;
-            toolbar.querySelectorAll('[data-canvas-size]').forEach((item) => {
-                const active = item === button;
-                item.classList.toggle('is-active', active);
-                item.setAttribute('aria-pressed', active ? 'true' : 'false');
-            });
-            canvas.dataset.preview = size;
-            canvasWrap.dataset.preview = size;
-        }));
-    }
 document.querySelectorAll('[data-zoom-meeting]').forEach((room) => {
     const joinButton = room.querySelector('[data-zoom-join]');
     const status = room.querySelector('[data-zoom-status]');
@@ -285,48 +235,6 @@ document.querySelectorAll('[data-zoom-meeting]').forEach((room) => {
     }
 });
 
-document.querySelectorAll('[data-public-shell]').forEach((shell) => {
-    const menuButton = shell.querySelector('[data-public-menu]');
-    const publicNavigation = shell.querySelector('[data-public-navigation]');
-    const publicSidebar = shell.querySelector('[data-public-sidebar]');
-    const backdrop = shell.querySelector('.workspace-backdrop');
-    const closers = shell.querySelectorAll('[data-public-close]');
-    const themeToggle = shell.querySelector('[data-public-theme-toggle]');
-    const storageKey = 'ministry-theme';
-    const legacyStorageKey = 'ministry-public-theme';
-    const setNavigation = (open) => {
-        shell.classList.toggle('navigation-open', open);
-        publicSidebar?.classList.toggle('is-open', open);
-        backdrop?.classList.toggle('is-open', open);
-        menuButton?.setAttribute('aria-expanded', String(open));
-    };
-
-    menuButton?.addEventListener('click', () => setNavigation(!shell.classList.contains('navigation-open')));
-    closers.forEach((button) => button.addEventListener('click', () => setNavigation(false)));
-    publicNavigation?.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => setNavigation(false)));
-    addPageListener(window, 'keydown', (event) => { if (event.key === 'Escape') setNavigation(false); });
-
-    const setTheme = (theme) => {
-        const dark = theme === 'dark';
-        window.applyMinistryTheme?.(dark ? 'dark' : 'light');
-        shell.classList.toggle('public-theme-dark', dark);
-        themeToggle?.setAttribute('aria-pressed', String(dark));
-        themeToggle?.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
-        const label = themeToggle?.querySelector('.workspace-theme-label');
-        if (label) label.textContent = dark ? 'Dark' : 'Light';
-    };
-
-    const savedTheme = window.localStorage.getItem(storageKey) ?? window.localStorage.getItem(legacyStorageKey);
-    if (savedTheme) window.localStorage.setItem(storageKey, savedTheme);
-    setTheme(savedTheme === 'dark' ? 'dark' : 'light');
-    themeToggle?.addEventListener('click', () => {
-        const theme = shell.classList.contains('public-theme-dark') ? 'light' : 'dark';
-        window.localStorage.setItem(storageKey, theme);
-        setTheme(theme);
-    });
-    addPageListener(window, 'storage', (event) => { if (event.key === storageKey) setTheme(event.newValue === 'dark' ? 'dark' : 'light'); });
-});
-
 document.querySelectorAll('[data-worship-shell]').forEach((shell) => {
     const toggle = shell.querySelector('[data-worship-theme-toggle]');
     if (!toggle) return;
@@ -456,6 +364,13 @@ document.querySelectorAll('[data-workspace-shell]').forEach((shell) => {
         dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
         dialog.querySelectorAll('[data-service-edit-close]').forEach((button) => button.addEventListener('click', () => dialog.close()));
     });
+    shell.querySelectorAll('[data-workspace-dialog-open]').forEach((trigger) => {
+        trigger.addEventListener('click', () => document.getElementById(trigger.dataset.workspaceDialogOpen)?.showModal());
+    });
+    shell.querySelectorAll('[data-workspace-dialog]').forEach((dialog) => {
+        dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+        dialog.querySelectorAll('[data-workspace-dialog-close]').forEach((button) => button.addEventListener('click', () => dialog.close()));
+    });
     shell.querySelectorAll('.workspace-content .data-panel').forEach((panel) => {
         if (panel.matches('.module-panel, .service-schedule-panel, .security-sessions-panel, .responsive-records')) return;
         const table = panel.querySelector('table');
@@ -468,19 +383,6 @@ document.querySelectorAll('[data-workspace-shell]').forEach((shell) => {
             cells.forEach((cell, index) => cell.dataset.label = labels[index] || `Details ${index + 1}`);
         });
     });
-});
-
-document.querySelectorAll('[name="birthday_collection_consent"]').forEach((consent) => {
-    const form = consent.closest('form');
-    const birthdayControls = form?.querySelectorAll('[name="birthday_month"], [name="birthday_day"], [name="birthday_staff_reminder"], [name="birthday_public_recognition"]') ?? [];
-    const syncBirthdayControls = () => {
-        birthdayControls.forEach((control) => {
-            control.disabled = !consent.checked;
-            control.closest('.member-preference')?.classList.toggle('is-disabled', !consent.checked);
-        });
-    };
-    syncBirthdayControls();
-    consent.addEventListener('change', syncBirthdayControls);
 });
 
 const setupWizard = document.querySelector('[data-setup-wizard]');
@@ -865,6 +767,148 @@ document.querySelectorAll('[data-page-block-editor]').forEach((form) => {
     let timer;
     let requestId = 0;
     let activeRequest;
+    let selectedTarget;
+    const installCanvasEditing = () => {
+        const canvasDocument = frame.contentDocument;
+        if (!canvasDocument) return;
+        const style = canvasDocument.createElement('style');
+        style.textContent = `
+            [data-page-editor-object] { cursor: pointer; }
+            [data-page-editor-object]:hover { outline: 2px solid color-mix(in srgb, var(--action) 55%, transparent); outline-offset: -2px; }
+            [data-page-editor-selected] { outline: 3px solid var(--action) !important; outline-offset: -3px !important; }
+            [data-page-editor-object]:focus-visible { outline: 3px solid var(--action); outline-offset: -3px; }
+            .page-editor-canvas-tools { position: absolute; z-index: 2147483000; display: flex; gap: 3px; padding: 4px; border-radius: 9px; background: var(--action); box-shadow: 0 8px 22px rgb(0 0 0 / 18%); }
+            .page-editor-canvas-tools button { display: grid; width: 32px; height: 32px; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--action-foreground); font: inherit; font-weight: 800; cursor: pointer; }
+            .page-editor-canvas-tools button:hover, .page-editor-canvas-tools button:focus-visible { background: color-mix(in srgb, var(--surface) 20%, transparent); outline: none; }
+        `;
+        canvasDocument.head.append(style);
+        const tools = canvasDocument.createElement('div');
+        tools.className = 'page-editor-canvas-tools';
+        tools.hidden = true;
+        tools.innerHTML = '<button type="button" data-canvas-action="move-up" aria-label="Move up" title="Move up">↑</button><button type="button" data-canvas-action="move-down" aria-label="Move down" title="Move down">↓</button><button type="button" data-canvas-action="duplicate" aria-label="Duplicate" title="Duplicate">⧉</button><button type="button" data-canvas-action="delete" aria-label="Delete" title="Delete">×</button>';
+        canvasDocument.body.append(tools);
+        canvasDocument.querySelectorAll('.public-page-structured-section').forEach((section, sectionIndex) => {
+            section.dataset.pageEditorObject = 'section';
+            section.dataset.pageEditorSection = String(sectionIndex);
+            section.tabIndex = 0;
+            section.querySelectorAll(':scope > .public-page-structured-columns > .public-page-structured-column').forEach((column, columnIndex) => {
+                column.dataset.pageEditorObject = 'column';
+                column.dataset.pageEditorSection = String(sectionIndex);
+                column.dataset.pageEditorColumn = String(columnIndex);
+                column.tabIndex = 0;
+                column.querySelectorAll(':scope > .public-page-element').forEach((element, elementIndex) => {
+                    element.dataset.pageEditorObject = 'element';
+                    element.dataset.pageEditorSection = String(sectionIndex);
+                    element.dataset.pageEditorColumn = String(columnIndex);
+                    element.dataset.pageEditorElement = String(elementIndex);
+                    element.tabIndex = 0;
+                    element.draggable = true;
+                });
+            });
+        });
+        const currentSelection = window.oneMinistryPageEditor?.selected;
+        if (currentSelection) {
+            const selector = `[data-page-editor-object="${currentSelection.kind}"][data-page-editor-section="${currentSelection.section}"]${currentSelection.kind !== 'section' ? `[data-page-editor-column="${currentSelection.column}"]` : ''}${currentSelection.kind === 'element' ? `[data-page-editor-element="${currentSelection.element}"]` : ''}`;
+            selectedTarget = canvasDocument.querySelector(selector);
+            selectedTarget?.setAttribute('data-page-editor-selected', '');
+        }
+        const selectCanvasObject = (target) => {
+            if (!target) return;
+            selectedTarget?.removeAttribute('data-page-editor-selected');
+            selectedTarget = target;
+            selectedTarget.setAttribute('data-page-editor-selected', '');
+            const rect = target.getBoundingClientRect();
+            tools.hidden = false;
+            tools.style.left = `${Math.max(8, rect.left + canvasDocument.defaultView.scrollX)}px`;
+            tools.style.top = `${Math.max(8, rect.top + canvasDocument.defaultView.scrollY - 42)}px`;
+            window.oneMinistryPageEditor?.select?.(
+                target.dataset.pageEditorObject,
+                Number(target.dataset.pageEditorSection || 0),
+                Number(target.dataset.pageEditorColumn || 0),
+                Number(target.dataset.pageEditorElement || 0),
+            );
+        };
+        tools.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-canvas-action]');
+            if (!button) return;
+            event.preventDefault();
+            event.stopPropagation();
+            window.oneMinistryPageEditor?.action?.(button.dataset.canvasAction);
+        });
+        canvasDocument.addEventListener('click', (event) => {
+            const target = event.target.closest('[data-page-editor-object]');
+            if (!target) return;
+            event.preventDefault();
+            event.stopPropagation();
+            selectCanvasObject(target);
+        }, true);
+        canvasDocument.addEventListener('keydown', (event) => {
+            if (!['Enter', ' '].includes(event.key)) return;
+            const target = event.target.closest('[data-page-editor-object]');
+            if (!target) return;
+            event.preventDefault();
+            selectCanvasObject(target);
+        });
+        const inlineField = (element, target) => {
+            const model = window.oneMinistryPageEditor?.document?.sections?.[Number(element.dataset.pageEditorSection)]?.columns?.[Number(element.dataset.pageEditorColumn)]?.elements?.[Number(element.dataset.pageEditorElement)];
+            if (!model) return null;
+            const tag = target.tagName.toLowerCase();
+            if (model.type === 'heading' && /^h[1-6]$/.test(tag)) return 'text';
+            if (model.type === 'paragraph' && tag === 'p') return 'text';
+            if (model.type === 'button' && ['a', 'button'].includes(tag)) return 'label';
+            if (model.type === 'quote' && tag === 'blockquote') return 'text';
+            if (/^h[1-6]$/.test(tag) && Object.hasOwn(model.content || {}, 'title')) return 'title';
+            if (tag === 'p' && Object.hasOwn(model.content || {}, 'body')) return 'body';
+            if (['a', 'button'].includes(tag) && Object.hasOwn(model.content || {}, 'button_label')) return 'button_label';
+            return null;
+        };
+        canvasDocument.addEventListener('dblclick', (event) => {
+            const element = event.target.closest('[data-page-editor-object="element"]');
+            const field = element ? inlineField(element, event.target) : null;
+            if (!element || !field) return;
+            event.preventDefault();
+            event.stopPropagation();
+            event.target.contentEditable = 'true';
+            event.target.focus();
+            const range = canvasDocument.createRange();
+            range.selectNodeContents(event.target);
+            const selection = frame.contentWindow?.getSelection();
+            selection?.removeAllRanges();
+            selection?.addRange(range);
+            event.target.addEventListener('blur', () => {
+                event.target.contentEditable = 'false';
+                window.oneMinistryPageEditor?.updateInline?.(
+                    Number(element.dataset.pageEditorSection),
+                    Number(element.dataset.pageEditorColumn),
+                    Number(element.dataset.pageEditorElement),
+                    field,
+                    event.target.textContent.trim(),
+                );
+            }, { once: true });
+        }, true);
+        let dragged;
+        canvasDocument.addEventListener('dragstart', (event) => {
+            dragged = event.target.closest('[data-page-editor-object="element"]');
+            if (!dragged) event.preventDefault();
+        });
+        canvasDocument.addEventListener('dragover', (event) => {
+            if (dragged && event.target.closest('[data-page-editor-object="element"]')) event.preventDefault();
+        });
+        canvasDocument.addEventListener('drop', (event) => {
+            const destination = event.target.closest('[data-page-editor-object="element"]');
+            if (!dragged || !destination || dragged === destination) return;
+            event.preventDefault();
+            window.oneMinistryPageEditor?.moveElement?.(
+                Number(dragged.dataset.pageEditorSection),
+                Number(dragged.dataset.pageEditorColumn),
+                Number(dragged.dataset.pageEditorElement),
+                Number(destination.dataset.pageEditorSection),
+                Number(destination.dataset.pageEditorColumn),
+                Number(destination.dataset.pageEditorElement),
+            );
+            dragged = null;
+        });
+    };
     const renderPublicPreview = async () => {
         const currentRequest = ++requestId;
         activeRequest?.abort();
@@ -885,9 +929,11 @@ document.querySelectorAll('[data-page-block-editor]').forEach((form) => {
             const html = await response.text();
             if (currentRequest !== requestId) return;
             const previewDocument = new DOMParser().parseFromString(html, 'text/html');
-            previewDocument.querySelectorAll('script').forEach((script) => script.remove());
             frame.srcdoc = `<!doctype html>${previewDocument.documentElement.outerHTML}`;
-            status.textContent = 'Preview matches the public page design.';
+            frame.addEventListener('load', () => {
+                installCanvasEditing();
+                status.textContent = 'Canvas is live. Select any section, column or element to edit it.';
+            }, { once: true });
         } catch (error) {
             if (error instanceof DOMException && error.name === 'AbortError') return;
             status.textContent = error instanceof Error ? error.message : 'The public preview could not be updated.';
@@ -907,10 +953,16 @@ document.querySelectorAll('[data-page-block-editor]').forEach((form) => {
     });
     form.addEventListener('ai-page-draft', schedulePreview);
     form.addEventListener('ai-section-revision', schedulePreview);
-    form.querySelectorAll('[data-preview]').forEach((button) => button.addEventListener('click', () => {
-        frame.dataset.preview = button.dataset.preview;
+    form.addEventListener('page-editor-document-change', schedulePreview);
+    form.querySelectorAll('[data-public-preview-size]').forEach((button) => button.addEventListener('click', () => {
+        frame.dataset.preview = button.dataset.publicPreviewSize;
+        form.querySelectorAll('[data-public-preview-size]').forEach((item) => {
+            const active = item === button;
+            item.classList.toggle('is-active', active);
+            item.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
     }));
-    schedulePreview();
+    renderPublicPreview();
 });
 
 const initializeEnhancedSelects = (root = document) => {
@@ -932,7 +984,7 @@ enhancedSelects.forEach((select) => {
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', 'm6 9 6 6 6-6'); path.setAttribute('stroke-linecap', 'round'); path.setAttribute('stroke-linejoin', 'round'); chevron.append(path);
     trigger.append(text, chevron);
     const options = document.createElement('div');
-    options.className = 'enhanced-select-options'; options.hidden = true;
+    options.className = `enhanced-select-options${select.closest('.school-form') ? ' course-select-options' : ''}`; options.hidden = true;
     const optionList = document.createElement('div');
     optionList.id = `enhanced-select-${index}`;
     optionList.setAttribute('role', 'listbox');
@@ -953,7 +1005,7 @@ enhancedSelects.forEach((select) => {
         searchInput = document.createElement('input');
         searchInput.type = 'search';
         searchInput.autocomplete = 'off';
-        searchInput.placeholder = 'Search by provider, model name, or ID';
+        searchInput.placeholder = 'Search options';
         searchInput.setAttribute('aria-label', `Search ${select.closest('label')?.childNodes[0]?.textContent?.trim() || 'models'}`);
         searchInput.setAttribute('aria-controls', optionList.id);
         searchCount = document.createElement('span');
@@ -962,7 +1014,7 @@ enhancedSelects.forEach((select) => {
         searchPanel.append(searchInput, searchCount);
         noResults = document.createElement('p');
         noResults.className = 'enhanced-select-no-results';
-        noResults.textContent = 'No models match. Try another search.';
+        noResults.textContent = 'No options match. Try another search.';
         noResults.setAttribute('role', 'status');
         noResults.hidden = true;
         options.append(searchPanel, noResults);
@@ -986,7 +1038,7 @@ enhancedSelects.forEach((select) => {
             choice.hidden = !matches;
             return count + Number(matches && !choice.disabled);
         }, 0);
-        if (!remoteUrl) searchCount.textContent = `${visibleCount} ${visibleCount === 1 ? 'model' : 'models'}`;
+        if (!remoteUrl) searchCount.textContent = `${visibleCount} ${visibleCount === 1 ? 'option' : 'options'}`;
         noResults.hidden = visibleCount !== 0;
     };
     const renderChoices = () => {
@@ -1099,7 +1151,7 @@ enhancedSelects.forEach((select) => {
                 remoteLoaded = false;
                 window.clearTimeout(remoteTimer);
                 ++remoteRequestId;
-                if (noResults) { noResults.textContent = 'No models match. Try another search.'; noResults.hidden = true; }
+                if (noResults) { noResults.textContent = 'No options match. Try another search.'; noResults.hidden = true; }
             }
             filterChoices();
         }
@@ -1127,7 +1179,7 @@ enhancedSelects.forEach((select) => {
         options.style.color = menuStyles.color;
         options.style.borderColor = menuStyles.borderColor;
         options.style.fontFamily = menuStyles.fontFamily;
-        document.body.append(options);
+        (wrapper.closest('dialog') ?? document.body).append(options);
         options.classList.add('is-portaled');
         wrapper.classList.add('is-open');
         options.hidden = false;
@@ -1162,13 +1214,54 @@ enhancedSelects.forEach((select) => {
     select.addEventListener('change', sync); select.before(wrapper); wrapper.append(select, trigger, options); renderChoices();
 });
 };
+const localizeGivingSelects = (root = document) => {
+    const regionNames = typeof Intl.DisplayNames === 'function' ? new Intl.DisplayNames([document.documentElement.lang || 'en'], { type: 'region' }) : null;
+    const currencyNames = typeof Intl.DisplayNames === 'function' ? new Intl.DisplayNames([document.documentElement.lang || 'en'], { type: 'currency' }) : null;
+    root.querySelectorAll('select[data-country-select] option[value]').forEach((option) => {
+        if (option.value) option.textContent = `${regionNames?.of(option.value) || option.value} (${option.value})`;
+    });
+    root.querySelectorAll('select[data-currency-select] option[value]').forEach((option) => {
+        if (option.value) option.textContent = `${option.value} — ${currencyNames?.of(option.value) || option.value}`;
+    });
+};
+localizeGivingSelects();
 initializeEnhancedSelects();
 // Pages that replace fragments in place (for example the media library filters)
 // can re-run the same select enhancement without a full navigation.
 window.initializeEnhancedSelects = initializeEnhancedSelects;
+
+document.querySelectorAll('[data-copy-text]').forEach((button) => button.addEventListener('click', async () => {
+    const value = button.dataset.copyText ?? '';
+    if (!value) return;
+    try { await navigator.clipboard.writeText(value); }
+    catch {
+        const field = document.createElement('textarea');
+        field.value = value; field.setAttribute('readonly', ''); field.style.position = 'fixed'; field.style.opacity = '0';
+        document.body.append(field); field.select(); document.execCommand('copy'); field.remove();
+    }
+    const label = button.getAttribute('title');
+    button.setAttribute('title', 'Copied');
+    window.setTimeout(() => button.setAttribute('title', label || 'Copy placeholder'), 1200);
+}));
 document.addEventListener('ministry:enhance-selects', (event) => {
-    initializeEnhancedSelects(event.detail instanceof Element ? event.detail : document);
+    const root = event.detail instanceof Element ? event.detail : document;
+    localizeGivingSelects(root);
+    initializeEnhancedSelects(root);
 });
+
+document.querySelectorAll('[data-provider-form]').forEach((form) => {
+    form.querySelector('[data-provider-picker]')?.addEventListener('change', (event) => {
+        form.action = `/api/v1/staff/giving/providers/${encodeURIComponent(event.target.value)}`;
+    });
+});
+document.querySelectorAll('[data-open-dialog]').forEach((button) => button.addEventListener('click', () => document.getElementById(button.dataset.openDialog)?.showModal()));
+document.querySelectorAll('.giving-dialog').forEach((dialog) => {
+    dialog.querySelectorAll('[data-close-dialog]').forEach((button) => button.addEventListener('click', () => dialog.close()));
+    dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+});
+document.querySelectorAll('form[data-confirm]').forEach((form) => form.addEventListener('submit', (event) => {
+    if (!window.confirm(form.dataset.confirm)) event.preventDefault();
+}));
 
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 
@@ -1309,12 +1402,18 @@ document.querySelectorAll('form[data-async-form]').forEach((form) => {
         const pendingLabel = form.dataset.asyncPendingLabel ?? form.dataset.pendingLabel ?? 'Saving…';
         showAsyncFeedback(pendingLabel, 'pending');
         const submitter = event.submitter;
-        const originalLabel = submitter?.textContent;
-        if (submitter) { submitter.disabled = true; submitter.textContent = pendingLabel; }
+        const originalContent = submitter?.innerHTML;
+        const formData = new FormData(form);
+        if (submitter?.name) formData.append(submitter.name, submitter.value);
+        if (submitter) {
+            submitter.disabled = true;
+            submitter.setAttribute('aria-busy', 'true');
+            if (!submitter.classList.contains('page-editor-icon-button')) submitter.textContent = pendingLabel;
+        }
         try {
             const response = await fetch(form.action, {
                 method: 'POST',
-                body: new FormData(form),
+                body: formData,
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}) },
                 credentials: 'same-origin',
             });
@@ -1330,7 +1429,11 @@ document.querySelectorAll('form[data-async-form]').forEach((form) => {
             showAsyncFeedback(error instanceof Error ? error.message : 'A network error prevented this change from being saved.', 'error');
         } finally {
             delete form.dataset.submitting;
-            if (submitter) { submitter.disabled = false; submitter.textContent = originalLabel ?? 'Save'; }
+            if (submitter) {
+                submitter.disabled = false;
+                submitter.removeAttribute('aria-busy');
+                submitter.innerHTML = originalContent ?? 'Save';
+            }
         }
     });
 });

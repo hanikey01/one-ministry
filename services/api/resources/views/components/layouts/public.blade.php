@@ -1,3 +1,10 @@
+@props(['title' => null, 'settings', 'features' => [], 'editorPreview' => false])
+
+@if($editorPreview)
+    <x-layouts.app :title="$title ?? null" :ministry-name="$settings->name">
+        <main class="page-editor-canvas-document">{{ $slot }}</main>
+    </x-layouts.app>
+@else
 <x-layouts.app :title="$title ?? null" :ministry-name="$settings->name">
     @php($liveWorship = \App\Models\ServiceOccurrence::query()->where('rehearsal_mode', false)->where('state', 'live')->orderBy('starts_at')->first())
     @php($terminology = app(\App\Support\MinistryTerminology::class))
@@ -47,16 +54,8 @@
             <section class="workspace-content public-content">{{ $slot }}</section>
             <footer class="public-footer">
     @php($footerLogo = $settings->dark_logo_path ?: $settings->logo_path)
-    @php($library = in_array('books_library', $features, true) ? 'books_library' : (in_array('video_sermons', $features, true) ? 'video_sermons' : 'audio_sermons'))
-    <section class="public-footer-intro">
-        <a class="public-footer-mark" href="{{ route('public.home') }}" aria-label="{{ $settings->name }} home">@if($footerLogo)<img src="{{ asset('storage/'.$footerLogo) }}" alt="{{ $settings->name }}">@else<span>{{ mb_strtoupper(mb_substr($settings->name, 0, 1)) }}</span>@endif</a>
-        <div><p class="public-footer-kicker">A ministry community</p><h2>{{ $settings->name }}</h2><p>{{ $settings->tagline ?: 'A place to worship, grow, and belong.' }}</p></div>
-        <div class="public-footer-cta"><a href="{{ route('public.home') }}#service-times">Plan your visit <x-ui.icon name="location" :size="15"/></a><a href="{{ $worshipUrl }}">{{ $worshipLabel }} <x-ui.icon name="worship" :size="15"/></a></div>
-    </section>
-    <nav class="public-footer-links" aria-label="Explore ministry links"><strong>Explore</strong><a href="{{ route('public.home') }}">Home</a><a href="{{ route('public.events') }}">Events</a><a href="{{ route('public.locations') }}">{{ $terminology->label('location', 'plural') }}</a>@if(in_array('groups',$features,true))<a href="{{ route('public.groups') }}">{{ $terminology->label('group', 'plural') }}</a>@endif @if(array_intersect(['books_library','audio_sermons','video_sermons','sermon_series'], $features))<a href="{{ route('public.library', $library) }}">Resources</a>@endif</nav>
-    <nav class="public-footer-links" aria-label="Connect with the ministry"><strong>Connect</strong>@if(auth()->check())<a href="{{ route('member.home') }}">Member portal</a>@else<a href="{{ route('login') }}">Member sign in</a>@endif<a href="{{ route('member.prayer') }}">Prayer request</a>@if($settings->contact_email)<a href="mailto:{{ $settings->contact_email }}">Email us</a>@endif @if($settings->contact_phone)<a href="tel:{{ preg_replace('/[^+0-9]/', '', $settings->contact_phone) }}">{{ $settings->contact_phone }}</a>@endif</nav>
-    <section class="public-footer-social"><strong>Stay connected</strong><p>Follow the latest teaching, gatherings, and ministry moments.</p><div>@foreach(['facebook' => 'Facebook', 'instagram' => 'Instagram', 'youtube' => 'YouTube'] as $network => $label)@if(data_get($settings->social_links, $network))<a href="{{ data_get($settings->social_links, $network) }}" target="_blank" rel="noopener noreferrer">{{ $label }} <x-ui.icon name="external" :size="12"/></a>@endif @endforeach</div></section>
-    <div class="public-footer-bottom"><span>© {{ now()->year }} {{ $settings->name }}. All rights reserved.</span><span>{{ $settings->public_address ?: $settings->timezone }}</span></div>
+    <a class="public-footer-mark" href="{{ route('public.home') }}" aria-label="{{ $settings->name }} home">@if($footerLogo)<img src="{{ asset('storage/'.$footerLogo) }}" alt="{{ $settings->name }}">@else<span>{{ mb_strtoupper(mb_substr($settings->name, 0, 1)) }}</span>@endif</a>
+    <p class="public-footer-copyright">© {{ now()->year }} {{ $settings->name }}. All rights reserved.</p>
 </footer>
         </main>
         @php($publicMobileItems = \Illuminate\Support\Facades\DB::table('navigation_items')->whereNull('parent_id')->where('is_enabled', true)->where('visible_mobile', true)->orderBy('position')->get()->filter(fn ($item) => ! $item->required_feature || in_array($item->required_feature, $features, true))->take(5))
@@ -65,3 +64,4 @@
         </nav>
     </div>
         </x-layouts.app>
+@endif
