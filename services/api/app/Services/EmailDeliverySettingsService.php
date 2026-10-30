@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class EmailDeliverySettingsService
 {
@@ -48,7 +49,7 @@ class EmailDeliverySettingsService
                 'from_name' => $data['from_name'] ?? null,
                 'host' => $provider === 'hosting' ? null : ($data['host'] ?: $preset['host']),
                 'port' => $provider === 'hosting' ? null : ($data['port'] ?: $preset['port']),
-                'encryption' => $provider === 'hosting' ? null : ($data['encryption'] ?: $preset['encryption']),
+                'encryption' => $provider === 'hosting' ? null : (array_key_exists('encryption', $data) ? $data['encryption'] : $preset['encryption']),
                 'username' => $provider === 'hosting' ? null : ($data['username'] ?? null),
                 'updated_by' => $actor->id,
             ];
@@ -56,6 +57,8 @@ class EmailDeliverySettingsService
                 $attributes['password_encrypted'] = null;
             } elseif (! empty($data['password'])) {
                 $attributes['password_encrypted'] = Crypt::encryptString($data['password']);
+            } elseif ($setting->provider !== $provider) {
+                $attributes['password_encrypted'] = null;
             }
             $candidate = clone $setting;
             $candidate->fill($attributes);
@@ -75,24 +78,31 @@ class EmailDeliverySettingsService
 
     public function sendRaw(string $recipient, string $subject, string $body): void
     {
+        $this->send($recipient, $subject, null, $body);
+    }
+
+    public function sendHtml(string $recipient, string $subject, string $html, string $text, ?string $recipientName = null): void
+    {
+        $this->send($recipient, $subject, $html, $text, $recipientName);
+    }
+
+    public function test(string $recipient, User $actor, ?string $ipAddress): void
+    {
         $setting = $this->setting();
-        $this->ensureActive($setting);
-        $mailer = 'ministry_delivery';
-        if ($setting->provider === 'hosting') {
-            config(['mail.mailers.'.$mailer => ['transport' => 'sendmail', 'path' => config('mail.mailers.sendmail.path')]]);
-        } else {
-            config(['mail.mailers.'.$mailer => ['transport' => 'smtp', 'host' => $setting->host, 'port' => $setting->port, 'scheme' => $setting->encryption, 'username' => $setting->username, 'password' => Crypt::decryptString((string) $setting->password_encrypted), 'timeout' => 15, 'local_domain' => parse_url((string) config('app.url'), PHP_URL_HOST)]]);
+        try {
+            $this->sendRaw($recipient, 'Email delivery test', "Your ministry email delivery connection is working.\n\nSent at ".now()->toIso8601String().'.');
+            $setting->forceFill(['last_tested_at' => now(), 'last_test_succeeded_at' => now(), 'last_test_status' => 'succeeded', 'last_test_error' => null])->save();
+            $this->auditTest($setting->id, $actor, true, $ipAddress);
+        } catch (Throwable $error) {
+            $setting->forceFill(['last_tested_at' => now(), 'last_test_status' => 'failed', 'last_test_error' => Str::limit($this->safeError($error), 500, '')])->save();
+            $this->auditTest($setting->id, $actor, false, $ipAddress);
+            throw ValidationException::withMessages(['test_email' => 'The test email could not be sent. '.$this->safeError($error)]);
         }
-        Mail::purge($mailer);
-        Mail::mailer($mailer)->raw($body, function ($message) use ($setting, $recipient, $subject): void {
-            $message->to($recipient)->subject($subject);
-            $message->from((string) $setting->from_address, (string) $setting->from_name);
-        });
     }
 
     public function ready(EmailDeliverySetting $setting): bool
     {
-        if (! filter_var($setting->from_address, FILTER_VALIDATE_EMAIL)) return false;
+        if (! filter_var($setting->from_address, FILTER_VALIDATE_EMAIL) || ! filled($setting->from_name)) return false;
         if ($setting->provider === 'hosting') return true;
         return filled($setting->host) && filled($setting->port) && filled($setting->username) && filled($setting->password_encrypted);
     }
@@ -110,5 +120,35 @@ class EmailDeliverySettingsService
         if (! $setting->enabled || ! $this->ready($setting)) {
             abort(503, 'Account email delivery is not configured. Contact the ministry administrator.');
         }
+    }
+
+    private function send(string $recipient, string $subject, ?string $html, string $text, ?string $recipientName = null): void
+    {
+        $setting = $this->setting();
+        $this->ensureActive($setting);
+        $mailer = 'ministry_delivery';
+        if ($setting->provider === 'hosting') {
+            config(['mail.mailers.'.$mailer => ['transport' => 'sendmail', 'path' => config('mail.mailers.sendmail.path')]]);
+        } else {
+            config(['mail.mailers.'.$mailer => ['transport' => 'smtp', 'host' => $setting->host, 'port' => $setting->port, 'scheme' => $setting->encryption === 'ssl' ? 'smtps' : 'smtp', 'username' => $setting->username, 'password' => Crypt::decryptString((string) $setting->password_encrypted), 'timeout' => 15, 'auto_tls' => $setting->encryption !== '', 'local_domain' => parse_url((string) config('app.url'), PHP_URL_HOST)]]);
+        }
+        Mail::purge($mailer);
+        $callback = function ($message) use ($setting, $recipient, $recipientName, $subject): void {
+            $message->to($recipient, $recipientName)->subject($subject);
+            $message->from((string) $setting->from_address, (string) $setting->from_name);
+        };
+        if ($html === null) Mail::mailer($mailer)->raw($text, $callback);
+        else Mail::mailer($mailer)->html($html, $callback);
+    }
+
+    private function auditTest(string $settingId, User $actor, bool $succeeded, ?string $ipAddress): void
+    {
+        DB::table('audit_events')->insert(['id' => (string) Str::uuid(), 'actor_user_id' => $actor->id, 'action' => 'email_delivery.tested', 'subject_type' => 'email_delivery_settings', 'subject_id' => $settingId, 'changes_json' => json_encode(['succeeded' => $succeeded], JSON_THROW_ON_ERROR), 'ip_address' => $ipAddress, 'created_at' => now()]);
+    }
+
+    private function safeError(Throwable $error): string
+    {
+        $message = preg_replace('/(password|token|key|secret)=?[^\s;]*/i', '$1=[redacted]', $error->getMessage());
+        return filled($message) ? (string) $message : 'Check the provider credentials, sender identity, port, and encryption settings.';
     }
 }

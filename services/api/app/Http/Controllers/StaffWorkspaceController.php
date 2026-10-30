@@ -17,6 +17,7 @@ use App\Services\ServiceLifecycle;
 use App\Services\ZoomVideoSdkSettingsService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -53,11 +54,38 @@ class StaffWorkspaceController extends Controller
 
     public function settings(Request $request): View
     {
-        $delivery = app(EmailDeliverySettingsService::class)->setting();
         $zoom = app(ZoomVideoSdkSettingsService::class)->setting();
         $homepagePages = DB::table('pages')->where('status', 'published')->orderBy('title')->get(['id', 'title', 'slug']);
 
-        return view('staff.settings', ['settings' => MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID), 'homepagePages' => $homepagePages, 'user' => $request->user(), 'timezones' => timezone_identifiers_list(), 'emailDelivery' => $delivery, 'emailProviders' => EmailDeliverySettingsService::providers(), 'zoomVideoSdk' => $zoom]);
+        return view('staff.settings', ['settings' => MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID), 'homepagePages' => $homepagePages, 'user' => $request->user(), 'timezones' => timezone_identifiers_list(), 'zoomVideoSdk' => $zoom]);
+    }
+
+    public function storeJourneyOption(Request $request): RedirectResponse
+    {
+        $data = $request->validate(['label' => ['required', 'string', 'max:120'], 'description' => ['nullable', 'string', 'max:500']]);
+        $key = Str::slug($data['label'], '_');
+        $key = substr($key, 0, 40);
+        if ($key === '' || DB::table('member_journey_options')->where('key', $key)->exists()) {
+            return to_route('staff.follow-up')->withErrors(['label' => 'Use a unique next-step name.']);
+        }
+        DB::table('member_journey_options')->insert(['id' => (string) Str::uuid(), 'key' => $key, 'label' => trim($data['label']), 'description' => filled($data['description'] ?? null) ? trim($data['description']) : null, 'active' => true, 'display_order' => (int) DB::table('member_journey_options')->max('display_order') + 1, 'created_at' => now(), 'updated_at' => now()]);
+
+        return to_route('staff.follow-up')->with('status', 'Next-step option added.');
+    }
+
+    public function updateJourneyOption(Request $request, string $option): RedirectResponse
+    {
+        $data = $request->validate(['label' => ['required', 'string', 'max:120'], 'description' => ['nullable', 'string', 'max:500'], 'active' => ['nullable', 'boolean'], 'display_order' => ['required', 'integer', 'min:0', 'max:9999']]);
+        DB::table('member_journey_options')->where('id', $option)->update(['label' => trim($data['label']), 'description' => filled($data['description'] ?? null) ? trim($data['description']) : null, 'active' => $request->boolean('active'), 'display_order' => $data['display_order'], 'updated_at' => now()]);
+
+        return to_route('staff.follow-up')->with('status', 'Next-step option updated.');
+    }
+
+    public function destroyJourneyOption(string $option): RedirectResponse
+    {
+        DB::table('member_journey_options')->where('id', $option)->update(['active' => false, 'updated_at' => now()]);
+
+        return to_route('staff.follow-up')->with('status', 'Next-step option hidden from members.');
     }
 
     public function updateHomepage(Request $request): RedirectResponse
@@ -529,10 +557,11 @@ class StaffWorkspaceController extends Controller
     public function followUp(Request $request): View
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
+        $journeyOptions = DB::table('member_journey_options')->orderBy('display_order')->orderBy('label')->get();
         $tasks = DB::table('follow_up_tasks')->leftJoin('people', 'people.id', '=', 'follow_up_tasks.person_id')
             ->select('follow_up_tasks.*', 'people.first_name', 'people.last_name')->where('follow_up_tasks.status', '!=', 'completed')->orderByRaw('follow_up_tasks.due_at is null')->orderBy('follow_up_tasks.due_at')->paginate(20);
 
-        return view('staff.follow-up', compact('settings', 'tasks') + ['user' => $request->user()]);
+        return view('staff.follow-up', compact('settings', 'tasks', 'journeyOptions') + ['user' => $request->user()]);
     }
 
     public function care(Request $request): View
@@ -582,12 +611,20 @@ class StaffWorkspaceController extends Controller
         return view('staff.communications', compact('settings', 'campaigns') + ['user' => $request->user()]);
     }
 
-    public function giving(Request $request): View
+    public function giving(Request $request, PermissionChecker $permissions): View
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
-        $donations = DB::table('donations')->join('giving_funds', 'giving_funds.id', '=', 'donations.fund_id')->select('donations.*', 'giving_funds.name as fund_name')->orderByDesc('donations.created_at')->paginate(20);
+        $canViewFinance = $permissions->allows($request->user(), 'finance.view');
+        $donations = $canViewFinance
+            ? DB::table('donations')->join('giving_funds', 'giving_funds.id', '=', 'donations.fund_id')->select('donations.*', 'giving_funds.name as fund_name')->orderByDesc('donations.created_at')->paginate(20)
+            : new LengthAwarePaginator([], 0, 20, 1, ['path' => $request->url()]);
+        $funds = DB::table('giving_funds')->orderBy('display_order')->orderBy('name')->get();
+        $providers = DB::table('payment_processor_configs')->orderBy('priority')->get()->map(function ($row) { $row->configured = filled($row->credentials_encrypted); unset($row->credentials_encrypted); return $row; });
+        $offlineMethods = DB::table('offline_giving_methods')->orderBy('display_order')->orderBy('label')->get();
 
-        return view('staff.giving', compact('settings', 'donations') + ['user' => $request->user()]);
+        $countries = config('giving.countries', []);
+        $currencies = config('giving.currencies', []);
+        return view('staff.giving', compact('settings', 'donations','funds','providers','offlineMethods', 'canViewFinance','countries','currencies') + ['user' => $request->user()]);
     }
 
     public function locations(Request $request): View
@@ -671,28 +708,9 @@ class StaffWorkspaceController extends Controller
             return to_route('staff.settings')->with('status', 'Set up and activate email delivery before sending a verification email.');
         }
 
-        $verification->request($request->user(), $delivery);
+        $verification->request($request->user());
 
         return to_route('staff.security')->with('status', 'A verification link has been sent to '.$request->user()->email.'.');
-    }
-
-    public function updateEmailDelivery(Request $request, EmailDeliverySettingsService $delivery): RedirectResponse
-    {
-        $data = $request->validate([
-            'provider' => ['required', Rule::in(array_keys(EmailDeliverySettingsService::providers()))],
-            'enabled' => ['nullable', 'boolean'],
-            'from_address' => ['nullable', 'email', 'max:254'],
-            'from_name' => ['nullable', 'string', 'max:160'],
-            'host' => ['nullable', 'string', 'max:253'],
-            'port' => ['nullable', 'integer', 'between:1,65535'],
-            'encryption' => ['nullable', Rule::in(['tls', 'ssl', ''])],
-            'username' => ['nullable', 'string', 'max:254'],
-            'password' => ['nullable', 'string', 'max:1024'],
-        ]);
-        $data['enabled'] = $request->boolean('enabled');
-        $delivery->update($data, $request->user(), $request->ip());
-
-        return to_route('staff.settings')->with('status', 'Email delivery settings saved.');
     }
 
     public function updateSettings(Request $request, UpdateMinistrySettings $update): RedirectResponse

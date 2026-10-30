@@ -22,6 +22,7 @@ COPY . .
 COPY --from=vendor /app/vendor ./vendor
 COPY --from=assets /app/public/build /opt/ministry-build
 RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views bootstrap/cache \
+    && rm -f public/hot \
     && rm -f bootstrap/cache/*.php \
     && chown -R www-data:www-data storage bootstrap/cache \
     && php artisan package:discover --ansi

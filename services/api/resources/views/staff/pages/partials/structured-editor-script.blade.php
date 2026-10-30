@@ -4,8 +4,6 @@
     if (!form) return;
 
     const canvas = form.querySelector('[data-canvas]');
-    const canvasWrap = canvas?.closest('.page-block-canvas-wrap');
-    const canvasStage = form.querySelector('[data-canvas-stage]');
     const inspector = form.querySelector('[data-inspector]');
     const navigator = form.querySelector('[data-page-navigator]');
     const inspectorPanel = form.querySelector('.page-block-inspector');
@@ -85,15 +83,6 @@
     let history = [];
     let future = [];
     let submittedDocument = null;
-    const syncCanvasPreview = () => {
-        if (!canvas || !canvasWrap || !canvasStage) return;
-        const previewWidth = { desktop:1180, tablet:768, mobile:390 }[canvas.dataset.preview || 'desktop'] || 1180;
-        const availableWidth = Math.max(0, canvasWrap.clientWidth - 24);
-        const scale = previewWidth > availableWidth && availableWidth > 0 ? availableWidth / previewWidth : 1;
-        canvasWrap.classList.toggle('is-scaled-preview', scale < 1);
-        canvasWrap.style.setProperty('--canvas-preview-scale', String(scale));
-        canvasStage.style.height = `${Math.ceil(canvas.offsetHeight * scale)}px`;
-    };
     const currentSection = () => documentState.sections[selected.section];
     const currentColumn = () => currentSection()?.columns[selected.column];
     const currentElement = () => currentColumn()?.elements[selected.element];
@@ -426,20 +415,19 @@
         const target = event.target.closest('[data-select-kind]'); if (target) select(target.dataset.selectKind, Number(target.dataset.section), Number(target.dataset.column || 0), Number(target.dataset.element || 0));
     });
     canvas.addEventListener('keydown', (event) => { if (!['Enter', ' '].includes(event.key)) return; const target = event.target.closest('[data-select-kind]'); if (!target) return; event.preventDefault(); select(target.dataset.selectKind, Number(target.dataset.section), Number(target.dataset.column || 0), Number(target.dataset.element || 0)); });
-    canvasWrap.addEventListener('click', (event) => {
+    canvas?.closest('.page-block-canvas-wrap')?.addEventListener('click', (event) => {
         const button = event.target.closest('[data-canvas-size]');
         if (!button) return;
         event.preventDefault();
         event.stopPropagation();
         const size = button.dataset.canvasSize;
         canvas.dataset.preview = size;
-        canvasWrap.dataset.preview = size;
-        canvasWrap.querySelectorAll('[data-canvas-size]').forEach((item) => {
+        canvas?.closest('.page-block-canvas-wrap')?.setAttribute('data-preview', size);
+        canvas?.closest('.page-block-canvas-wrap')?.querySelectorAll('[data-canvas-size]').forEach((item) => {
             const active = item === button;
             item.classList.toggle('is-active', active);
             item.setAttribute('aria-pressed', active ? 'true' : 'false');
         });
-        requestAnimationFrame(syncCanvasPreview);
     });
     form.addEventListener('click', (event) => { if (event.target.closest('[data-inspector-close]')) { event.preventDefault(); event.stopPropagation(); closeInspector(); } });
     navigator?.addEventListener('click', (event) => { const target = event.target.closest('[data-navigator-kind]'); if (!target) return; select(target.dataset.navigatorKind, Number(target.dataset.section), Number(target.dataset.column || 0), Number(target.dataset.element || 0)); openInspector(); });

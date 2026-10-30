@@ -34,7 +34,9 @@ class PublicWorkspaceController extends Controller
         $this->enabled('giving');
 
         return $this->view('public.giving', [
-            'funds' => DB::table('giving_funds')->where('active', true)->orderBy('name')->get(),
+            'funds' => DB::table('giving_funds')->where('active', true)->where('public_visible',true)->orderBy('display_order')->orderBy('name')->get(),
+            'givingMarkets' => DB::table('payment_processor_configs')->where('enabled',true)->whereNotNull('credentials_encrypted')->select('country','currency')->distinct()->orderBy('country')->orderBy('currency')->get(),
+            'offlineGivingMethods' => DB::table('offline_giving_methods')->where('active',true)->orderBy('display_order')->orderBy('label')->get(),
         ]);
     }
 
@@ -43,7 +45,7 @@ class PublicWorkspaceController extends Controller
         abort_unless(in_array($library, ['books_library', 'audio_sermons', 'video_sermons', 'sermon_series'], true), 404);
         $this->enabled($library);
         $items = $library === 'sermon_series'
-            ? DB::table('sermon_series')->where('status', 'published')->orderByDesc('starts_on')->paginate(18)
+            ? DB::table('sermon_series')->where('status', 'published')->orderByDesc('created_at')->paginate(18)
             : DB::table('media_assets')->leftJoin('library_categories', 'library_categories.id', '=', 'media_assets.library_category_id')->where(['media_assets.library' => $library, 'media_assets.status' => 'published'])->orderByDesc('media_assets.published_at')->select('media_assets.*', 'library_categories.name as category_name')->paginate(18);
 
         return $this->view('public.library', compact('library', 'items'));

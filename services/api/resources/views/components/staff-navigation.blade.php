@@ -1,6 +1,7 @@
 @php
     $user = auth()->user();
-    $menuEntries = collect(app(\App\Services\NavigationLayout::class)->entries('staff', 'sidebar', $user, []));
+    $features = \App\Models\FeatureSetting::query()->pluck('key')->all();
+    $menuEntries = collect(app(\App\Services\NavigationLayout::class)->entries('staff', 'sidebar', $user, $features));
     $groups = $menuEntries->groupBy('group');
 @endphp
 @if ($user)

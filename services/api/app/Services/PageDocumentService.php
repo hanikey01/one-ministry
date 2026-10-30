@@ -159,8 +159,14 @@ final class PageDocumentService
             $value = Str::limit(trim((string) $value), in_array($key, ['custom_css', 'custom_js'], true) ? 50000 : $max, '');
             if ($key === 'custom_id' && $value !== '' && ! preg_match('/^[A-Za-z][A-Za-z0-9_-]{0,79}$/', $value)) $this->invalid('Custom CSS IDs must start with a letter and contain only letters, numbers, hyphens, or underscores.');
             if ($key === 'custom_class' && $value !== '' && ! preg_match('/^[A-Za-z][A-Za-z0-9_-]*(?:\s+[A-Za-z][A-Za-z0-9_-]*)*$/', $value)) $this->invalid('Custom CSS classes must contain only safe class names separated by spaces.');
-            if (in_array($key, ['background_color', 'border_color', 'overlay_color'], true) && $value !== '' && ! preg_match('/^(?:#[0-9a-fA-F]{6}|canvas|surface|surface_muted|action|brand)$/', $value)) $this->invalid('Page colours must use an approved theme token or six-digit hex value.');
-            if (in_array($key, ['border_width', 'radius_top_left', 'radius_top_right', 'radius_bottom_right', 'radius_bottom_left', 'shadow_x', 'shadow_y', 'shadow_blur', 'shadow_spread'], true) && $value !== '' && ! preg_match('/^(?:0|\d+(?:\.\d+)?)(?:px|%|em|rem|vw|vh)$/', $value)) $this->invalid('Style dimensions must use px, %, em, rem, vw, or vh units.');
+            if (in_array($key, ['background_color', 'border_color', 'overlay_color', 'text_color', 'button_background', 'button_hover_background', 'button_text_color', 'button_border_color', 'shadow_color'], true) && $value !== '' && ! preg_match('/^(?:#[0-9a-fA-F]{6}|canvas|surface|surface_muted|action|brand)$/', $value)) $this->invalid('Page colours must use an approved theme token or six-digit hex value.');
+            $positiveDimensions = ['border_width', 'radius_top_left', 'radius_top_right', 'radius_bottom_right', 'radius_bottom_left', 'shadow_blur', 'font_size', 'button_padding_x', 'button_padding_y', 'button_radius', 'button_border_width', 'content_max_width', 'min_height', 'row_gap', 'element_gap', 'custom_width'];
+            $signedDimensions = ['shadow_x', 'shadow_y', 'shadow_spread', 'letter_spacing'];
+            if (in_array($key, [...$positiveDimensions, ...$signedDimensions], true) && preg_match('/^-?\d+(?:\.\d+)?$/', $value)) $value .= 'px';
+            if (in_array($key, $positiveDimensions, true) && $value !== '' && ! preg_match('/^(?:0|\d+(?:\.\d+)?)(?:px|%|em|rem|vw|vh)$/', $value)) $this->invalid('Style dimensions must use px, %, em, rem, vw, or vh units.');
+            if (in_array($key, $signedDimensions, true) && $value !== '' && ! preg_match('/^-?(?:0|\d+(?:\.\d+)?)(?:px|%|em|rem|vw|vh)$/', $value)) $this->invalid('Style dimensions must use px, %, em, rem, vw, or vh units.');
+            if ($key === 'line_height' && $value !== '' && ! preg_match('/^(?:\d+(?:\.\d+)?|(?:0|\d+(?:\.\d+)?)(?:px|%|em|rem))$/', $value)) $this->invalid('Line height must be unitless or use px, %, em, or rem.');
+            if ($key === 'overlay_opacity' && $value !== '' && (! ctype_digit($value) || (int) $value > 100)) $this->invalid('Overlay opacity must be a whole number from 0 to 100.');
             $allowedSettings = [
                 'background' => ['transparent', 'canvas', 'surface', 'surface_muted', 'action', 'brand'],
                 'background_overlay' => ['none', 'soft', 'strong'],
@@ -170,9 +176,19 @@ final class PageDocumentService
                 'overflow' => ['visible', 'hidden'],
                 'grid_preset' => ['one', 'two', 'three', 'four'],
                 'border_style' => ['none', 'solid', 'dashed', 'dotted'],
+                'font_family' => ['inherit', 'system', 'arial', 'verdana', 'trebuchet', 'georgia', 'times', 'palatino', 'courier'],
+                'font_weight' => ['400', '500', '600', '700', '800'],
+                'text_transform' => ['none', 'uppercase', 'lowercase', 'capitalize'],
+                'button_width' => ['auto', 'full'],
+                'content_width' => ['full', 'wide', 'standard', 'narrow', 'custom'],
+                'vertical_alignment' => ['start', 'center', 'end', 'stretch'],
+                'background_position' => ['left_top', 'center_top', 'right_top', 'left_center', 'center_center', 'right_center', 'left_bottom', 'center_bottom', 'right_bottom'],
+                'background_size' => ['auto', 'cover', 'contain'],
+                'background_repeat' => ['no_repeat', 'repeat', 'repeat_x', 'repeat_y'],
+                'background_attachment' => ['scroll', 'fixed'],
             ];
             if (isset($allowedSettings[$key]) && ! in_array($value, $allowedSettings[$key], true)) $this->invalid('Choose an approved page appearance setting.');
-            if ($key === 'background_image' && $value !== '' && ! filter_var($value, FILTER_VALIDATE_URL)) $this->invalid('Choose a valid background image URL.');
+            if ($key === 'background_image' && $value !== '' && ! $this->isSafeMediaUrl($value)) $this->invalid('Choose a valid background image URL or ministry media path.');
             $result[$key] = $value;
         }
         return $result;
@@ -188,19 +204,29 @@ final class PageDocumentService
             'padding' => ['compact', 'regular', 'spacious'],
             'margin' => ['none', 'compact', 'regular', 'spacious'],
             'column_gap' => ['compact', 'regular', 'spacious'],
-            'width' => ['full', 'half', 'third'],
+            'width' => ['full', 'half', 'third', 'custom'],
             'order' => ['1', '2', '3', '4'],
             'gap' => ['compact', 'regular', 'spacious'],
+            'font_size' => null,
+            'line_height' => null,
+            'letter_spacing' => null,
+            'custom_width' => null,
         ];
         foreach (['desktop', 'tablet', 'mobile'] as $breakpoint) {
             if (! array_key_exists($breakpoint, $responsive)) continue;
             $settings = $this->settings($responsive[$breakpoint], 40);
             foreach ($settings as $key => $value) {
-                if (! array_key_exists($key, $allowed) || ! in_array($value, $allowed[$key], true)) $this->invalid('Choose a valid responsive setting.');
+                if (in_array($key, ['padding', 'margin'], true) && is_array($value)) continue;
+                if (! array_key_exists($key, $allowed) || (is_array($allowed[$key]) && ! in_array($value, $allowed[$key], true))) $this->invalid('Choose a valid responsive setting.');
             }
             $result[$breakpoint] = $settings;
         }
         return $result;
+    }
+    private function isSafeMediaUrl(string $value): bool
+    {
+        return filter_var($value, FILTER_VALIDATE_URL) !== false
+            || preg_match('#^/(?!/)[A-Za-z0-9._~!$&\'()*+,;=:@%/-]+(?:\?[A-Za-z0-9._~!$&\'()*+,;=:@%/?-]*)?$#', $value) === 1;
     }
     private function id(mixed $id): string { return is_string($id) && preg_match('/^[a-zA-Z0-9_-]{1,80}$/', $id) ? $id : (string) Str::uuid(); }
     private function invalid(string $message): never { throw ValidationException::withMessages(['blocks' => $message]); }

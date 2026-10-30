@@ -3,15 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Services\EmailVerificationService;
-use App\Services\EmailDeliverySettingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class EmailVerificationController extends Controller
 {
-    public function request(Request $request, EmailVerificationService $verification, EmailDeliverySettingsService $delivery): JsonResponse
+    public function request(Request $request, EmailVerificationService $verification): JsonResponse
     {
-        $verification->request($request->user(), $delivery);
+        $verification->request($request->user());
 
         return response()->json(['data' => ['status' => 'requested']])->header('Cache-Control', 'no-store');
     }

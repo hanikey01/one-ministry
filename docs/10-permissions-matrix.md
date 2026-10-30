@@ -78,6 +78,6 @@ For each resource, test: unauthenticated access, correct role and scope, wrong l
 
 | Permission | Default role | Scope |
 |---|---|---|
-| `school.manage` | School manager, ministry administrator, super administrator | Create and operate courses, lessons, assessments, live classes, and enrollments |
-| `school.instruct` | School manager, ministry administrator, super administrator | Teach courses and review learner progress |
+| `school.manage` | Ministry Operations Coordinator, Ministry Administrator, Super Administrator | Create and operate courses, lessons, assessments, live classes, enrolments, certificates, instructor assignments, and exports |
+| `school.instruct` | Ministry Operations Coordinator, Ministry Administrator, Super Administrator | Open and teach only explicitly assigned courses; does not grant installation-wide course administration |
 

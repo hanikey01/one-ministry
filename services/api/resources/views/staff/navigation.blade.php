@@ -34,7 +34,7 @@
                 <div class="navigation-layout-grid">
                     @php($sidebarSections = collect($menuOptions[$surface])->pluck('group')->filter()->unique()->values())
                     @foreach(['sidebar' => ['Sidebar', 'Choose destinations and the section where each appears.'], 'mobile' => ['Mobile footer', 'Shown at the bottom of the screen on mobile devices.']] as $menuSlot => [$slotLabel, $slotDescription])
-                        @php($maxSelections = $menuSlot === 'mobile' ? 5 : 24)
+                        @php($maxSelections = $menuSlot === 'mobile' ? 5 : null)
                         @php($selectedEntries = collect($menuLayouts[$surface][$menuSlot] ?? []))
                         @php($selectedKeys = $selectedEntries->map(fn ($entry) => is_string($entry) ? $entry : ($entry['key'] ?? null))->filter()->values())
                         <section class="navigation-layout-card" data-navigation-selection data-surface="{{ $surface }}" data-menu-slot="{{ $menuSlot }}" data-max-selections="{{ $maxSelections }}">
@@ -170,6 +170,13 @@
             const tabs = [...document.querySelectorAll('[data-navigation-tab]')];
             const panels = [...document.querySelectorAll('[data-navigation-panel]')];
             const saveBar = document.querySelector('[data-navigation-save-bar]');
+            const refreshSelectTitle = (select) => {
+                select.title = select.options[select.selectedIndex]?.text || '';
+            };
+            document.querySelectorAll('[data-navigation-group], .navigation-public-section select').forEach((select) => {
+                refreshSelectTitle(select);
+                select.addEventListener('change', () => refreshSelectTitle(select));
+            });
             const activateTab = (name, focus = false) => {
                 tabs.forEach((tab) => {
                     const active = tab.dataset.navigationTab === name;
@@ -274,12 +281,13 @@
                     if (event.key === 'Escape') { event.preventDefault(); closeIconPicker(picker, true); }
                 });
             });
-            window.MinistryPage?.addListener(document, 'pointerdown', (event) => {
+            const dismissIconPickers = (event) => {
                 document.querySelectorAll('[data-icon-picker-panel]:not([hidden])').forEach((panel) => {
-                    const owner = document.querySelector(`[aria-controls="${CSS.escape(panel.id)}"]`)?.closest('[data-icon-picker]');
+                    const owner = document.getElementById(panel.dataset.owner)?.closest('[data-icon-picker]') || document.querySelector(`[aria-controls="${CSS.escape(panel.id)}"]`)?.closest('[data-icon-picker]');
                     if (owner && !owner.contains(event.target) && !panel.contains(event.target)) closeIconPicker(owner);
                 });
-            });
+            };
+            document.addEventListener('pointerdown', dismissIconPickers);
             window.MinistryPage?.addListener(window, 'resize', () => document.querySelectorAll('[data-icon-picker-panel]:not([hidden])').forEach((panel) => {
                 const owner = document.querySelector(`[aria-controls="${CSS.escape(panel.id)}"]`)?.closest('[data-icon-picker]');
                 if (owner) positionIconPicker(owner);
@@ -343,7 +351,7 @@
                 rows.forEach((row) => {
                     const checkbox = row.querySelector('[data-navigation-checkbox]');
                     checkbox.addEventListener('change', () => {
-                        if (checkbox.checked && activeList.querySelectorAll('[data-navigation-row]').length >= max) {
+                        if (checkbox.checked && max > 0 && activeList.querySelectorAll('[data-navigation-row]').length >= max) {
                             checkbox.checked = false;
                             const summary = card.querySelector('.navigation-add-destinations summary strong');
                             if (summary) summary.textContent = `Maximum ${max} destinations selected`;

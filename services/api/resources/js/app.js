@@ -768,9 +768,28 @@ document.querySelectorAll('[data-page-block-editor]').forEach((form) => {
     let requestId = 0;
     let activeRequest;
     let selectedTarget;
+    const previewViewport = frame.closest('.page-editor-preview-viewport');
+    const syncPreviewHeight = () => {
+        const previewDocument = frame.contentDocument;
+        if (!previewDocument) return;
+        const documentElement = previewDocument.documentElement;
+        const body = previewDocument.body;
+        const height = Math.max(
+            documentElement?.scrollHeight || 0,
+            documentElement?.offsetHeight || 0,
+            body?.scrollHeight || 0,
+            body?.offsetHeight || 0,
+            720,
+        );
+        frame.style.height = `${height}px`;
+    };
     const installCanvasEditing = () => {
         const canvasDocument = frame.contentDocument;
         if (!canvasDocument) return;
+        syncPreviewHeight();
+        const previewResizeObserver = new ResizeObserver(syncPreviewHeight);
+        previewResizeObserver.observe(canvasDocument.documentElement);
+        if (canvasDocument.body) previewResizeObserver.observe(canvasDocument.body);
         const style = canvasDocument.createElement('style');
         style.textContent = `
             [data-page-editor-object] { cursor: pointer; }
@@ -932,6 +951,7 @@ document.querySelectorAll('[data-page-block-editor]').forEach((form) => {
             frame.srcdoc = `<!doctype html>${previewDocument.documentElement.outerHTML}`;
             frame.addEventListener('load', () => {
                 installCanvasEditing();
+                syncPreviewHeight();
                 status.textContent = 'Canvas is live. Select any section, column or element to edit it.';
             }, { once: true });
         } catch (error) {
@@ -955,7 +975,9 @@ document.querySelectorAll('[data-page-block-editor]').forEach((form) => {
     form.addEventListener('ai-section-revision', schedulePreview);
     form.addEventListener('page-editor-document-change', schedulePreview);
     form.querySelectorAll('[data-public-preview-size]').forEach((button) => button.addEventListener('click', () => {
-        frame.dataset.preview = button.dataset.publicPreviewSize;
+        const size = button.dataset.publicPreviewSize;
+        frame.dataset.preview = size;
+        if (previewViewport) previewViewport.dataset.preview = size;
         form.querySelectorAll('[data-public-preview-size]').forEach((item) => {
             const active = item === button;
             item.classList.toggle('is-active', active);

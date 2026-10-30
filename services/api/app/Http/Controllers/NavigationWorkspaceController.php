@@ -50,7 +50,10 @@ class NavigationWorkspaceController extends Controller
         foreach (NavigationLayout::SURFACES as $surface) {
             $rules["menus.{$surface}"] = ['required', 'array:sidebar,mobile'];
             foreach (['sidebar', 'mobile'] as $slot) {
-                $rules["menus.{$surface}.{$slot}"] = ['required', 'array', 'min:1', 'max:24'];
+                $rules["menus.{$surface}.{$slot}"] = ['required', 'array', 'min:1'];
+                if (! ($surface === 'staff' && $slot === 'sidebar')) {
+                    $rules["menus.{$surface}.{$slot}"][] = 'max:24';
+                }
                 $rules["menus.{$surface}.{$slot}.*"] = ['required', 'string', 'max:255'];
             }
         }
@@ -68,8 +71,8 @@ class NavigationWorkspaceController extends Controller
             $options = $layout->options($surface);
             foreach (['sidebar', 'mobile'] as $slot) {
                 $keys = array_values(array_unique($validated['menus'][$surface][$slot]));
-                $maxItems = $slot === 'mobile' ? 5 : 24;
-                if (count($keys) > $maxItems) {
+                $maxItems = $slot === 'mobile' ? 5 : (($surface === 'staff' && $slot === 'sidebar') ? null : 24);
+                if ($maxItems !== null && count($keys) > $maxItems) {
                     throw ValidationException::withMessages(['menus' => $slot === 'mobile' ? 'A mobile footer can contain up to five destinations.' : 'A sidebar can contain up to 24 destinations.']);
                 }
                 $items = [];
@@ -83,7 +86,7 @@ class NavigationWorkspaceController extends Controller
                         throw ValidationException::withMessages(['menus' => 'Choose an available menu icon.']);
                     }
                     $position = data_get($request->input('positions', []), "{$surface}.{$slot}.{$fieldKey}", count($items) + 1);
-                    if (! is_numeric($position) || (int) $position < 1 || (int) $position > $maxItems) {
+                    if (! is_numeric($position) || (int) $position < 1 || ($maxItems !== null && (int) $position > $maxItems)) {
                         throw ValidationException::withMessages(['menus' => 'Menu order must be within the available range.']);
                     }
                     $section = $slot === 'sidebar'

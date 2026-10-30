@@ -6,15 +6,15 @@ use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class PasswordRecoveryService
 {
+    public function __construct(private readonly EmailTemplateService $templates) {}
+
     public function request(string $email): void
     {
-        $this->ensureMailReady();
         $email = Str::lower($email);
         $user = User::query()->where('email', $email)->first();
         if ($user === null) {
@@ -31,10 +31,13 @@ class PasswordRecoveryService
             'token' => Hash::make($token), 'created_at' => now(),
         ]);
 
-        $url = rtrim(config('app.url'), '/').'/admin/reset-password#token='.$token.'&email='.rawurlencode($email);
-        Mail::raw("A password reset was requested for your ministry staff account. This link expires in 30 minutes.\n\n{$url}\n\nIf you did not request this, you can ignore this message.", function ($message) use ($email): void {
-            $message->to($email)->subject('Reset your ministry staff password');
-        });
+        $url = route('password.reset.create', ['token' => $token, 'email' => $email]);
+        try {
+            $this->templates->send('password_reset', $email, ['user_name' => $user->name, 'expires_minutes' => 30, 'action_url' => $url], $user->name, 'Reset password');
+        } catch (\Throwable $error) {
+            DB::table('password_reset_tokens')->where('email', $email)->delete();
+            throw $error;
+        }
     }
 
     public function reset(string $email, string $token, string $password, ?string $ip): void
@@ -58,15 +61,4 @@ class PasswordRecoveryService
         });
     }
 
-    private function ensureMailReady(): void
-    {
-        $mailer = config('mail.default');
-        $transport = config("mail.mailers.{$mailer}.transport");
-        if ($transport === 'array' && app()->environment('testing')) {
-            return;
-        }
-        if (! in_array($transport, ['smtp', 'ses', 'postmark', 'resend', 'sendmail'], true)) {
-            abort(503, 'Account email delivery is not configured. Contact the ministry administrator.');
-        }
-    }
 }

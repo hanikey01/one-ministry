@@ -3,13 +3,28 @@
 namespace App\Http\Controllers;
 
 use App\Services\StaffInvitationService;
+use App\Models\MinistrySetting;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class StaffInvitationController extends Controller
 {
+    public function create(Request $request): View
+    {
+        return view('auth.accept-invitation', ['settings' => MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID), 'token' => $request->query('token')]);
+    }
+
+    public function storeBrowser(Request $request, StaffInvitationService $invitations): RedirectResponse
+    {
+        $data = $request->validate(['token' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/'], 'password' => ['required', 'string', 'min:12', 'confirmed']]);
+        $invitations->accept($data['token'], $data['password']);
+        return to_route('login')->with('status', 'Your staff account is ready. Sign in with your new password.');
+    }
+
     public function index(): JsonResponse
     {
         $invitations = DB::table('staff_invitations')

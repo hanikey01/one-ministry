@@ -39,7 +39,9 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/public/sermon-series/{series}', [LibraryController::class, 'publicSeries']);
     Route::get('/public/libraries/{library}/{asset}/download', [LibraryController::class, 'download']);
     Route::get('/public/giving/funds', [GivingController::class, 'funds']);
+    Route::get('/public/giving/options', [GivingController::class, 'options']);
     Route::post('/public/giving/intents', [GivingController::class, 'intent'])->middleware('throttle:10,1');
+    Route::get('/public/giving/donations/{donation}/status', [GivingController::class, 'status'])->middleware('throttle:60,1');
     Route::get('/public/groups', [GroupDiscoveryController::class, 'index']);
     Route::post('/public/groups/{group}/join-requests', [GroupDiscoveryController::class, 'request'])->middleware('throttle:10,1');
     Route::post('/webhooks/giving/{provider}', [GivingController::class, 'webhook'])->middleware('throttle:60,1');

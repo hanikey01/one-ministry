@@ -124,6 +124,56 @@ class PageDocumentServiceTest extends TestCase
         app(PageDocumentService::class)->normalise($document);
     }
 
+    public function test_responsive_per_side_spacing_survives_normalisation(): void
+    {
+        $document = ['version' => 2, 'sections' => [[
+            'id' => 'section-spacing', 'type' => 'section', 'settings' => [],
+            'responsive' => ['desktop' => [
+                'padding' => ['top' => '24px', 'right' => '2rem', 'bottom' => '24px', 'left' => '2rem'],
+                'margin' => ['top' => '-8px', 'right' => '0px', 'bottom' => '0px', 'left' => '0px'],
+            ]],
+            'columns' => [[
+                'id' => 'column-main', 'settings' => [], 'responsive' => [],
+                'elements' => [['id' => 'paragraph', 'type' => 'paragraph', 'content' => ['text' => 'Welcome'], 'settings' => [], 'responsive' => []]],
+            ]],
+        ]]];
+
+        $responsive = app(PageDocumentService::class)->normalise($document)['sections'][0]['responsive']['desktop'];
+
+        $this->assertSame('2rem', $responsive['padding']['right']);
+        $this->assertSame('-8px', $responsive['margin']['top']);
+    }
+
+    public function test_section_column_and_element_design_settings_survive_normalisation(): void
+    {
+        $document = ['version' => 2, 'sections' => [[
+            'id' => 'section-design', 'type' => 'section',
+            'settings' => ['custom_id' => 'welcome-section', 'custom_class' => 'featured-section', 'custom_css' => 'selector { color: #112233; }', 'custom_js' => 'selector.dataset.ready = "yes";', 'radius_top_left' => '12px'],
+            'responsive' => ['mobile' => ['alignment' => 'center']],
+            'columns' => [[
+                'id' => 'column-design',
+                'settings' => ['custom_id' => 'welcome-column', 'custom_class' => 'featured-column', 'custom_css' => 'padding-inline: 1rem;', 'custom_js' => 'selector.dataset.column = "ready";'],
+                'responsive' => ['desktop' => ['padding' => ['top' => '10px', 'right' => '2rem', 'bottom' => '10px', 'left' => '2rem']]],
+                'elements' => [[
+                    'id' => 'button-design', 'type' => 'button', 'content' => ['label' => 'Welcome', 'url' => ''],
+                    'settings' => ['custom_id' => 'welcome-button', 'custom_class' => 'featured-button', 'font_size' => '18px', 'button_padding_x' => '22px', 'button_radius' => '999px'],
+                    'responsive' => ['tablet' => ['margin' => ['top' => '4px', 'right' => '0px', 'bottom' => '4px', 'left' => '0px']]],
+                ]],
+            ]],
+        ]]];
+
+        $normalised = app(PageDocumentService::class)->normalise($document);
+        $section = $normalised['sections'][0];
+        $column = $section['columns'][0];
+        $element = $column['elements'][0];
+
+        $this->assertSame('selector { color: #112233; }', $section['settings']['custom_css']);
+        $this->assertSame('welcome-column', $column['settings']['custom_id']);
+        $this->assertSame('2rem', $column['responsive']['desktop']['padding']['right']);
+        $this->assertSame('999px', $element['settings']['button_radius']);
+        $this->assertSame('4px', $element['responsive']['tablet']['margin']['top']);
+    }
+
     public function test_custom_code_element_preserves_bounded_html_css_and_javascript(): void
     {
         $document = ['version' => 2, 'sections' => [[
@@ -144,5 +194,77 @@ class PageDocumentServiceTest extends TestCase
         $this->assertSame('button { color: rebeccapurple; }', $normalised['sections'][0]['columns'][0]['elements'][0]['content']['css']);
         $this->assertSame('compact', $normalised['sections'][0]['responsive']['desktop']['margin']);
         $this->assertSame('welcome-card', $normalised['sections'][0]['columns'][0]['elements'][0]['settings']['custom_id']);
+    }
+
+    public function test_section_and_column_layout_controls_survive_normalisation(): void
+    {
+        $document = ['version' => 2, 'sections' => [[
+            'id' => 'section-layout', 'type' => 'section',
+            'settings' => [
+                'content_width' => 'custom', 'content_max_width' => '1040px', 'min_height' => '80vh',
+                'vertical_alignment' => 'center', 'row_gap' => '2rem', 'background_position' => 'right_center',
+                'background_size' => 'contain', 'background_repeat' => 'no_repeat', 'background_attachment' => 'scroll',
+            ],
+            'responsive' => ['tablet' => ['column_count' => '2']],
+            'columns' => [[
+                'id' => 'column-layout',
+                'settings' => ['min_height' => '320px', 'vertical_alignment' => 'end', 'element_gap' => '1.5rem'],
+                'responsive' => [
+                    'desktop' => ['width' => 'custom', 'custom_width' => '62%'],
+                    'mobile' => ['width' => 'full', 'order' => '2'],
+                ],
+                'elements' => [['id' => 'copy', 'type' => 'paragraph', 'content' => ['text' => 'Welcome'], 'settings' => [], 'responsive' => []]],
+            ]],
+        ]]];
+
+        $normalised = app(PageDocumentService::class)->normalise($document);
+        $section = $normalised['sections'][0];
+        $column = $section['columns'][0];
+
+        $this->assertSame('1040px', $section['settings']['content_max_width']);
+        $this->assertSame('right_center', $section['settings']['background_position']);
+        $this->assertSame('320px', $column['settings']['min_height']);
+        $this->assertSame('62%', $column['responsive']['desktop']['custom_width']);
+        $this->assertSame('full', $column['responsive']['mobile']['width']);
+    }
+
+    public function test_responsive_typography_is_bounded_and_preserved(): void
+    {
+        $document = ['version' => 2, 'sections' => [[
+            'id' => 'section-type', 'type' => 'section', 'settings' => [], 'responsive' => [],
+            'columns' => [[
+                'id' => 'column-type', 'settings' => [], 'responsive' => [],
+                'elements' => [[
+                    'id' => 'heading-type', 'type' => 'heading', 'content' => ['text' => 'Welcome'], 'settings' => [],
+                    'responsive' => [
+                        'desktop' => ['font_size' => '48px', 'line_height' => '1.1', 'letter_spacing' => '-1px'],
+                        'mobile' => ['font_size' => '30px', 'line_height' => '1.2'],
+                    ],
+                ]],
+            ]],
+        ]]];
+
+        $responsive = app(PageDocumentService::class)->normalise($document)['sections'][0]['columns'][0]['elements'][0]['responsive'];
+
+        $this->assertSame('48px', $responsive['desktop']['font_size']);
+        $this->assertSame('-1px', $responsive['desktop']['letter_spacing']);
+        $this->assertSame('30px', $responsive['mobile']['font_size']);
+    }
+
+    public function test_internal_ministry_media_path_is_valid_for_backgrounds(): void
+    {
+        $document = ['version' => 2, 'sections' => [[
+            'id' => 'section-media', 'type' => 'section',
+            'settings' => ['background_image' => '/media/8c2738b3-8de1-46c6-987b-f51f51649435?variant=public'],
+            'responsive' => [],
+            'columns' => [[
+                'id' => 'column-main', 'settings' => [], 'responsive' => [],
+                'elements' => [['id' => 'copy', 'type' => 'paragraph', 'content' => ['text' => 'Welcome'], 'settings' => [], 'responsive' => []]],
+            ]],
+        ]]];
+
+        $normalised = app(PageDocumentService::class)->normalise($document);
+
+        $this->assertSame('/media/8c2738b3-8de1-46c6-987b-f51f51649435?variant=public', $normalised['sections'][0]['settings']['background_image']);
     }
 }

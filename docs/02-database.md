@@ -55,13 +55,16 @@ Staff invitations use `staff_invitations(id uuid PK, email varchar(254), name va
 | Community | `groups`, `group_memberships`, `events`, `event_registrations`, `volunteer_teams`, `volunteer_assignments` | Dates and location; waitlist order; team role and shift uniqueness. |
 | Communication | `message_templates`, `campaigns`, `message_deliveries`, `notification_preferences` | Delivery outcome; consent snapshot; provider message ID unique where present. |
 | Giving | `funds`, `donations`, `payment_attempts`, `payment_events`, `receipts`, `reconciliation_batches` | Append-only payment events; unique provider transaction ID; donation state derived from verified events. |
+| Testimonies | `testimonies` | Member submissions remain private until reviewed; public rows require explicit consent and published status. Author visibility is separate from authorship. |
 | Operations | `outbox_events`, `webhook_receipts`, `audit_events`, `export_jobs`, `backup_manifests` | Unique event IDs; immutable audit and webhook receipt rows. |
 
 ## 3. Key record definitions
 
 ### 2.2 Email delivery
 
-`email_delivery_settings` is a singleton installation record. It stores the active provider choice, enabled state, sender address/name, and SMTP connection metadata. SMTP passwords and provider keys are encrypted before storage and are never returned to staff screens or copied into audit payloads. The supported portable choices are the hosting sendmail service, custom SMTP, Resend, Postmark, SendGrid, Mailgun, Brevo, Google Workspace/Gmail, Amazon SES SMTP, and Zoho SMTP. A provider must have a valid sender and complete connection details before activation.
+`email_delivery_settings` is a singleton installation record. It stores the active provider choice, enabled state, sender address/name, SMTP connection metadata, and the timestamp/outcome of the latest operator test. SMTP passwords and provider keys are encrypted before storage and are never returned to staff screens or copied into audit payloads. The supported portable choices are the hosting sendmail service, custom SMTP, Resend, Postmark, SendGrid, Mailgun, Brevo, Google Workspace/Gmail, Amazon SES SMTP, and Zoho SMTP. A provider must have a valid sender and complete connection details before activation.
+
+`email_templates` stores one installation-owned template per stable event key. It retains the staff-facing name and description, subject, plain-text body template, approved placeholder catalog, active state, updater, and timestamps. Staff cannot edit the shared HTML shell or introduce arbitrary HTML. Security action URLs are rendered by the platform as labelled buttons rather than interpolated into editable body copy.
 
 ### 3.1 Person and identity
 
@@ -157,5 +160,5 @@ Public navigation is ministry-owned and stored as ordered `navigation_items`. Ea
 `navigation_layouts` stores ordered staff and member sidebar destinations as bounded key/icon/section JSON entries, and mobile-footer destinations as bounded key/icon entries. Sidebar section values must match a section in the server-owned destination registry; destination keys never resolve to arbitrary routes. The staff renderer reapplies permission and module checks for every request; member links are still protected by their route middleware and module gates. Published page destinations are selectable, and navigation changes record an audit event against the installation settings identifier.
 # Digital school extension
 
-The digital school uses installation-local records: `school_courses`, `school_course_modules`, `school_lessons`, `school_enrollments`, `school_lesson_progress`, `school_assessments`, `school_assessment_questions`, `school_assessment_attempts`, `school_live_classes`, and `school_certificates`. A person can have one enrollment per course. Certificates are uniquely tied to a completed enrollment and can be revoked without deleting completion history. Live classes may reference a platform meeting or an approved external URL.
+The digital school uses installation-local records: `school_courses`, `school_course_modules`, `school_lessons`, `school_enrollments`, `school_lesson_progress`, `school_assessments`, `school_assessment_questions`, `school_assessment_attempts`, `school_live_classes`, `school_certificates`, and `school_course_instructors`. A person can have one enrollment per course. A completed enrollment may have a historical certificate chain: a revoked certificate is retained with its reason, actor, and public verification state; a replacement certificate links to the credential it supersedes. Course instructor assignments give staff with `school.instruct` read/instructor access only to explicitly assigned courses. Live classes may reference a platform meeting or an approved external URL.
 

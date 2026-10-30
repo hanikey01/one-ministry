@@ -7,13 +7,13 @@
     </div>
     <div class="navigation-destination-controls" data-public-controls @if(!$enabled) hidden @endif>
         <div class="navigation-move-controls" aria-label="Reorder {{ $item->label }}">
-            <button type="button" data-public-move="up" aria-label="Move {{ $item->label }} up">↑</button>
-            <button type="button" data-public-move="down" aria-label="Move {{ $item->label }} down">↓</button>
+            <button class="navigation-move-button navigation-move-button-up" type="button" data-public-move="up" aria-label="Move {{ $item->label }} up"><x-ui.icon name="chevron-down" :size="15"/></button>
+            <button class="navigation-move-button navigation-move-button-down" type="button" data-public-move="down" aria-label="Move {{ $item->label }} down"><x-ui.icon name="chevron-down" :size="15"/></button>
         </div>
         @if(!$item->parent_id)
             <div class="navigation-section-control navigation-public-section">
                 <label class="sr-only" for="public-navigation-section-{{ $item->id }}">Section for {{ $item->label }}</label>
-                <select id="public-navigation-section-{{ $item->id }}" name="sections[{{ $item->id }}]" aria-label="Section for {{ $item->label }}">
+                <select id="public-navigation-section-{{ $item->id }}" name="sections[{{ $item->id }}]" aria-label="Section for {{ $item->label }}" title="{{ $item->section }}">
                     @foreach($publicSections as $section)<option value="{{ $section }}" @selected($item->section === $section)>{{ $section }}</option>@endforeach
                 </select>
             </div>

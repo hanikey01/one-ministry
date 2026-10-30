@@ -4,15 +4,15 @@
 
 ## 1. Identity, authorization, and scope
 
-Visitors may browse and watch public services anonymously. Form submission asks only for information needed to respond. Account registration verifies a contact method before sensitive self-service actions. Staff invitations require an administrator with assignment authority. Sessions can be revoked individually or all at once; elevated roles require multifactor authentication before restricted care, finance, security, or export actions.
+Visitors may browse and watch public services anonymously. Form submission asks only for information needed to respond. Account registration verifies a contact method before sensitive self-service actions. Staff invitations require an administrator with assignment authority. Sessions can be revoked individually or all at once. Staff workflows use authentication, permission checks, verified email where required, and audit trails; they do not require a separate MFA session challenge.
 
-AI provider credentials and page-editor model routes are an explicit configuration exception: they require the `ai.manage` permission and verified email, and are audited, but do not require MFA enrollment or a recent MFA challenge. Provider keys remain encrypted and write-only. This does not change the MFA requirements for other elevated or restricted actions.
+AI provider credentials and page-editor model routes require the `ai.manage` permission and verified email, and are audited. Provider keys remain encrypted and write-only.
 
 Authorization has three checks: action permission, object relationship, and assigned scope. A group leader can see their group, not every person. A care worker can see assigned cases, not all prayer requests. Finance access never grants pastoral access. Admin configuration rights do not silently grant restricted-data reading rights. Direct object URLs and exports follow the same checks as list screens.
 
 The installation catalog is deliberately small: Ministry Administrator, Content & Media Editor, Ministry Operations Coordinator, Care Staff, Finance Staff, Service & Production Team, Children’s Team, Security Administrator, and Super Administrator. Visitor is public state and Member is ordinary account access. Department, group, volunteer, service, and meeting responsibilities are contextual assignments. Roles that must be tied to an assigned service, meeting, department, or team are never granted through an installation-wide invitation workflow.
 
-Department teams use the same scope rule. A person may belong to several department rosters. A coordinator or executive can add and remove ordinary members only in the department where they hold that active role. A ministry administrator may create departments and appoint or remove coordinators and executives. Care and Finance roster membership never grants private care-case or giving-record access; those domains retain their separate permissions, assignment checks, verified-email requirement, MFA requirement, and audit trail.
+Department teams use the same scope rule. A person may belong to several department rosters. A coordinator or executive can add and remove ordinary members only in the department where they hold that active role. A ministry administrator may create departments and appoint or remove coordinators and executives. Care and Finance roster membership never grants private care-case or giving-record access; those domains retain their separate permissions, assignment checks, verified-email requirement, and audit trail.
 
 ## 2. Feature configuration
 
@@ -74,6 +74,10 @@ Private meetings require a room-scoped grant. Recording is off by default, start
 
 ## 9. Messaging and giving
 
+### Testimony moderation
+
+A member testimony begins as `submitted` and is visible only to its owner and authorized content staff. Staff-authored records begin as drafts. Editing published testimony returns it to draft. Public rendering requires published status, an effective publication time, and explicit public-sharing consent. Public author-name display is independent from the retained internal authorship link. Members may withdraw only their own submitted or rejected testimony. Submission, withdrawal, editing, publication, rejection, and archival are audited. Publishing requires `content.publish` and verified email but not MFA.
+
 Each outbound message has purpose, audience, template version, consent basis, delivery channel, and idempotency key. Essential operational notices and optional ministry campaigns are distinguished. Unsubscribe or preference changes are honored before sending. Failed delivery is visible to staff and retryable within a configured limit.
 
 A gift begins as pending. Only a verified provider event or reviewed offline reconciliation makes it confirmed. Provider webhook retries are deduplicated. Reversal/refund appends a new event and updates the derived balance; the original event stays intact. Receipts are issued after confirmation. Donor data is excluded from ordinary engagement dashboards and follow-up targeting unless a ministry has explicitly defined and justified a specific finance workflow.
@@ -92,6 +96,6 @@ Track request IDs, service transitions, webhook verification failures, job failu
 - Capacity counts active and completed enrollments.
 - Only active learners can complete lessons or submit assessments.
 - Completion requires all published lessons and all published assessments to be passed.
-- Certificates are issued once, only when certificates are enabled and completion requirements are satisfied.
+- Certificates are issued only when certificates are enabled and completion requirements are satisfied. Revocation never deletes credential history. A replacement may be issued only by authorized staff after revocation, receives a fresh number and verification code, and links to the superseded credential; the earlier public link continues to report revoked status.
 - A live class is a meeting experience and must not be treated as an unlimited broadcast.
 

@@ -25,15 +25,7 @@ services:
   vite:
     image: node:22-alpine
     working_dir: /var/www/html
-    command: ["sh", "-c", "if [ ! -x node_modules/.bin/vite ]; then npm install --no-audit --no-fund --ignore-scripts; fi; exec npm run dev -- --host 0.0.0.0"]
-    ports:
-      - "5173:5173"
-    environment:
-      # Use localhost by default. Set DEV_HOST to the computer's LAN address
-      # when testing from a phone so the generated Vite asset and HMR URLs are reachable.
-      VITE_DEV_ORIGIN: "http://${DEV_HOST:-localhost}:${DEV_PORT:-8080}"
-      VITE_HMR_HOST: "${DEV_HOST:-localhost}"
-      VITE_HMR_CLIENT_PORT: "${DEV_PORT:-8080}"
+    command: ["sh", "-c", "rm -f public/hot; if [ ! -x node_modules/.bin/vite ]; then npm install --no-audit --no-fund --ignore-scripts; fi; exec npm run build -- --watch"]
     volumes:
       - ./services/api:/var/www/html
       - vite_node_modules:/var/www/html/node_modules

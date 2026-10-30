@@ -13,7 +13,18 @@
         </article>
         <article class="security-card"><span class="security-card-icon muted"><x-ui.icon name="people" :size="20"/></span><p>ACTIVE SESSIONS</p><h2>{{ $sessions->count() }} {{ str('session')->plural($sessions->count()) }}</h2><span>Review your account access regularly and sign out from unfamiliar devices.</span></article>
     </section>
-    @if($mfaSetup && ! $mfaEnabled)<section class="security-enrollment" aria-labelledby="mfa-enrollment-title"><div><p>STEP 1 OF 2</p><h2 id="mfa-enrollment-title">Add this key to your authenticator app.</h2><span>Choose “enter a setup key” in your app, then use the current six-digit code to confirm it here.</span></div><code>{{ $mfaSetup['secret'] }}</code><form method="POST" action="{{ route('staff.security.mfa.enable') }}">@csrf<label>Authenticator code<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="000000"></label><button class="button" type="submit">Verify and enable</button></form></section>@endif
-    @if($recoveryCodes)<section class="security-recovery" aria-labelledby="recovery-title"><div><p>SAVE THESE NOW</p><h2 id="recovery-title">Recovery codes</h2><span>Each code works once. Store them in a password manager or another private place.</span></div><div>@foreach($recoveryCodes as $code)<code>{{ $code }}</code>@endforeach</div></section>@endif
+    @if($mfaSetup && ! $mfaEnabled)<section class="security-enrollment" aria-labelledby="mfa-enrollment-title"><div><p>STEP 1 OF 2</p><h2 id="mfa-enrollment-title">Add this key to your authenticator app.</h2><span>Choose “enter a setup key” in your app, then use the current six-digit code to confirm it here.</span></div><div class="security-copy-field"><code id="mfa-setup-key">{{ $mfaSetup['secret'] }}</code><button class="copy-button" type="button" data-copy-target="mfa-setup-key" aria-label="Copy authenticator setup key">Copy key</button></div><form method="POST" action="{{ route('staff.security.mfa.enable') }}">@csrf<label>Authenticator code<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="000000"></label><button class="button" type="submit">Verify and enable</button></form></section>@endif
+    @if($recoveryCodes)<section class="security-recovery" aria-labelledby="recovery-title"><div><p>SAVE THESE NOW</p><h2 id="recovery-title">Recovery codes</h2><span>Each code works once. Store them in a password manager or another private place.</span></div><div class="security-recovery-codes">@foreach($recoveryCodes as $code)<code>{{ $code }}</code>@endforeach<button class="copy-button" type="button" data-copy-target="recovery-codes" aria-label="Copy all recovery codes">Copy all codes</button><textarea id="recovery-codes" class="visually-hidden" readonly>{{ implode("\n", $recoveryCodes) }}</textarea></div></section>@endif
     <section class="data-panel security-sessions-panel"><table><thead><tr><th>Session</th><th>Last active</th></tr></thead><tbody>@forelse($sessions as $session)<tr><td data-label="Session"><strong>{{ $session->id }}</strong></td><td data-label="Last active">{{ \Illuminate\Support\Carbon::createFromTimestamp($session->last_activity)->timezone($settings->timezone)->format('M j, Y · g:i A') }}</td></tr>@empty<tr><td colspan="2" class="empty-cell">No sessions recorded.</td></tr>@endforelse</tbody></table></section>
+    <script>
+        document.querySelectorAll('[data-copy-target]').forEach((button) => button.addEventListener('click', async () => {
+            const target = document.getElementById(button.dataset.copyTarget);
+            if (!target) return;
+            const value = target.value ?? target.textContent.trim();
+            try { await navigator.clipboard.writeText(value); } catch { target.select?.(); document.execCommand('copy'); }
+            const label = button.textContent;
+            button.textContent = 'Copied';
+            setTimeout(() => { button.textContent = label; }, 1800);
+        }));
+    </script>
 </x-layouts.workspace>

@@ -25,9 +25,9 @@
         <div><p>PAGE CANVAS</p><strong>Edit the live page</strong></div>
         <details class="page-editor-navigator"><summary>Navigator</summary><div data-page-navigator></div></details>
         <div class="page-canvas-toolbar" role="group" aria-label="Canvas preview size">
-            <button type="button" class="is-active" data-public-preview-size="desktop" aria-pressed="true" aria-label="Desktop canvas" title="Desktop canvas"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="1.5"></rect><path d="M8 20h8M12 17v3"></path></svg></button>
-            <button type="button" data-public-preview-size="tablet" aria-pressed="false" aria-label="Tablet canvas" title="Tablet canvas"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="2"></rect><path d="M10 18h4"></path></svg></button>
-            <button type="button" data-public-preview-size="mobile" aria-pressed="false" aria-label="Mobile canvas" title="Mobile canvas"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3" width="8" height="18" rx="2"></rect><path d="M11 18h2"></path></svg></button>
+            <button type="button" class="page-canvas-mode-button is-active" data-public-preview-size="desktop" aria-pressed="true" aria-label="Desktop canvas" title="Desktop canvas"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="1.5"></rect><path d="M8 20h8M12 17v3"></path></svg></button>
+            <button type="button" class="page-canvas-mode-button" data-public-preview-size="tablet" aria-pressed="false" aria-label="Tablet canvas" title="Tablet canvas"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="2"></rect><path d="M10 18h4"></path></svg></button>
+            <button type="button" class="page-canvas-mode-button" data-public-preview-size="mobile" aria-pressed="false" aria-label="Mobile canvas" title="Mobile canvas"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3" width="8" height="18" rx="2"></rect><path d="M11 18h2"></path></svg></button>
         </div>
     </header>
     <p class="page-editor-preview-status" data-public-preview-status role="status">Loading the editable page…</p>

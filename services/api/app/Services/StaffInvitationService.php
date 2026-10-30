@@ -10,11 +10,13 @@ use Illuminate\Validation\ValidationException;
 
 class StaffInvitationService
 {
+    public function __construct(private readonly EmailTemplateService $templates) {}
+
     public function create(string $name, string $email, string $roleKey, User $actor, ?string $ip): array
     {
         $email = Str::lower($email);
 
-        return DB::transaction(function () use ($name, $email, $roleKey, $actor, $ip): array {
+        $invitation = DB::transaction(function () use ($name, $email, $roleKey, $actor, $ip): array {
             if (! in_array($roleKey, RoleCatalog::ROUTINE_INVITATION_ROLES, true) || ! DB::table('roles')->where('key', $roleKey)->exists()) {
                 throw ValidationException::withMessages(['role_key' => 'Choose one of the available staff roles.']);
             }
@@ -40,9 +42,20 @@ class StaffInvitationService
             return [
                 'id' => $id, 'name' => $name, 'email' => $email,
                 'role_key' => $roleKey, 'expires_at' => $expiresAt->toIso8601String(),
-                'accept_url' => '/admin/accept-invitation#token='.$token,
+                'accept_url' => route('staff.invitation.accept.page', ['token' => $token]),
             ];
         });
+
+        try {
+            $ministry = \App\Models\MinistrySetting::findOrFail(\App\Models\MinistrySetting::SINGLETON_ID);
+            $this->templates->send('staff_invitation', $email, ['invitee_name' => $name, 'inviter_name' => $actor->name, 'ministry_name' => $ministry->name, 'role_name' => Str::headline($roleKey), 'expires_hours' => 24, 'action_url' => $invitation['accept_url']], $name, 'Accept invitation');
+        } catch (\Throwable $error) {
+            DB::table('staff_invitations')->where('id', $invitation['id'])->update(['revoked_at' => now(), 'updated_at' => now()]);
+            $this->audit($actor, 'staff_invitation.delivery_failed', $invitation['id'], ['email' => $email], $ip);
+            throw $error;
+        }
+
+        return $invitation;
     }
 
     public function accept(string $token, string $password): void

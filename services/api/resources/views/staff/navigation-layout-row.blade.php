@@ -10,13 +10,13 @@
     </div>
     <div class="navigation-destination-controls">
         <div class="navigation-move-controls" @if(!$selected) hidden @endif>
-            <button type="button" data-move-up aria-label="Move {{ $option['label'] }} up">↑</button>
-            <button type="button" data-move-down aria-label="Move {{ $option['label'] }} down">↓</button>
+            <button class="navigation-move-button navigation-move-button-up" type="button" data-move-up aria-label="Move {{ $option['label'] }} up"><x-ui.icon name="chevron-down" :size="15"/></button>
+            <button class="navigation-move-button navigation-move-button-down" type="button" data-move-down aria-label="Move {{ $option['label'] }} down"><x-ui.icon name="chevron-down" :size="15"/></button>
         </div>
         @if($menuSlot === 'sidebar')
             <div class="navigation-section-control" data-navigation-section-control @if(!$selected) hidden @endif>
                 <label class="sr-only" for="navigation-section-{{ $surface }}-{{ $fieldKey }}">Section for {{ $option['label'] }}</label>
-                <select id="navigation-section-{{ $surface }}-{{ $fieldKey }}" name="groups[{{ $surface }}][sidebar][{{ $fieldKey }}]" aria-label="Section for {{ $option['label'] }}" data-navigation-group @disabled(!$selected)>
+                <select id="navigation-section-{{ $surface }}-{{ $fieldKey }}" name="groups[{{ $surface }}][sidebar][{{ $fieldKey }}]" aria-label="Section for {{ $option['label'] }}" title="{{ $configuredGroup }}" data-navigation-group @disabled(!$selected)>
                     @foreach($sidebarSections as $section)
                         <option value="{{ $section }}" @selected($configuredGroup === $section)>{{ $section }}</option>
                     @endforeach

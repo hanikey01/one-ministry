@@ -9,17 +9,23 @@ use Illuminate\Validation\ValidationException;
 
 class EmailVerificationService
 {
-    public function request(User $user, EmailDeliverySettingsService $delivery): void
+    public function __construct(private readonly EmailTemplateService $templates) {}
+
+    public function request(User $user): void
     {
         if ($user->email_verified_at !== null) {
             return;
         }
-        $delivery->ensureActive();
         $token = bin2hex(random_bytes(32));
         DB::table('email_verification_tokens')->where('user_id', $user->id)->whereNull('used_at')->delete();
         DB::table('email_verification_tokens')->insert(['id' => (string) Str::uuid(), 'user_id' => $user->id, 'token_hash' => hash('sha256', $token), 'expires_at' => now()->addMinutes(30), 'created_at' => now(), 'updated_at' => now()]);
         $url = route('email.verify.show', ['token' => $token]);
-        $delivery->sendRaw($user->email, 'Verify your ministry staff email', "Verify your ministry staff email address. This link expires in 30 minutes.\n\n{$url}");
+        try {
+            $this->templates->send('staff_email_verification', $user->email, ['user_name' => $user->name, 'expires_minutes' => 30, 'action_url' => $url], $user->name, 'Verify email');
+        } catch (\Throwable $error) {
+            DB::table('email_verification_tokens')->where('user_id', $user->id)->whereNull('used_at')->delete();
+            throw $error;
+        }
     }
 
     public function verify(string $token, ?string $ip): void

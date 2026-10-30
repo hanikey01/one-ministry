@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MinistrySetting;
+use App\Services\CertificateQrCode;
 use App\Services\DigitalSchoolService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -18,10 +19,14 @@ class MemberSchoolController extends Controller
         $this->enabled();
         $person = $this->person($request);
         $courses = DB::table('school_courses')->whereNull('deleted_at')->where('status', 'published')
+            ->when($request->filled('q'), fn ($query) => $query->where(fn ($search) => $search->where('title', 'like', '%'.$request->string('q').'%')->orWhere('summary', 'like', '%'.$request->string('q').'%')))
+            ->when($request->filled('level'), fn ($query) => $query->where('level', $request->string('level')))
+            ->when($request->filled('category'), fn ($query) => $query->where('category', $request->string('category')))
             ->orderByRaw('case when starts_at is null then 1 else 0 end')->orderBy('starts_at')->get();
         $enrollments = DB::table('school_enrollments')->where('person_id', $person->id)->get()->keyBy('course_id');
+        $categories = DB::table('school_courses')->whereNull('deleted_at')->where('status', 'published')->whereNotNull('category')->distinct()->orderBy('category')->pluck('category');
 
-        return view('member.school.index', $this->base($request, $person) + compact('courses', 'enrollments'));
+        return view('member.school.index', $this->base($request, $person) + compact('courses', 'enrollments', 'categories'));
     }
 
     public function show(Request $request, string $course): View
@@ -40,7 +45,11 @@ class MemberSchoolController extends Controller
         $classes = DB::table('school_live_classes')->where('course_id', $course)->whereIn('status', ['scheduled', 'live'])->orderBy('starts_at')->get();
         $certificate = $enrollment ? DB::table('school_certificates')->where('enrollment_id', $enrollment->id)->whereNull('revoked_at')->first() : null;
 
-        return view('member.school.show', $this->base($request, $person) + ['course' => $courseRow] + compact('enrollment', 'modules', 'lessons', 'progress', 'assessments', 'questions', 'attempts', 'classes', 'certificate'));
+        $orderedLessons = $modules->flatMap(fn ($module) => $lessons->get($module->id, collect()));
+        $nextLesson = $enrollment ? $orderedLessons->first(fn ($lesson) => optional($progress->get($lesson->id))->status !== 'completed') : null;
+        $previewLessons = $orderedLessons->where('preview', true);
+
+        return view('member.school.show', $this->base($request, $person) + ['course' => $courseRow] + compact('enrollment', 'modules', 'lessons', 'progress', 'assessments', 'questions', 'attempts', 'classes', 'certificate', 'nextLesson', 'previewLessons'));
     }
 
     public function enroll(Request $request, string $course): RedirectResponse
@@ -84,6 +93,37 @@ class MemberSchoolController extends Controller
         return back()->with('status', 'Lesson completed. Your progress has been updated.');
     }
 
+    public function saveLessonProgress(Request $request, string $course, string $lesson): \Illuminate\Http\JsonResponse
+    {
+        $this->enabled();
+        $person = $this->person($request);
+        $data = $request->validate(['progress_seconds' => ['required', 'integer', 'min:0', 'max:172800']]);
+        $enrollment = DB::table('school_enrollments')->where(['course_id' => $course, 'person_id' => $person->id, 'status' => 'active'])->first();
+        abort_unless($enrollment, 403);
+        $exists = DB::table('school_lessons')->join('school_course_modules', 'school_course_modules.id', '=', 'school_lessons.module_id')
+            ->where('school_lessons.id', $lesson)->where('school_course_modules.course_id', $course)
+            ->where('school_course_modules.published', true)->where('school_lessons.published', true)->exists();
+        abort_unless($exists, 404);
+
+        $progress = DB::table('school_lesson_progress')->where(['enrollment_id' => $enrollment->id, 'lesson_id' => $lesson])->first();
+        if ($progress) {
+            if ($progress->status !== 'completed') {
+                DB::table('school_lesson_progress')->where('id', $progress->id)->update([
+                    'status' => 'started', 'progress_seconds' => max((int) $progress->progress_seconds, $data['progress_seconds']),
+                    'last_viewed_at' => now(), 'updated_at' => now(),
+                ]);
+            }
+        } else {
+            DB::table('school_lesson_progress')->insert([
+                'id' => (string) Str::uuid(), 'enrollment_id' => $enrollment->id, 'lesson_id' => $lesson,
+                'status' => 'started', 'progress_seconds' => $data['progress_seconds'], 'last_viewed_at' => now(),
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+
+        return response()->json(['saved' => true]);
+    }
+
     public function submitAssessment(Request $request, string $course, string $assessment, DigitalSchoolService $school): RedirectResponse
     {
         $this->enabled();
@@ -102,14 +142,20 @@ class MemberSchoolController extends Controller
         return back()->with('status', $attempt->passed ? "Assessment passed with {$attempt->score_percent}%." : "You scored {$attempt->score_percent}%. Review the lessons and try again.");
     }
 
-    public function certificate(Request $request, string $course): View
+    public function certificate(Request $request, string $course, CertificateQrCode $qrCode): View
     {
         $this->enabled();
         $person = $this->person($request);
-        $record = DB::table('school_certificates')->join('school_enrollments', 'school_enrollments.id', '=', 'school_certificates.enrollment_id')->join('school_courses', 'school_courses.id', '=', 'school_enrollments.course_id')->where('school_courses.id', $course)->where('school_enrollments.person_id', $person->id)->whereNull('school_certificates.revoked_at')->first(['school_certificates.*', 'school_courses.title as course_title']);
+        $record = DB::table('school_certificates')->join('school_enrollments', 'school_enrollments.id', '=', 'school_certificates.enrollment_id')->join('school_courses', 'school_courses.id', '=', 'school_enrollments.course_id')->where('school_courses.id', $course)->where('school_enrollments.person_id', $person->id)->whereNull('school_certificates.revoked_at')->first(['school_certificates.*', 'school_courses.title as current_course_title']);
         abort_unless($record, 404);
 
-        return view('member.school.certificate', $this->base($request, $person) + ['certificate' => $record]);
+        $verificationUrl = route('public.certificates.verify', $record->verification_code);
+
+        return view('member.school.certificate', $this->base($request, $person) + [
+            'certificate' => $record,
+            'verificationUrl' => $verificationUrl,
+            'certificateQrSvg' => $qrCode->svg($verificationUrl),
+        ]);
     }
 
     private function enabled(): void

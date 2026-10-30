@@ -122,7 +122,7 @@ class InstallMinistry
                 }
             }
 
-            foreach (['digital_church', 'interactive_meetings', 'people', 'groups', 'giving', 'books_library', 'audio_sermons', 'video_sermons', 'sermon_series'] as $feature) {
+            foreach (['digital_church', 'interactive_meetings', 'people', 'groups', 'giving', 'testimonies', 'books_library', 'audio_sermons', 'video_sermons', 'sermon_series'] as $feature) {
                 FeatureSetting::firstOrCreate(['key' => $feature], ['state' => 'disabled']);
             }
 

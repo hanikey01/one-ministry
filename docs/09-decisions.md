@@ -164,3 +164,19 @@ When a question is resolved, record date, decision maker, evidence, alternatives
 **Reason:** User direction, 2026-10-26. Advanced escape hatches can be useful for expert page authors and AI-assisted composition, but unrestricted code would bypass the current portable renderer, semantic theme tokens, privacy controls, and page-document validation.
 
 **Status:** Accepted by user direction, 2026-10-27. The document validator limits the fields, AI proposals remain reviewable and unsaved until staff apply them, and ordinary page draft and publishing gates continue to apply.
+
+### D-037 — Ministry administrator installation-wide access
+
+**Decision:** The Ministry Administrator and Super Administrator roles have installation-wide access to all available permission checks. This includes Giving configuration and finance workflows. The permission checker remains the single enforcement point so new permission keys are covered automatically.
+
+**Reason:** User direction, 2026-10-29. The ministry administrator is the installation owner and must be able to operate any ministry role without being blocked by role-specific navigation or permission gates.
+
+**Status:** Accepted and implemented. Sensitive actions remain audited by their owning workflows.
+
+### D-038 — Installation-owned email workspace and bounded templates
+
+**Decision:** Email delivery configuration moves from general Appearance settings into a dedicated staff Email workspace. The installation owns its SMTP or hosting-mail connection, encrypted credentials, sender identity, and editable event templates. Staff edit subject and plain-text body copy using an event-specific placeholder allowlist; the platform owns the responsive HTML shell and security action buttons. Connection and template test sends use safe operator-selected recipients and sample data.
+
+**Reason:** Delivery credentials, operational verification, and message content form one supportable workflow but do not belong to visual appearance settings. Bounded templates preserve ministry voice without allowing arbitrary HTML, broken security links, or provider-specific content storage.
+
+**Status:** Accepted by user direction, 2026-10-29. Initial wiring covers staff verification, password recovery, and staff invitations; other catalog templates are available for subsequent workflow integration.

@@ -128,9 +128,10 @@ final class NavigationLayout
             'staff.departments' => $this->item('Departments', 'groups', 'staff.departments', 'Ministry'),
             'staff.school.index' => $this->item('Digital school', 'school', 'staff.school.index', 'Ministry', 'school.manage', 'digital_school'),
             'staff.communications' => $this->item('Communications', 'message', 'staff.communications', 'Ministry', 'communications.manage'),
-            'staff.giving' => $this->item('Giving', 'giving', 'staff.giving', 'Ministry', 'finance.view', null, 'giving'),
+            'staff.giving' => $this->item('Giving', 'giving', 'staff.giving', 'Ministry', 'giving.manage', null, 'giving'),
             'staff.reports' => $this->item('Reports', 'reports', 'staff.reports', 'Ministry', 'reports.view'),
             'staff.content' => $this->item('Content library', 'content', 'staff.content', 'Publishing', 'content.manage'),
+            'staff.testimonies' => $this->item('Testimonies','sparkles','staff.testimonies','Publishing','content.manage','testimonies'),
             'staff.pages' => $this->item('Pages', 'content', 'staff.pages', 'Publishing', 'content.manage'),
             'staff.navigation' => $this->item('Navigation', 'menu', 'staff.navigation', 'Publishing', 'content.manage'),
             'staff.media-library' => $this->item('Media library', 'image', 'staff.media-library', 'Publishing', 'content.manage'),
@@ -139,6 +140,7 @@ final class NavigationLayout
             'staff.access' => $this->item('Staff access', 'access', 'staff.access', 'Administration', 'roles.manage'),
             'staff.ai-settings' => $this->item('AI model settings', 'settings', 'staff.ai-settings', 'Administration', 'ai.manage'),
             'staff.terminology' => $this->item('Terminology', 'message', 'staff.terminology', 'Administration', 'settings.update'),
+            'staff.email' => $this->item('Email', 'email', 'staff.email', 'Administration', 'settings.read'),
             'staff.security' => $this->item('Security', 'security', 'staff.security', 'Administration'),
             'staff.settings' => $this->item('Settings', 'settings', 'staff.settings', 'Administration', 'settings.read'),
         ];
@@ -156,6 +158,7 @@ final class NavigationLayout
             'member.activity' => $this->item('Participation', 'services', 'member.activity', 'My ministry'),
             'member.next-steps' => $this->item('Next steps', 'followup', 'member.next-steps', 'My ministry'),
             'member.prayer.page' => $this->item('Prayer', 'care', 'member.prayer.page', 'My ministry'),
+            'member.testimonies' => $this->item('My testimonies','sparkles','member.testimonies','My ministry',null,null,'testimonies'),
             'member.giving' => $this->item('Giving', 'giving', 'member.giving', 'My account', null, null, 'giving'),
             'member.profile' => $this->item('Profile & preferences', 'people', 'member.profile', 'My account'),
         ];

@@ -35,7 +35,7 @@ final class RoleCatalog
         'content_media_editor' => ['content.manage', 'content.publish', 'communications.manage'],
         'ministry_operations_coordinator' => ['community.manage', 'departments.manage', 'services.manage', 'reports.view', 'school.manage', 'school.instruct'],
         'care_staff' => ['care.manage', 'care.notes.write'],
-        'finance_staff' => ['finance.view', 'finance.reconcile'],
+        'finance_staff' => ['finance.view', 'finance.reconcile', 'giving.manage'],
         // These are enforced only through a future service/meeting assignment
         // workflow; they intentionally have no installation-wide invitation.
         'service_production_team' => ['services.manage'],

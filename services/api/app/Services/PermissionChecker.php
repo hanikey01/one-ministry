@@ -10,6 +10,10 @@ class PermissionChecker
 {
     public function allows(User $user, string $permission, string $scopeType = 'installation', ?string $scopeId = null): bool
     {
+        if ($this->isInstallationAdministrator($user)) {
+            return true;
+        }
+
         return $this->activeGrants($user)
             ->where('role_permissions.permission_key', $permission)
             ->where(function ($query) use ($scopeType, $scopeId): void {
@@ -31,6 +35,10 @@ class PermissionChecker
     /** @return array<int, string> */
     public function installationPermissions(User $user): array
     {
+        if ($this->isInstallationAdministrator($user)) {
+            return DB::table('permissions')->orderBy('key')->pluck('key')->all();
+        }
+
         return $this->activeGrants($user)
             ->where('user_role_assignments.scope_type', 'installation')
             ->whereNull('user_role_assignments.scope_id')
@@ -50,5 +58,19 @@ class PermissionChecker
                 $query->whereNull('user_role_assignments.expires_at')
                     ->orWhere('user_role_assignments.expires_at', '>', now());
             });
+    }
+
+    private function isInstallationAdministrator(User $user): bool
+    {
+        return DB::table('user_role_assignments')
+            ->where('user_id', $user->id)
+            ->whereIn('role_key', ['ministry_administrator', 'super_administrator'])
+            ->where('scope_type', 'installation')
+            ->whereNull('scope_id')
+            ->whereNull('revoked_at')
+            ->where(function ($query): void {
+                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->exists();
     }
 }

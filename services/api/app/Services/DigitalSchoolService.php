@@ -44,10 +44,19 @@ class DigitalSchoolService
             'updated_at' => now(),
         ]);
 
-        if ($complete && DB::table('school_courses')->where('id', $enrollment->course_id)->value('certificate_enabled')) {
-            DB::table('school_certificates')->insertOrIgnore([
+        if ($complete && DB::table('school_courses')->where('id', $enrollment->course_id)->value('certificate_enabled')
+            && ! DB::table('school_certificates')->where('enrollment_id', $enrollmentId)->whereNull('revoked_at')->exists()) {
+            $course = DB::table('school_courses')->where('id', $enrollment->course_id)->first(['title', 'certificate_template_key']);
+            $person = DB::table('people')->where('id', $enrollment->person_id)->first(['first_name', 'last_name']);
+            $issuer = DB::table('ministry_settings')->where('id', 1)->value('name');
+            DB::table('school_certificates')->insert([
                 'id' => (string) Str::uuid(), 'enrollment_id' => $enrollmentId,
                 'certificate_number' => 'OMS-'.now()->format('Ym').'-'.strtoupper(Str::random(10)),
+                'verification_code' => strtoupper(Str::random(16)),
+                'recipient_name' => trim(($person->first_name ?? '').' '.($person->last_name ?? '')),
+                'course_title' => $course?->title,
+                'issuer_name' => $issuer,
+                'template_key' => $course?->certificate_template_key ?: 'classic',
                 'issued_at' => now(), 'created_at' => now(), 'updated_at' => now(),
             ]);
         }

@@ -1523,12 +1523,12 @@ html body.ministry-app .workspace-content .page-block-library-close svg { width:
 .page-block-library :is(p, h2, span) { margin: 0; }.page-block-library p { color: var(--muted); font-size: .56rem; font-weight: 780; letter-spacing: .1em; }.page-block-library h2 { color: var(--ink); font-size: .84rem; }.page-block-library header span { display: block; margin-top: 5px; color: var(--muted); font-size: .62rem; line-height: 1.45; }
 .page-block-library-group { display: grid; gap: 4px; padding: 10px; border-bottom: 1px solid var(--line); }.page-block-library-group:last-child { border-bottom: 0; }.page-block-library-group > small { margin: 0 5px 3px; color: var(--muted); font-size: .52rem; font-weight: 780; letter-spacing: .1em; }
 .page-block-library-group button { width: 100%; min-height: 32px; border: 1px solid transparent; border-radius: 8px; padding: 0 8px; background: transparent; color: var(--ink); font: inherit; font-size: .64rem; font-weight: 680; text-align: left; cursor: pointer; }.page-block-library-group button:hover { border-color: var(--line-strong); background: var(--surface-muted); }
-.page-block-canvas-wrap { min-width:0; overflow:hidden; border:1px solid var(--line); border-radius:var(--radius-md,16px); background:var(--surface); }
+.page-block-canvas-wrap { min-width:0; overflow-x:clip; overflow-y:visible; border:1px solid var(--line); border-radius:var(--radius-md,16px); background:var(--surface); }
 .page-editor-canvas-document { min-width:100%; min-height:100vh; box-sizing:border-box; overflow-x:hidden; background:var(--canvas); }
 .page-editor-canvas-document > :is(.public-page-structured, .public-page-blocks) { width:100%; max-width:none; margin:0; }
 .page-editor-canvas-document .public-page-structured-section { border-radius:0; }
-.page-editor-preview-viewport { display:flex; width:100%; overflow:auto; overscroll-behavior:contain; padding:14px; background:var(--surface-muted,var(--surface)); }
-.page-editor-public-preview { display:block; flex:0 0 auto; width:1180px; height:max(720px,75vh); margin-inline:auto; border:1px solid var(--line); border-radius:var(--radius-sm,12px); background:var(--surface); box-shadow:var(--shadow-sm); }
+.page-editor-preview-viewport { display:flex; width:100%; overflow-x:auto; overflow-y:hidden; overscroll-behavior-x:contain; padding:14px; background:var(--surface-muted,var(--surface)); }
+.page-editor-public-preview { display:block; flex:1 1 100%; width:100%; max-width:100%; min-height:720px; height:auto; margin-inline:auto; border:1px solid var(--line); border-radius:var(--radius-sm,12px); background:var(--surface); box-shadow:var(--shadow-sm); }
 .page-block-library-trigger { position:fixed; z-index:30; inset-inline-start:12px; top:50%; display:grid; width:42px; height:42px; place-items:center; border:1px solid var(--line); border-radius:50%; background:var(--surface); color:var(--brand); box-shadow:0 8px 24px var(--shadow-soft); cursor:pointer; transform:translateY(-50%); }
 .page-block-library-trigger svg { width:19px; height:19px; fill:none; stroke:currentColor; stroke-linecap:round; stroke-width:2; }
 .page-block-library-backdrop { position:fixed; z-index:39; inset:0; background:color-mix(in srgb, var(--ink) 42%, transparent); opacity:0; pointer-events:none; transition:opacity .2s ease; }
@@ -1554,9 +1554,9 @@ html body.ministry-app .workspace-content .page-block-library-close svg { width:
 @media (min-width: 801px) { .page-block-library { position:fixed; z-index:40; inset-block:96px 24px; inset-inline-start:0; width:280px; overflow:auto; transform:translateX(-102%); box-shadow:12px 0 32px var(--shadow-soft); } }
 @media (max-width: 800px) { .page-block-library-trigger { inset-inline-start:12px; top:50%; bottom:auto; transform:translateY(-50%); } .page-block-library { position:fixed; z-index:40; top:84px; right:auto; bottom:16px; left:0; width:min(300px,86vw); max-height:none; overflow:auto; border-radius:0 18px 18px 0; transform:translateX(-105%); box-shadow:0 18px 48px var(--shadow-soft); } .page-block-library.is-open { transform:translateX(0); } }
 @media (max-width: 680px) { .page-canvas-header { align-items:flex-start; flex-wrap:wrap; }.page-editor-navigator { margin-left:0; }.page-canvas-header .page-canvas-toolbar { width:100%; justify-content:center; } .page-editor-preview-viewport { padding:8px; } }
-.page-editor-public-preview[data-preview="desktop"] { width:1180px; }
-.page-editor-public-preview[data-preview="tablet"] { width:768px; margin-inline:auto; }
-.page-editor-public-preview[data-preview="mobile"] { width:390px; margin-inline:auto; }
+.page-editor-public-preview[data-preview="desktop"] { width:100%; max-width:100%; }
+.page-editor-preview-viewport[data-preview="tablet"] .page-editor-public-preview { flex:0 0 768px; width:768px; max-width:none; margin-inline:auto; }
+.page-editor-preview-viewport[data-preview="mobile"] .page-editor-public-preview { flex:0 0 390px; width:390px; max-width:none; margin-inline:auto; }
 .page-editor-preview-status { margin:8px 0 12px; color:var(--muted); font-size:.63rem; line-height:1.4; }
 .public-page-image-placeholder { display:grid; min-height:220px; place-content:center; padding:24px; color:var(--muted); text-align:center; }
 .staff-theme-dark .page-editor-public-preview { background:var(--surface); }
@@ -1756,7 +1756,7 @@ html body.ministry-app .workspace-content .page-block-library-close svg { width:
 .workspace-content .page-block-inspector .page-inspector-actions button:hover { border-color: var(--line-strong) !important; }
 
 /* Ministry accent is the consistent fill and text contrast for action buttons. */
-.ministry-app :is(button:not(.workspace-backdrop):not(.workspace-menu):not(.member-menu):not(.public-menu):not(.workspace-close):not(.member-close):not(.workspace-theme-toggle):not(.member-theme-toggle):not(.button-secondary):not(.enhanced-select-trigger):not(.enhanced-select-options button):not(.setup-timezone-list button):not(.navigation-audience-tabs button):not(.navigation-move-controls button):not(.navigation-destination-grid form button):not(.navigation-section-control .enhanced-select-trigger):not(.navigation-icon-control .icon-picker-trigger):not(.icon-picker-option):not(.page-block-library-trigger):not(.page-block-library-group button):not(.page-block-library-close):not(.page-block-inspector-close):not(.page-editor-icon-button):not(.page-media-backdrop):not(.page-media-option):not(.page-media-close):not([data-canvas-size]):not([data-inspector-mode]):not([data-inspector-tab]):not([data-breakpoint]),input[type="button"],input[type="submit"],input[type="reset"],.button:not(.button-secondary):not(.page-editor-icon-button),.public-action,.auth-submit,.school-button,.learning-button,.public-worship-action,.setup-back,.setup-next,.setup-finish,.setup-preview-action,.homepage-delete-form button,.home-quiet-action,.public-footer-cta a,.workspace-sidebar-actions a,.member-sidebar-footer a,[role="button"]) {
+.ministry-app :is(button:not(.workspace-backdrop):not(.workspace-menu):not(.member-menu):not(.public-menu):not(.workspace-close):not(.member-close):not(.workspace-theme-toggle):not(.member-theme-toggle):not(.button-secondary):not(.page-canvas-mode-button):not(.enhanced-select-trigger):not(.enhanced-select-options button):not(.setup-timezone-list button):not(.navigation-audience-tabs button):not(.navigation-move-controls button):not(.navigation-destination-grid form button):not(.navigation-section-control .enhanced-select-trigger):not(.navigation-icon-control .icon-picker-trigger):not(.icon-picker-option):not(.page-block-library-trigger):not(.page-block-library-group button):not(.page-block-library-close):not(.page-block-inspector-close):not(.page-editor-icon-button):not(.page-media-backdrop):not(.page-media-option):not(.page-media-close):not([data-canvas-size]):not([data-inspector-mode]):not([data-inspector-tab]):not([data-breakpoint]),input[type="button"],input[type="submit"],input[type="reset"],.button:not(.button-secondary):not(.page-editor-icon-button),.public-action,.auth-submit,.school-button,.learning-button,.public-worship-action,.setup-back,.setup-next,.setup-finish,.setup-preview-action,.homepage-delete-form button,.home-quiet-action,.public-footer-cta a,.workspace-sidebar-actions a,.member-sidebar-footer a,[role="button"]) {
     border-color:var(--accent)!important;
     background:var(--accent)!important;
     color:var(--accent-foreground)!important;
@@ -2164,7 +2164,8 @@ html body.ministry-app .workspace-content .page-block-library-close svg { width:
    presentation rules while reusing the shared neutral theme tokens. */
 .workspace-content .page-block-canvas-wrap {
     box-sizing: border-box;
-    overflow: hidden;
+    overflow-x: clip;
+    overflow-y: visible;
     border: 1px solid var(--line) !important;
     border-radius: 16px;
     background: var(--surface-muted, var(--surface)) !important;
@@ -2431,7 +2432,8 @@ html body.ministry-app .workspace-content .ai-page-draft-panel {
 }
 html body.ministry-app .workspace-content .page-block-canvas-wrap {
     min-width: 0;
-    overflow: hidden;
+    overflow-x: clip;
+    overflow-y: visible;
     position: relative;
 }
 html body.ministry-app .workspace-content .page-block-canvas-stage { min-width: 0; }
@@ -2492,7 +2494,7 @@ html body.ministry-app .workspace-content .page-block-add-canvas:hover {
 }
 html body.ministry-app .workspace-content .page-canvas-header .page-canvas-toolbar button {
     border-color: transparent !important;
-    background: transparent !important;
+    background: var(--surface) !important;
     color: var(--muted) !important;
     box-shadow: none !important;
 }
@@ -2506,6 +2508,17 @@ html body.ministry-app .workspace-content .page-canvas-header .page-canvas-toolb
 html body.ministry-app .workspace-content .page-canvas-header .page-canvas-toolbar button.is-active {
     background: var(--action) !important;
     color: var(--action-foreground) !important;
+    box-shadow: 0 2px 7px var(--shadow-soft) !important;
+}
+html body.ministry-app .workspace-content .page-canvas-header .page-canvas-toolbar button[aria-pressed="false"] {
+    background: var(--surface) !important;
+    color: var(--muted) !important;
+    box-shadow: none !important;
+}
+html body.ministry-app .workspace-content .page-canvas-header .page-canvas-toolbar button[aria-pressed="true"] {
+    background: var(--action) !important;
+    color: var(--action-foreground) !important;
+    box-shadow: 0 2px 7px var(--shadow-soft) !important;
 }
 html body.ministry-app .workspace-content .page-editor-actions {
     display: flex;

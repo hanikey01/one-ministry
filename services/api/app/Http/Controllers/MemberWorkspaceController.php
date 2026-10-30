@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -76,13 +77,16 @@ class MemberWorkspaceController extends Controller
             ? DB::table('volunteer_assignments')->join('volunteer_teams', 'volunteer_teams.id', '=', 'volunteer_assignments.team_id')->where('person_id', $person->id)->where('starts_at', '>=', now())->orderBy('starts_at')->get(['volunteer_assignments.role', 'volunteer_assignments.starts_at', 'volunteer_assignments.status', 'volunteer_teams.name as team_name'])
             : collect();
         $donations = ($isHome || $view === 'member.giving') && in_array('giving', $features, true)
-            ? DB::table('donations')->join('giving_funds', 'giving_funds.id', '=', 'donations.fund_id')->where('donations.person_id', $person->id)->whereIn('donations.status', ['confirmed', 'refunded', 'reversed'])->latest('confirmed_at')->limit(10)->get(['amount_minor', 'currency', 'status', 'confirmed_at', 'giving_funds.name as fund_name'])
+            ? DB::table('donations')->join('giving_funds', 'giving_funds.id', '=', 'donations.fund_id')->where('donations.person_id', $person->id)->whereIn('donations.status', ['confirmed', 'refunded', 'reversed'])->latest('donations.confirmed_at')->limit(10)->get(['donations.amount_minor', 'donations.currency', 'donations.status', 'donations.confirmed_at', 'giving_funds.name as fund_name'])
             : collect();
         $attendance = ($isHome || $view === 'member.activity')
             ? DB::table('attendance_records')->where('person_id', $person->id)->whereIn('status', ['present', 'confirmed', 'self_reported', 'corrected'])->latest('observed_at')->limit(6)->get(['source', 'status', 'observed_at'])
             : collect();
         $journeys = ($isHome || $view === 'member.next-steps')
             ? DB::table('member_journeys')->where('person_id', $person->id)->latest('created_at')->get(['type', 'status', 'created_at', 'completed_at'])
+            : collect();
+        $journeyOptions = ($isHome || $view === 'member.next-steps')
+            ? DB::table('member_journey_options')->where('active', true)->orderBy('display_order')->orderBy('label')->get(['key', 'label', 'description'])
             : collect();
         $prayers = ($isHome || $view === 'member.prayer')
             ? DB::table('prayer_requests')->where('person_id', $person->id)->latest('created_at')->get(['id', 'visibility', 'status', 'created_at'])
@@ -95,7 +99,7 @@ class MemberWorkspaceController extends Controller
             'preferences' => $view === 'member.profile' ? DB::table('notification_preferences')->where('person_id', $person->id)->first() : null,
             'birthday' => $view === 'member.profile' && $person->birthday ? CarbonImmutable::parse($person->birthday) : null,
             'groups' => $groups, 'events' => $events, 'serving' => $serving, 'donations' => $donations,
-            'attendance' => $attendance, 'journeys' => $journeys, 'prayers' => $prayers,
+            'attendance' => $attendance, 'journeys' => $journeys, 'journeyOptions' => $journeyOptions, 'prayers' => $prayers,
             'nextEvent' => $events->first(),
             'features' => $features,
             'metrics' => ['groups' => $groups->count(), 'events' => $events->count(), 'serving' => $serving->count(), 'journeys' => $journeys->whereIn('status', ['requested', 'contacted', 'enrolled'])->count()],
@@ -109,25 +113,26 @@ class MemberWorkspaceController extends Controller
         $data = $request->validate(['prayer_text' => ['required', 'string', 'max:4000'], 'visibility' => ['required', Rule::in(['prayer_team', 'assigned_care_only'])], 'consent_to_contact' => ['nullable', 'boolean']]);
         DB::table('prayer_requests')->insert(['id' => (string) Str::uuid(), 'person_id' => $person->id, 'user_id' => $request->user()->id, 'prayer_text_encrypted' => Crypt::encryptString(trim($data['prayer_text'])), 'visibility' => $data['visibility'], 'consent_to_contact' => $request->boolean('consent_to_contact'), 'status' => 'received', 'created_at' => now(), 'updated_at' => now()]);
 
-        return to_route('member.home')->withFragment('prayer')->with('status', 'Your private prayer request was received.');
+        return to_route('member.prayer.page')->with('status', 'Your private prayer request was received.');
     }
 
     public function journey(Request $request): RedirectResponse
     {
         $person = $this->person($request);
-        $data = $request->validate(['type' => ['required', Rule::in(['membership', 'baptism', 'new_member_class', 'discipleship', 'serving'])], 'consent_to_contact' => ['accepted']]);
+        $data = $request->validate(['type' => ['required', Rule::exists('member_journey_options', 'key')->where(fn ($query) => $query->where('active', true))], 'consent_to_contact' => ['accepted']]);
+        $label = DB::table('member_journey_options')->where('key', $data['type'])->value('label');
         $duplicate = DB::table('member_journeys')->where('person_id', $person->id)->where('type', $data['type'])->whereIn('status', ['requested', 'contacted', 'enrolled'])->exists();
         if ($duplicate) {
-            return to_route('member.home')->withFragment('next-steps')->withErrors(['type' => 'You already have an active request for this next step.']);
+            return to_route('member.next-steps')->withErrors(['type' => 'You already have an active request for this next step.']);
         }
         $journeyId = (string) Str::uuid();
         $taskId = (string) Str::uuid();
-        DB::transaction(function () use ($person, $request, $data, $journeyId, $taskId): void {
-            DB::table('follow_up_tasks')->insert(['id' => $taskId, 'person_id' => $person->id, 'kind' => 'journey_'.$data['type'], 'status' => 'open', 'summary' => 'Member requested '.str($data['type'])->replace('_', ' ')->headline().' follow-up.', 'due_at' => now()->addDays(3), 'created_at' => now(), 'updated_at' => now()]);
+        DB::transaction(function () use ($person, $request, $data, $journeyId, $taskId, $label): void {
+            DB::table('follow_up_tasks')->insert(['id' => $taskId, 'person_id' => $person->id, 'kind' => 'journey_'.$data['type'], 'status' => 'open', 'summary' => 'Member requested '.$label.' follow-up.', 'due_at' => now()->addDays(3), 'created_at' => now(), 'updated_at' => now()]);
             DB::table('member_journeys')->insert(['id' => $journeyId, 'person_id' => $person->id, 'user_id' => $request->user()->id, 'follow_up_task_id' => $taskId, 'type' => $data['type'], 'status' => 'requested', 'consent_to_contact' => true, 'created_at' => now(), 'updated_at' => now()]);
         });
 
-        return to_route('member.home')->withFragment('next-steps')->with('status', 'Your next-step request was sent to the ministry team.');
+        return to_route('member.next-steps')->with('status', 'Your next-step request was sent to the ministry team.');
     }
 
     public function update(Request $request): RedirectResponse
@@ -140,22 +145,25 @@ class MemberWorkspaceController extends Controller
             'email' => ['nullable', 'email', 'max:254'],
             'phone' => ['nullable', 'string', 'max:40'],
             'consent_to_contact' => ['nullable', 'boolean'],
-            'birthday_collection_consent' => ['nullable', 'boolean'],
-            'birthday_month' => ['nullable', 'integer', 'between:1,12', 'required_if:birthday_collection_consent,1'],
-            'birthday_day' => ['nullable', 'integer', 'between:1,31', 'required_if:birthday_collection_consent,1'],
+            'birthday_month' => ['required', 'integer', 'between:1,12'],
+            'birthday_day' => ['required', 'integer', 'between:1,31'],
+            'profile_image' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
-        $birthdayConsent = $request->boolean('birthday_collection_consent');
-        $birthday = null;
-        if ($birthdayConsent) {
-            $month = (int) $profile['birthday_month'];
-            $day = (int) $profile['birthday_day'];
-            if (! checkdate($month, $day, 2000)) {
-                throw ValidationException::withMessages(['birthday_day' => 'Choose a valid day for the selected month.']);
+        if ($request->hasFile('profile_image')) {
+            if ($person->profile_image_path) {
+                Storage::disk('public')->delete($person->profile_image_path);
             }
-            // A leap year is deliberately used so the record contains only month and day, never an age.
-            $birthday = CarbonImmutable::create(2000, $month, $day, 0, 0, 0, 'UTC')->toDateString();
+            $profile['profile_image_path'] = $request->file('profile_image')->store('profiles', 'public');
         }
-        unset($profile['birthday_collection_consent'], $profile['birthday_month'], $profile['birthday_day']);
+        unset($profile['profile_image']);
+        $month = (int) $profile['birthday_month'];
+        $day = (int) $profile['birthday_day'];
+        if (! checkdate($month, $day, 2000)) {
+            throw ValidationException::withMessages(['birthday_day' => 'Choose a valid day for the selected month.']);
+        }
+        // A leap year is deliberately used so the record contains only month and day, never an age.
+        $birthday = CarbonImmutable::create(2000, $month, $day, 0, 0, 0, 'UTC')->toDateString();
+        unset($profile['birthday_month'], $profile['birthday_day']);
         $profile['consent_to_contact'] = $request->boolean('consent_to_contact');
         $profile['birthday'] = $birthday;
 
@@ -165,8 +173,8 @@ class MemberWorkspaceController extends Controller
         $preferenceValues = [
             'email_marketing' => $request->boolean('email_marketing'),
             'sms_marketing' => $request->boolean('sms_marketing'),
-            'birthday_staff_reminder' => $birthdayConsent && $request->boolean('birthday_staff_reminder'),
-            'birthday_public_recognition' => $birthdayConsent && $request->boolean('birthday_public_recognition'),
+            'birthday_staff_reminder' => $request->boolean('birthday_staff_reminder'),
+            'birthday_public_recognition' => $request->boolean('birthday_public_recognition'),
             'updated_at' => now(),
         ];
         if (DB::table('notification_preferences')->where('person_id', $person->id)->exists()) {
@@ -182,7 +190,7 @@ class MemberWorkspaceController extends Controller
             ]);
         }
 
-        return to_route('member.home')->with('status', 'Your profile and preferences were saved.');
+        return to_route('member.profile')->with('status', 'Your profile and preferences were saved.');
     }
 
     private function person(Request $request): object

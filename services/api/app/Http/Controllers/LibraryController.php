@@ -18,7 +18,7 @@ class LibraryController extends Controller
     {
         $this->requireEnabled($library);
         if ($library === 'sermon_series') {
-            return response()->json(['data' => DB::table('sermon_series')->where('status', 'published')->orderByDesc('starts_on')->get()]);
+            return response()->json(['data' => DB::table('sermon_series')->where('status', 'published')->orderByDesc('created_at')->get()]);
         }
 
         return response()->json(['data' => $this->assets($library)->where('media_assets.status', 'published')->orderByDesc('media_assets.published_at')->get()->map(fn ($asset) => $this->publicAsset($asset))]);
@@ -79,10 +79,10 @@ class LibraryController extends Controller
     public function store(Request $request, string $library): JsonResponse
     {
         $this->requireLibrary($library);
-        $data = $request->validate(['title' => ['required', 'string', 'max:200'], 'description' => ['nullable', 'string'], 'provider' => ['nullable', 'string', 'max:40'], 'provider_key' => ['nullable', 'string', 'max:255'], 'youtube_url' => ['nullable', 'url', 'max:500'], 'speaker' => ['nullable', 'string', 'max:160'], 'scripture_reference' => ['nullable', 'string', 'max:255'], 'duration_seconds' => ['nullable', 'integer', 'min:0'], 'sermon_series_id' => ['nullable', 'uuid', 'exists:sermon_series,id'], 'library_category_id' => ['nullable', 'uuid', 'exists:library_categories,id'], 'tag_ids' => ['sometimes', 'array'], 'tag_ids.*' => ['uuid', 'exists:library_tags,id'], 'status' => ['sometimes', Rule::in(['draft', 'published'])]]);
+        $data = $request->validate(['title' => ['required', 'string', 'max:200'], 'description' => ['nullable', 'string'], 'provider' => ['nullable', 'string', 'max:40'], 'provider_key' => ['nullable', 'string', 'max:255'], 'youtube_url' => ['nullable', 'url', 'max:500'], 'speaker' => ['nullable', 'string', 'max:160'], 'scripture_reference' => ['nullable', 'string', 'max:255'], 'duration_seconds' => ['nullable', 'integer', 'min:0'], 'sermon_series_id' => ['nullable', 'uuid', 'exists:sermon_series,id'], 'library_category_id' => ['nullable', 'uuid', 'exists:library_categories,id'], 'tag_ids' => ['sometimes', 'array'], 'tag_ids.*' => ['uuid', 'exists:library_tags,id']]);
         $id = (string) Str::uuid();
         if ($library === 'sermon_series') {
-            DB::table('sermon_series')->insert(['id' => $id, 'title' => $data['title'], 'description' => $data['description'] ?? null, 'status' => $data['status'] ?? 'draft', 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('sermon_series')->insert(['id' => $id, 'title' => $data['title'], 'description' => $data['description'] ?? null, 'status' => 'draft', 'created_at' => now(), 'updated_at' => now()]);
 
             return response()->json(['data' => DB::table('sermon_series')->where('id', $id)->first()], 201);
         }
@@ -95,7 +95,7 @@ class LibraryController extends Controller
             $data['provider_key'] = $this->youtubeId($youtubeUrl);
         }
         DB::transaction(function () use ($data, $id, $library, $tags): void {
-            DB::table('media_assets')->insert(['id' => $id, ...$data, 'provider' => $data['provider'] ?? 'external', 'provider_key' => $data['provider_key'] ?? $id, 'library' => $library, 'kind' => $library === 'books_library' ? 'book' : 'sermon', 'published_at' => ($data['status'] ?? 'draft') === 'published' ? now() : null, 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('media_assets')->insert(['id' => $id, ...$data, 'provider' => $data['provider'] ?? 'external', 'provider_key' => $data['provider_key'] ?? $id, 'library' => $library, 'kind' => $library === 'books_library' ? 'book' : 'sermon', 'status' => 'draft', 'published_at' => null, 'created_at' => now(), 'updated_at' => now()]);
             $this->attachTags($id, $tags);
         });
 

@@ -20,12 +20,13 @@ class PageWorkspaceController extends Controller
     private const RESERVED = ['admin', 'api', 'events', 'groups', 'give', 'login', 'member', 'pages', 'resources', 'setup', 'staff', 'worship', 'books', 'sermons', 'media', 'dashboard-preview'];
 
     private const STARTERS = [
-        'about' => ['label' => 'About us', 'slug' => 'about-us', 'summary' => 'Share your story, mission, and the people you serve.', 'body' => "Our story\n\nShare how this ministry began and the community it serves.\n\nOur mission\n\nState the purpose that guides your ministry and the invitation you extend to people."],
-        'visit' => ['label' => 'Plan your visit', 'slug' => 'visit', 'summary' => 'Give first-time guests the practical details they need.', 'body' => "You are welcome here\n\nTell guests what they can expect when they arrive.\n\nWhen and where\n\nAdd your service times, location, parking, and accessibility information.\n\nWhat to expect\n\nDescribe the experience in a warm, straightforward way."],
-        'beliefs' => ['label' => 'What we believe', 'slug' => 'beliefs', 'summary' => 'Explain your convictions with clear, welcoming language.', 'body' => "What we believe\n\nIntroduce the convictions that shape your worship, life together, and service.\n\nOur foundation\n\nAdd the beliefs and practices you want people to understand."],
-        'leadership' => ['label' => 'Leadership', 'slug' => 'leadership', 'summary' => 'Introduce pastoral staff and ministry leaders.', 'body' => "Meet our leaders\n\nIntroduce the people who serve and lead this ministry.\n\nLeadership team\n\nAdd each leader's name, role, and a short introduction."],
-        'contact' => ['label' => 'Contact us', 'slug' => 'contact', 'summary' => 'Make it simple for people to reach the ministry.', 'body' => "Get in touch\n\nShare the best way for people to contact your ministry.\n\nOffice hours\n\nAdd office hours, an email address, phone number, and location details."],
-        'blank' => ['label' => 'Blank page', 'slug' => '', 'summary' => 'Start with a title and write the page your way.', 'body' => ''],
+        'homepage' => ['label' => 'Homepage', 'slug' => 'home', 'summary' => 'A polished ministry homepage with welcome, gatherings, connection, and next steps.'],
+        'about' => ['label' => 'About', 'slug' => 'about-us', 'summary' => 'Tell the ministry story, explain its mission, and introduce its values.'],
+        'visit' => ['label' => 'Plan a visit', 'slug' => 'visit', 'summary' => 'Help newcomers find a gathering and know what to expect.'],
+        'beliefs' => ['label' => 'Beliefs', 'slug' => 'beliefs', 'summary' => 'Present convictions in an approachable, readable structure.'],
+        'leadership' => ['label' => 'Leadership', 'slug' => 'leadership', 'summary' => 'Introduce ministry leaders with flexible profile cards.'],
+        'contact' => ['label' => 'Contact', 'slug' => 'contact', 'summary' => 'Combine contact guidance, directions, and a clear response path.'],
+        'blank' => ['label' => 'Blank canvas', 'slug' => '', 'summary' => 'Begin with one clean section and build a custom layout.'],
     ];
 
     public function index(Request $request): View
@@ -41,7 +42,7 @@ class PageWorkspaceController extends Controller
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
         $starter = self::STARTERS[$request->string('template')->toString()] ?? self::STARTERS['blank'];
 
-        return view('staff.pages.form', compact('settings', 'starter') + ['user' => $request->user(), 'page' => null, 'blocks' => app(\App\Services\PageDocumentService::class)->fromFlat($this->starterBlocks($request->string('template')->toString(), $starter['body']), $this->enabledFeatures()), 'features' => $this->enabledFeatures(), 'aiDraftAvailable' => app(ModuleAvailability::class)->visibleToStaff('ai_page_editor', $request->user()), 'aiDraftRoute' => DB::table('ai_task_routes')->where('task_key', 'page_editor')->first()]);
+        return view('staff.pages.form', compact('settings', 'starter') + ['user' => $request->user(), 'page' => null, 'canPublish' => app(PermissionChecker::class)->allows($request->user(), 'content.publish'), 'blocks' => $this->starterDocument($request->string('template')->toString()), 'features' => $this->enabledFeatures(), 'aiDraftAvailable' => app(ModuleAvailability::class)->visibleToStaff('ai_page_editor', $request->user()), 'aiDraftRoute' => DB::table('ai_task_routes')->where('task_key', 'page_editor')->first()]);
     }
 
     public function preview(Request $request): View
@@ -67,19 +68,29 @@ class PageWorkspaceController extends Controller
     public function store(Request $request): RedirectResponse|JsonResponse
     {
         $data = $this->data($request);
+        $publish = $request->boolean('publish');
+        if ($publish) {
+            abort_unless(app(PermissionChecker::class)->allows($request->user(), 'content.publish'), 403);
+            abort_if($request->user()->email_verified_at === null, 403, 'Verify your email address before publishing.');
+        }
         $id = (string) Str::uuid();
-        DB::transaction(function () use ($request, $data, $id): void {
+        DB::transaction(function () use ($request, $data, $id, $publish): void {
             DB::table('pages')->insert([...$data, 'id' => $id, 'status' => 'draft', 'created_by' => $request->user()->id, 'updated_by' => $request->user()->id, 'created_at' => now(), 'updated_at' => now()]);
             $this->revision($id, 1, $data, $request->user()->id);
-            $this->audit($request, 'content.page_created', $id, ['slug' => $data['slug']]);
+            $this->audit($request, 'content.page_created', $id, ['slug' => $data['slug'], 'status' => $publish ? 'published' : 'draft']);
+            if ($publish) DB::table('pages')->where('id', $id)->update(['status' => 'published', 'published_at' => now(), 'published_by' => $request->user()->id]);
         });
 
-        $message = 'Draft created. Review and publish it when it is ready.';
+        $message = $publish ? 'Page published. It is now available on the public site.' : 'Draft created. Review and publish it when it is ready.';
 
         if ($request->expectsJson()) {
             return response()->json([
                 'message' => $message,
-                'data' => ['redirect' => route('staff.pages.edit', $id), 'page_id' => $id],
+                'data' => [
+                    'redirect' => route('staff.pages.edit', $id),
+                    'page_id' => $id,
+                    'document' => json_decode($data['blocks'], true, 512, JSON_THROW_ON_ERROR),
+                ],
             ], 201);
         }
 
@@ -108,22 +119,32 @@ class PageWorkspaceController extends Controller
     public function update(Request $request, string $page): RedirectResponse|JsonResponse
     {
         $record = DB::table('pages')->where('id', $page)->firstOrFail();
+        $publish = $request->boolean('publish');
+        if ($publish) {
+            abort_unless(app(PermissionChecker::class)->allows($request->user(), 'content.publish'), 403);
+            abort_if($request->user()->email_verified_at === null, 403, 'Verify your email address before publishing.');
+        }
         $data = $this->data($request, $page);
         $migrationRevision = $this->requiresDocumentMigration($record->blocks ?? null);
         $revision = (int) DB::table('content_revisions')->where('page_id', $page)->max('revision') + ($migrationRevision ? 2 : 1);
-        DB::transaction(function () use ($request, $page, $data, $revision, $record, $migrationRevision): void {
+        DB::transaction(function () use ($request, $page, $data, $revision, $record, $migrationRevision, $publish): void {
             if ($migrationRevision) $this->revision($page, $revision - 1, $this->legacyRevisionPayload($record), $request->user()->id);
-            DB::table('pages')->where('id', $page)->update([...$data, 'status' => 'draft', 'review_notes' => null, 'published_at' => null, 'published_by' => null, 'updated_by' => $request->user()->id, 'updated_at' => now()]);
+            DB::table('pages')->where('id', $page)->update([...$data, 'status' => $publish ? 'published' : 'draft', 'review_notes' => null, 'published_at' => $publish ? now() : null, 'published_by' => $publish ? $request->user()->id : null, 'updated_by' => $request->user()->id, 'updated_at' => now()]);
             $this->revision($page, $revision, $data, $request->user()->id);
-            $this->audit($request, 'content.page_updated', $page, ['revision' => $revision, 'previous_status' => $record->status]);
+            $this->audit($request, $publish ? 'content.page_published' : 'content.page_updated', $page, ['revision' => $revision, 'previous_status' => $record->status, 'status' => $publish ? 'published' : 'draft']);
         });
 
-        $message = 'Changes saved as a draft. The page needs review before it is public.';
+        $message = $publish ? 'Page saved and published.' : 'Changes saved as a draft. The page needs review before it is public.';
 
         if ($request->expectsJson()) {
             return response()->json([
                 'message' => $message,
-                'data' => ['page_id' => $page, 'revision' => $revision, 'status' => 'draft'],
+                'data' => [
+                    'page_id' => $page,
+                    'revision' => $revision,
+                    'status' => $publish ? 'published' : 'draft',
+                    'document' => json_decode($data['blocks'], true, 512, JSON_THROW_ON_ERROR),
+                ],
             ]);
         }
 
@@ -142,6 +163,10 @@ class PageWorkspaceController extends Controller
             'status' => ['required', Rule::in(['draft', 'published'])],
         ]);
         abort_if(in_array($data['slug'], self::RESERVED, true), 422, 'This page address is reserved.');
+        if ($data['status'] === 'published' && $record->status !== 'published') {
+            abort_unless(app(PermissionChecker::class)->allows($request->user(), 'content.publish'), 403);
+            abort_if($request->user()->email_verified_at === null, 403, 'Verify your email address before publishing.');
+        }
 
         $changes = [
             ...$data,
@@ -172,29 +197,35 @@ class PageWorkspaceController extends Controller
         return back()->with('status', $message);
     }
 
+    public function destroy(Request $request, string $page): RedirectResponse
+    {
+        $record = DB::table('pages')->where('id', $page)->firstOrFail();
+        DB::transaction(function () use ($request, $page, $record): void {
+            DB::table('pages')->where('id', $page)->delete();
+            $this->audit($request, 'content.page_deleted', $page, [
+                'title' => $record->title,
+                'slug' => $record->slug,
+                'status' => $record->status,
+            ]);
+        });
+
+        return to_route('staff.pages')->with('status', 'Page deleted.');
+    }
+
     public function publish(Request $request, string $page): RedirectResponse
     {
-        $record = DB::table('pages')->where('id', $page)->where('status', 'draft')->first();
+        $record = DB::table('pages')->where('id', $page)->first();
         abort_unless($record, 404);
         $blocks = $this->normaliseBlocks($record->blocks ?? null, $record->body ?? null);
         foreach ($blocks as $block) {
             $data = $block['data'];
-            if (($block['type'] === 'image' && blank($data['url']))
-                || ($block['type'] === 'media_text' && blank($data['media_url']))
-                ) {
-                throw ValidationException::withMessages(['blocks' => 'Choose an image for every image section, or remove sections you do not need.']);
-            }
-            if ((filled($data['button_label'] ?? '') && blank($data['button_url'] ?? ''))
-                || (filled($data['label'] ?? '') && $block['type'] === 'button' && blank($data['url'] ?? ''))) {
-                throw ValidationException::withMessages(['blocks' => 'Choose a destination for every button, or remove its label before publishing.']);
-            }
         }
         DB::transaction(function () use ($request, $page): void {
-            DB::table('pages')->where('id', $page)->where('status', 'draft')->update(['status' => 'published', 'review_notes' => null, 'published_at' => now(), 'published_by' => $request->user()->id, 'updated_at' => now()]);
+            DB::table('pages')->where('id', $page)->update(['status' => 'published', 'review_notes' => null, 'published_at' => now(), 'published_by' => $request->user()->id, 'updated_at' => now()]);
             $this->audit($request, 'content.page_reviewed', $page, ['status' => 'published']);
         });
 
-        return back()->with('status', 'Page published. It is now available on the public site.');
+        return redirect()->route('staff.pages.edit', $page)->with('status', 'Page published. It is now available on the public site.');
     }
 
     private function data(Request $request, ?string $page = null): array
@@ -340,7 +371,6 @@ class PageWorkspaceController extends Controller
                 if ($key === 'layout' && ! in_array($data[$key], ['one', 'two', 'three'], true)) throw ValidationException::withMessages(['blocks' => 'Choose a valid section column layout.']);
                 if ($key === 'padding' && ! in_array($data[$key], ['compact', 'regular', 'spacious'], true)) throw ValidationException::withMessages(['blocks' => 'Choose a valid section spacing option.']);
                 if (in_array($key, ['url', 'media_url'], true) && $data[$key] !== '' && ! preg_match('#^https?://#i', $data[$key])) throw ValidationException::withMessages(['blocks' => 'Media links must use an HTTP or HTTPS URL.']);
-                if ($key === 'button_url' && $data[$key] !== '' && ! preg_match('#^(?:https?://|/)#i', $data[$key])) throw ValidationException::withMessages(['blocks' => 'Button destinations must use an HTTP(S) link or an internal path.']);
                 if ($key === 'images' && $data[$key] !== '') {
                     $images = array_values(array_filter(preg_split('/\R/', $data[$key]) ?: []));
                     if (count($images) > 12 || collect($images)->contains(fn (string $url): bool => ! preg_match('#^https?://#i', trim($url)))) throw ValidationException::withMessages(['blocks' => 'A gallery accepts up to 12 HTTP or HTTPS image links.']);
@@ -417,37 +447,117 @@ class PageWorkspaceController extends Controller
         return FeatureSetting::query()->where('state', 'enabled')->pluck('key')->all();
     }
 
-    /** @return array<int, array{type: string, data: array<string, string>}> */
-    private function starterBlocks(string $template, ?string $fallback): array
+    /** @return array{version:int,sections:array<int,array<string,mixed>>} */
+    private function starterDocument(string $template): array
     {
-        $starters = [
+        $hero = fn (string $eyebrow, string $title, string $body, string $label = '', string $url = '') => $this->starterElement('hero', compact('eyebrow', 'title', 'body') + ['button_label' => $label, 'button_url' => $url], [
+            'text_color' => '#ffffff', 'button_background' => 'surface', 'button_hover_background' => 'surface_muted', 'button_text_color' => '#17324d', 'button_radius' => '999px', 'button_padding_x' => '28px', 'button_padding_y' => '14px',
+            'custom_css' => 'selector .public-page-hero { min-height: min(680px, 78vh); border-radius: 28px; padding: clamp(44px, 8vw, 108px); background: radial-gradient(circle at 88% 12%, rgb(255 255 255 / 16%), transparent 31%), linear-gradient(135deg, #102a43 0%, #173f5f 58%, #2f6f73 100%); box-shadow: 0 28px 70px rgb(16 42 67 / 24%); } selector .public-page-hero small { width: max-content; border: 1px solid rgb(255 255 255 / 28%); border-radius: 999px; padding: 7px 12px; background: rgb(255 255 255 / 10%); font-size: .72rem; font-weight: 800; letter-spacing: .16em; } selector .public-page-hero h1 { max-width: 14ch; font-family: Georgia, serif; font-size: clamp(2.6rem, 7vw, 5.6rem); line-height: .98; letter-spacing: -.055em; } selector .public-page-hero p { max-width: 58ch; font-size: clamp(1rem, 2vw, 1.2rem); line-height: 1.75; opacity: .88; } selector .public-page-hero .button { margin-top: 10px; font-weight: 800; }',
+        ], ['desktop' => ['padding' => ['top' => '0px', 'right' => '0px', 'bottom' => '0px', 'left' => '0px']], 'mobile' => ['padding' => ['top' => '0px', 'right' => '0px', 'bottom' => '0px', 'left' => '0px']]]);
+        $feature = fn (string $icon, string $title, string $body) => $this->starterElement('icon_box', ['icon' => $icon, 'title' => $title, 'body' => $body, 'button_label' => '', 'button_url' => ''], [
+            'background_color' => 'surface', 'radius_top_left' => '22px', 'radius_top_right' => '22px', 'radius_bottom_right' => '22px', 'radius_bottom_left' => '22px', 'shadow_x' => '0px', 'shadow_y' => '14px', 'shadow_blur' => '42px', 'shadow_spread' => '0px', 'shadow_color' => '#000000',
+            'custom_css' => 'selector .public-page-icon-box { height: 100%; box-sizing: border-box; border: 1px solid rgb(23 50 77 / 9%); border-radius: 22px; padding: clamp(26px, 3vw, 38px); box-shadow: 0 16px 44px rgb(16 42 67 / 9%); } selector .public-page-icon-box .ui-icon { box-sizing: content-box; border-radius: 15px; padding: 12px; background: #e9f3ef; color: #2f6f73; } selector .public-page-icon-box h2 { margin-top: 10px; font-family: Georgia, serif; font-size: clamp(1.35rem, 2vw, 1.75rem); letter-spacing: -.025em; } selector .public-page-icon-box p { font-size: .98rem; line-height: 1.75; }',
+        ], ['desktop' => ['padding' => ['top' => '0px', 'right' => '0px', 'bottom' => '0px', 'left' => '0px']]]);
+        $leadSettings = ['content_width' => 'wide', 'min_height' => '72vh', 'vertical_alignment' => 'center', 'background_color' => 'action', 'padding' => 'spacious', 'overflow' => 'hidden'];
+        $standardSettings = ['content_width' => 'standard', 'padding' => 'spacious', 'column_gap' => 'regular'];
+        $compactSettings = ['content_width' => 'standard', 'padding' => 'regular', 'column_gap' => 'regular'];
+
+        $documents = [
+            'homepage' => [
+                $this->starterSection([$this->starterColumn([$hero('WELCOME HOME', 'Faith grows best in community.', 'A warm, confident introduction to your ministry—created to help every visitor feel seen, find a gathering, and take a meaningful next step.', 'Plan your visit', '/visit')])], [...$leadSettings, 'background_color' => '#f4f0e8'], ['desktop' => ['padding' => ['top' => '34px', 'right' => '34px', 'bottom' => '34px', 'left' => '34px']], 'mobile' => ['padding' => ['top' => '12px', 'right' => '12px', 'bottom' => '12px', 'left' => '12px']]]),
+                $this->starterSection([
+                    $this->starterColumn([$feature('people', 'Find your people', 'Discover relationships, small groups, and ministry spaces where you can belong and grow.')]),
+                    $this->starterColumn([$feature('calendar', 'Join us this week', 'Choose a gathering and arrive with everything you need for a relaxed first visit.')]),
+                    $this->starterColumn([$feature('hand-heart', 'Take your next step', 'Explore simple ways to connect, serve, ask for prayer, or learn more about faith.')]),
+                ], $standardSettings + ['title' => 'There is a place for you here', 'body' => 'Three clear paths help newcomers move from browsing to belonging.', 'background_color' => '#f7f9fb', 'custom_css' => 'selector .public-page-structured-heading { margin-bottom: 18px; } selector .public-page-structured-heading h2 { max-width: 15ch; font-family: Georgia, serif; font-size: clamp(2rem, 4vw, 3.4rem); color: #102a43; } selector .public-page-structured-heading p { max-width: 54ch; font-size: 1.05rem; }'], ['tablet' => ['column_count' => '2'], 'mobile' => ['stack' => 'stack']]),
+                $this->starterSection([
+                    $this->starterColumn([
+                        $this->starterElement('rich_text', ['title' => 'More than a service. A community for everyday life.', 'text' => "Use this finished section to introduce the heart of your ministry. Share what people can expect: thoughtful worship, practical teaching, genuine relationships, and room to grow at their own pace.\n\nReplace this copy with your ministry’s real voice before publishing."], ['font_family' => 'georgia', 'text_color' => '#102a43', 'custom_css' => 'selector .public-page-rich-text h2 { max-width: 15ch; font-size: clamp(2rem, 4vw, 3.6rem); line-height: 1.06; letter-spacing: -.045em; } selector .public-page-rich-text p { max-width: 60ch; font-family: system-ui, sans-serif; font-size: 1rem; line-height: 1.85; color: #425466; }'], ['desktop' => ['padding' => ['top' => '10px', 'right' => '20px', 'bottom' => '10px', 'left' => '0px']]])
+                    ], ['vertical_alignment' => 'center']),
+                    $this->starterColumn([
+                        $this->starterElement('statistics', ['title' => 'Life together', 'stat_one_value' => '01', 'stat_one_label' => 'Gather in worship', 'stat_two_value' => '02', 'stat_two_label' => 'Grow in community', 'stat_three_value' => '03', 'stat_three_label' => 'Serve with purpose'], ['background_color' => '#173f5f', 'text_color' => '#ffffff', 'radius_top_left' => '26px', 'radius_top_right' => '26px', 'radius_bottom_right' => '26px', 'radius_bottom_left' => '26px', 'custom_css' => 'selector .public-page-statistics { border: 0; border-radius: 26px; padding: clamp(30px, 5vw, 58px); background: linear-gradient(145deg, #173f5f, #102a43); color: white; box-shadow: 0 24px 54px rgb(16 42 67 / 22%); } selector .public-page-statistics h2 { color: #b9ddd2; letter-spacing: .1em; text-transform: uppercase; font-size: .78rem; } selector .public-page-statistics article { border-color: rgb(255 255 255 / 16%); } selector .public-page-statistics strong { color: white; font-family: Georgia, serif; } selector .public-page-statistics span { color: rgb(255 255 255 / 72%); }'], ['desktop' => ['padding' => ['top' => '0px', 'right' => '0px', 'bottom' => '0px', 'left' => '0px']]])
+                    ], ['vertical_alignment' => 'center']),
+                ], $standardSettings + ['background_color' => '#ffffff', 'column_gap' => 'spacious'], ['mobile' => ['stack' => 'stack']]),
+                $this->starterSection([
+                    $this->starterColumn([$this->starterElement('service_times', ['title' => 'Gather with us', 'body' => 'Current public service times and locations appear here automatically.'], ['custom_css' => 'selector .public-page-dynamic-list { height: 100%; box-sizing: border-box; border: 0; border-radius: 24px; padding: clamp(28px, 4vw, 44px); background: #ffffff; box-shadow: 0 16px 44px rgb(16 42 67 / 9%); } selector .public-page-dynamic-list small { color: #2f6f73; }'])]),
+                    $this->starterColumn([$this->starterElement('events', ['title' => 'Something to look forward to', 'body' => 'Published upcoming events appear here automatically.'], ['custom_css' => 'selector .public-page-dynamic-list { height: 100%; box-sizing: border-box; border: 0; border-radius: 24px; padding: clamp(28px, 4vw, 44px); background: #173f5f; color: #ffffff; box-shadow: 0 16px 44px rgb(16 42 67 / 18%); } selector .public-page-dynamic-list :is(h2, p, small, strong, span, a) { color: inherit; } selector .public-page-dynamic-list p, selector .public-page-dynamic-list span { opacity: .76; }'])]),
+                ], $standardSettings + ['title' => 'This week at the ministry', 'body' => 'Live ministry information keeps the homepage useful without manual duplication.', 'background_color' => '#edf4f2', 'custom_css' => 'selector .public-page-structured-heading h2 { font-family: Georgia, serif; font-size: clamp(2rem, 4vw, 3.2rem); color: #102a43; }'], ['mobile' => ['stack' => 'stack']]),
+                $this->starterSection([
+                    $this->starterColumn([$this->starterElement('welcome', ['title' => 'Come as you are', 'body' => 'You do not need to have everything figured out. Begin with a visit and meet people who will be glad to welcome you.'], ['custom_css' => 'selector .public-page-callout { height: 100%; box-sizing: border-box; border: 1px solid #d7e4df; border-radius: 24px; padding: clamp(28px, 4vw, 46px); background: #f4f8f6; } selector .public-page-callout h2 { font-family: Georgia, serif; font-size: clamp(1.8rem, 3vw, 2.6rem); color: #102a43; }'])]),
+                    $this->starterColumn([$this->starterElement('next_steps', ['title' => 'Ready for what is next?', 'body' => 'Connect with a team, join a group, discover faith, or find a place to serve.'], ['custom_css' => 'selector .public-page-callout { height: 100%; box-sizing: border-box; border: 0; border-radius: 24px; padding: clamp(28px, 4vw, 46px); background: #f4f0e8; } selector .public-page-callout h2 { font-family: Georgia, serif; font-size: clamp(1.8rem, 3vw, 2.6rem); color: #102a43; }'])]),
+                ], $standardSettings + ['title' => 'Start where you are', 'background_color' => '#ffffff', 'custom_css' => 'selector .public-page-structured-heading h2 { font-family: Georgia, serif; font-size: clamp(2rem, 4vw, 3.2rem); color: #102a43; }'], ['mobile' => ['stack' => 'stack']]),
+                $this->starterSection([$this->starterColumn([$this->starterElement('call_to_action', ['title' => 'Your story can begin here.', 'body' => 'Join us this week and discover a community where faith, hope, and everyday life come together.', 'button_label' => 'Plan your visit', 'button_url' => '/visit'], ['button_background' => 'surface', 'button_hover_background' => 'surface_muted', 'button_text_color' => '#17324d', 'button_radius' => '999px', 'button_padding_x' => '28px', 'button_padding_y' => '14px', 'custom_css' => 'selector .public-page-cta { min-height: 360px; align-content: center; border-radius: 28px; padding: clamp(38px, 7vw, 86px); background: radial-gradient(circle at 90% 10%, rgb(255 255 255 / 18%), transparent 30%), linear-gradient(135deg, #2f6f73, #173f5f); box-shadow: 0 26px 64px rgb(16 42 67 / 20%); } selector .public-page-cta h2 { max-width: 14ch; font-family: Georgia, serif; font-size: clamp(2.2rem, 5vw, 4.4rem); line-height: 1; } selector .public-page-cta p { font-size: 1.05rem; }'])])], $compactSettings + ['background_color' => '#f4f0e8'], ['desktop' => ['padding' => ['top' => '64px', 'right' => '34px', 'bottom' => '64px', 'left' => '34px']], 'mobile' => ['padding' => ['top' => '32px', 'right' => '12px', 'bottom' => '32px', 'left' => '12px']]]),
+            ],
             'about' => [
-                ['type' => 'hero', 'data' => ['eyebrow' => 'WELCOME', 'title' => 'A place to belong', 'body' => 'We are a community learning to follow Jesus together.', 'button_label' => 'Plan your visit', 'button_url' => '/pages/visit']],
-                ['type' => 'heading', 'data' => ['text' => 'Our story']],
-                ['type' => 'paragraph', 'data' => ['text' => 'Share how this ministry began and the people it serves.']],
-                ['type' => 'call_to_action', 'data' => ['title' => 'Come and see', 'body' => 'We would be glad to welcome you this week.', 'button_label' => 'Get in touch', 'button_url' => '/pages/contact']],
+                $this->starterSection([$this->starterColumn([$hero('ABOUT', 'Tell the story behind your ministry.', 'Introduce the calling, people, and purpose that shape this community.')])], $leadSettings),
+                $this->starterSection([$this->starterColumn([$this->starterElement('rich_text', ['title' => 'Our story', 'text' => 'Replace this text with an honest account of how the ministry began, who it serves, and what God has done through the community.'])])], $standardSettings),
+                $this->starterSection([
+                    $this->starterColumn([$feature('book', 'Our foundation', 'Summarize the convictions that guide the ministry.')]),
+                    $this->starterColumn([$feature('people', 'Our community', 'Describe the people and place the ministry is called to serve.')]),
+                    $this->starterColumn([$feature('globe', 'Our mission', 'Explain the impact the ministry hopes to make.')]),
+                ], $standardSettings + ['title' => 'What shapes us'], ['mobile' => ['stack' => 'stack']]),
+                $this->starterSection([$this->starterColumn([$this->starterElement('call_to_action', ['title' => 'Come and experience the community', 'body' => 'Invite readers to take a practical next step.', 'button_label' => 'Plan a visit', 'button_url' => '/visit'])])], $compactSettings + ['background_color' => 'surface_muted']),
             ],
             'visit' => [
-                ['type' => 'hero', 'data' => ['eyebrow' => 'PLAN YOUR VISIT', 'title' => 'You are welcome here', 'body' => 'Find everything you need for a relaxed first visit.', 'button_label' => 'Find a location', 'button_url' => '/locations']],
-                ['type' => 'service_times', 'data' => ['title' => 'Join us this week', 'body' => 'Find a time and location that works for you.']],
-                ['type' => 'paragraph', 'data' => ['text' => 'Tell guests what to expect when they arrive, including parking, accessibility, and children�s ministry.']],
+                $this->starterSection([$this->starterColumn([$hero('PLAN A VISIT', 'Know what to expect before you arrive.', 'Add the practical details that help a first visit feel simple and welcoming.', 'Find a location', '/locations')])], $leadSettings),
+                $this->starterSection([$this->starterColumn([$this->starterElement('service_times', ['title' => 'Choose a gathering', 'body' => 'Public service times from the ministry schedule appear here.'])])], $standardSettings),
+                $this->starterSection([
+                    $this->starterColumn([$feature('location', 'Arrival and parking', 'Explain where to enter, park, and ask for assistance.')]),
+                    $this->starterColumn([$feature('people', 'Children and families', 'Describe check-in and age-appropriate ministry without making assumptions.')]),
+                    $this->starterColumn([$feature('heart', 'Accessibility and care', 'Share accessibility details and how visitors can request help.')]),
+                ], $standardSettings + ['title' => 'Your first visit'], ['mobile' => ['stack' => 'stack']]),
+                $this->starterSection([$this->starterColumn([$this->starterElement('accordion', ['title' => 'Frequently asked questions', 'question_one' => 'What should I wear?', 'answer_one' => 'Add the ministry’s helpful answer.', 'question_two' => 'When should I arrive?', 'answer_two' => 'Add an arrival recommendation.', 'question_three' => 'Who can help when I arrive?', 'answer_three' => 'Explain how visitors can identify the welcome team.'])])], $standardSettings),
             ],
             'beliefs' => [
-                ['type' => 'hero', 'data' => ['eyebrow' => 'OUR FOUNDATION', 'title' => 'What we believe', 'body' => 'The convictions that shape our worship, life together, and service.', 'button_label' => '', 'button_url' => '']],
-                ['type' => 'heading', 'data' => ['text' => 'Rooted in Scripture']],
-                ['type' => 'paragraph', 'data' => ['text' => 'Introduce the beliefs and practices you want people to understand.']],
+                $this->starterSection([$this->starterColumn([$hero('OUR BELIEFS', 'Explain what your ministry believes with clarity and grace.', 'Use this page to describe the convictions that shape worship, community, and service.')])], $leadSettings),
+                $this->starterSection([
+                    $this->starterColumn([$this->starterElement('rich_text', ['title' => 'Core belief', 'text' => 'Add a concise statement and supporting explanation.'])]),
+                    $this->starterColumn([$this->starterElement('rich_text', ['title' => 'Life together', 'text' => 'Explain how belief is practiced in community.'])]),
+                    $this->starterColumn([$this->starterElement('rich_text', ['title' => 'Mission and service', 'text' => 'Explain how belief shapes the ministry’s public mission.'])]),
+                ], $standardSettings + ['title' => 'A foundation for faith and life'], ['mobile' => ['stack' => 'stack']]),
+                $this->starterSection([$this->starterColumn([$this->starterElement('quote', ['text' => 'Add a short Scripture passage or ministry statement that expresses the heart of this page.', 'attribution' => ''])])], $compactSettings + ['background_color' => 'surface_muted']),
             ],
             'leadership' => [
-                ['type' => 'hero', 'data' => ['eyebrow' => 'OUR PEOPLE', 'title' => 'Meet our leaders', 'body' => 'People who serve this ministry with care and conviction.', 'button_label' => '', 'button_url' => '']],
-                ['type' => 'paragraph', 'data' => ['text' => 'Add each leader�s name, role, and a short introduction.']],
+                $this->starterSection([$this->starterColumn([$hero('LEADERSHIP', 'Introduce the people who serve and lead.', 'Use real names, roles, photographs, and biographies before publishing this page.')])], $leadSettings),
+                $this->starterSection([
+                    $this->starterColumn([$this->starterElement('image_card', ['url' => '', 'alt' => '', 'title' => 'Leader name', 'body' => 'Role and short biography.', 'button_label' => '', 'button_url' => ''])]),
+                    $this->starterColumn([$this->starterElement('image_card', ['url' => '', 'alt' => '', 'title' => 'Leader name', 'body' => 'Role and short biography.', 'button_label' => '', 'button_url' => ''])]),
+                    $this->starterColumn([$this->starterElement('image_card', ['url' => '', 'alt' => '', 'title' => 'Leader name', 'body' => 'Role and short biography.', 'button_label' => '', 'button_url' => ''])]),
+                ], $standardSettings + ['title' => 'Meet the team'], ['tablet' => ['column_count' => '2'], 'mobile' => ['stack' => 'stack']]),
+                $this->starterSection([$this->starterColumn([$this->starterElement('call_to_action', ['title' => 'Looking for a ministry team?', 'body' => 'Direct visitors to the appropriate public contact route.', 'button_label' => 'Contact the ministry', 'button_url' => '/contact'])])], $compactSettings + ['background_color' => 'surface_muted']),
             ],
             'contact' => [
-                ['type' => 'hero', 'data' => ['eyebrow' => 'CONTACT', 'title' => 'Get in touch', 'body' => 'We would love to hear from you and help you take your next step.', 'button_label' => 'Send a message', 'button_url' => '/contact']],
-                ['type' => 'paragraph', 'data' => ['text' => 'Share office hours, email address, phone number, and location details.']],
+                $this->starterSection([$this->starterColumn([$hero('CONTACT', 'Make it easy for people to reach the right team.', 'Explain expected response times and never request sensitive information through a public page.')])], $leadSettings),
+                $this->starterSection([
+                    $this->starterColumn([$this->starterElement('contact_form', ['title' => 'Send a message', 'body' => 'Add the public contact fields and consent language appropriate for your ministry.', 'submit_label' => 'Send message'])]),
+                    $this->starterColumn([$this->starterElement('map_directions', ['title' => 'Visit in person', 'address' => 'Add the public ministry address.', 'directions_url' => '', 'button_label' => 'Get directions'])]),
+                ], $standardSettings + ['title' => 'We would be glad to hear from you'], ['mobile' => ['stack' => 'stack']]),
             ],
+            'blank' => [$this->starterSection([$this->starterColumn([])], ['content_width' => 'standard', 'padding' => 'regular'])],
         ];
 
-        return $starters[$template] ?? $this->editorBlocks(null, $fallback);
+        $document = ['version' => 2, 'sections' => $documents[$template] ?? $documents['blank']];
+
+        return app(\App\Services\PageDocumentService::class)->normalise($document, $this->enabledFeatures());
+    }
+
+    /** @param array<int,array<string,mixed>> $columns */
+    private function starterSection(array $columns, array $settings = [], array $responsive = []): array
+    {
+        $responsive['mobile'] = ($responsive['mobile'] ?? []) + ['padding' => ['top' => '36px', 'right' => '22px', 'bottom' => '36px', 'left' => '22px']];
+
+        return ['id' => (string) Str::uuid(), 'type' => 'section', 'settings' => $settings, 'responsive' => $responsive, 'columns' => $columns];
+    }
+
+    /** @param array<int,array<string,mixed>> $elements */
+    private function starterColumn(array $elements, array $settings = [], array $responsive = []): array
+    {
+        return ['id' => (string) Str::uuid(), 'settings' => $settings, 'responsive' => $responsive, 'elements' => $elements];
+    }
+
+    private function starterElement(string $type, array $content, array $settings = [], array $responsive = []): array
+    {
+        return ['id' => (string) Str::uuid(), 'type' => $type, 'content' => $content, 'settings' => $settings, 'responsive' => $responsive];
     }
 
     /** @param array<int, array{type: string, data: array<string, string>}> $blocks */
