@@ -11,7 +11,7 @@ return new class extends Migration
     {
         Schema::table('meetings', function (Blueprint $table): void {
             $table->string('provider', 40)->default('zoom_video_sdk')->after('title');
-            $table->string('session_name', 200)->nullable()->unique()->after('provider');
+            $table->string('session_name', 191)->nullable()->unique()->after('provider');
             $table->text('session_passcode_encrypted')->nullable()->after('session_name');
             $table->string('access_policy', 32)->default('member_only')->after('status');
             $table->string('entry_policy', 32)->default('waiting_room')->after('access_policy');

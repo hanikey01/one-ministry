@@ -29,7 +29,7 @@ final class EmailWorkspaceController extends Controller
     {
         $data = $request->validate(['test_email' => ['required', 'email', 'max:254']]);
         $delivery->test($data['test_email'], $request->user(), $request->ip());
-        return to_route('staff.email')->with('status', 'Test email sent successfully to '.$data['test_email'].'.');
+        return to_route('staff.email')->with('status', 'Test message accepted by the configured mail transport for '.$data['test_email'].'. Check the inbox and spam folder; transport acceptance does not confirm delivery.');
     }
 
     public function updateTemplate(Request $request, string $template, EmailTemplateService $templates): RedirectResponse

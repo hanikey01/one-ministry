@@ -6,9 +6,8 @@
         @case('people') <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/> @break
         @case('services') <path d="M3 21h18M5 21V10h14v11M3 10h18M12 3l9 7H3l9-7ZM8 14v3M12 14v3M16 14v3"/> @break
         @case('worship') <circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4V8Z"/><path d="M4 5.5v2M20 16.5v2"/> @break
-        @case('groups') <circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2"/><path d="M3 20a6 6 0 0 1 12 0M15 15a5 5 0 0 1 6 5"/> @break
+        @case('departments') <circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2"/><path d="M3 20a6 6 0 0 1 12 0M15 15a5 5 0 0 1 6 5"/> @break
         @case('calendar') <rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/> @break
-        @case('volunteer') <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"/> @break
         @case('content') <rect x="3" y="4" width="18" height="16" rx="2"/><path d="m8 13 2.5-2.5L15 15l2-2 3 3M8 8h.01"/> @break
         @case('school') <path d="m3 10 9-5 9 5-9 5-9-5Z"/><path d="M7 12.5V17c3 2 7 2 10 0v-4.5M21 10v6"/> @break
         @case('homepage') <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/> @break

@@ -27,7 +27,7 @@ These are recommendations recorded for coherent planning. Validate in a proof of
 | ID | Working choice | Validation needed |
 | --- | --- | --- |
 | A-001 | One ministry per installation, with multiple branches/campuses. | Confirm network/denomination deployment needs. |
-| A-002 | Large services use broadcast distribution; small groups use interactive conferencing. | Prototype UX and load profiles. |
+| A-002 | Large services use broadcast distribution; small interactive gatherings use interactive conferencing. | Prototype UX and load profiles. |
 | A-003 | Laravel Blade + Livewire + Alpine.js web/application, MySQL/MariaDB baseline with PostgreSQL support, host cron and database queue baseline. | Confirm supported PHP/database version matrix and shared-host limits. |
 | A-004 | Zoom Video SDK interactive media; HLS-based broadcast delivery; provider adapters. | Prototype Zoom Video SDK meeting, recording, latency, cost, and host controls. |
 | A-005 | Docker Compose is an optional local-development and enhanced-server profile; a Laravel shared-host deployment is the baseline package. | Test on target shared hosting environments and upgrade path. |
@@ -95,11 +95,11 @@ When a question is resolved, record date, decision maker, evidence, alternatives
 
 ### D-030 — Structured responsive page documents
 
-**Decision:** The central page editor will evolve from a flat ordered block list to a versioned page document containing sections/containers, columns, and child elements. Sections own full-width/background/spacing settings; columns own responsive width, stacking, alignment, and gap behavior; elements own content and element-specific settings. Responsive overrides are explicit for desktop, tablet, and mobile, with safe defaults when an override is absent. A compatibility reader will continue to open existing flat documents while they are migrated.
+**Decision:** The central page editor uses a versioned page document containing sections/containers, columns, and child elements. Sections own full-width/background/spacing settings; columns own responsive width, stacking, alignment, and gap behavior; elements own content and element-specific settings. Responsive overrides are explicit for desktop, tablet, and mobile, with safe defaults when an override is absent. Version 2 is the only supported pre-release page-document format; flat-document conversion and compatibility readers are intentionally removed.
 
 **Reason:** A flat list cannot express reusable parent containers, multiple elements in one column, nested layout, or breakpoint-specific behavior. The structured model is required for an Elementor-style editor while preserving the shared-hosting renderer, approved element allowlist, module gates, and draft-first publication workflow.
 
-**Status:** Accepted for the next page-editor implementation batch, 2026-10-22.
+**Status:** Updated by user direction and implemented without legacy compatibility, 2026-11-03.
 
 ### D-029 — Bounded AI page-editor provider configuration
 
@@ -119,11 +119,11 @@ When a question is resolved, record date, decision maker, evidence, alternatives
 
 ### D-031 — AI page composition and section-scoped editing
 
-**Decision:** The AI page editor proposes a complete ordered page outline using approved section types and ministry-owned theme tokens. Staff choose whether to apply the proposed page plan; manual section insertion remains available. Every section can be edited independently by staff or by AI. An AI section edit receives the selected section, page purpose, ordered page outline, and the current page's section content as coherence context, then may return only a replacement for the selected section. Staff review and accept or reject that replacement. Adding, removing, or reordering sections is a separate explicit action. The interface clearly states that current draft page content is sent to the installation's configured provider for a scoped AI edit. No private member, attendance, care, children's, or giving records are included, and prompts or generated copy are not retained in logs or audits.
+**Decision:** The AI page editor may propose a complete version-2 page document or a complete replacement for one selected section, column, or element. A scoped request receives the ordered public draft for coherence but can affect only the selected object. Within that object it may choose approved native elements, arrange permitted children, and configure content, layout, style, spacing, typography, responsive settings, and bounded custom code. Native elements are preferred; `custom_code` is used only when no native element can express the design and remains isolated in the documented sandbox. Media URLs and destinations are never invented. Every proposal is server-normalized, staged for review, applied explicitly as one undoable editor action, and remains unsaved and unpublished until the normal staff workflows run. No private member, attendance, care, children's, or giving records are included, and prompts or generated content are not retained in logs or audits.
 
 **Reason:** Staff need local control over each page section without losing tone and continuity across the page. Sending page context helps the selected section fit its neighbors; constraining the returned change to one section protects all other edits.
 
-**Status:** Accepted by user direction, 2026-10-21. Implemented as a section-scoped revision endpoint and inspector workflow. Staff may still add, remove, duplicate, reorder, or edit blocks manually. Full-page context is sent to the configured provider, but the response schema is limited to the selected block's existing fields; URL values are preserved. Staff review and explicitly apply revisions, then save as a normal draft for publication review. Browser/provider and automated release checks remain pending.
+**Status:** Superseded and expanded by user direction, 2026-11-03. Source now uses a section/column/element replacement contract rather than copy-field patches. Browser/provider and full release checks remain pending.
 
 ### D-032 — Ministry-controlled display terminology
 
@@ -131,7 +131,7 @@ When a question is resolved, record date, decision maker, evidence, alternatives
 
 **Reason:** Ministries use different words for their gatherings and community structure, and those words should appear consistently without changing application behavior or creating a separate codebase.
 
-**Status:** Accepted by user direction, 2026-10-21. Initial terminology configuration is implemented for service, meeting, group, location, volunteer, department, and member labels. Labels now flow into the shared staff/member/public navigation, primary directory headings, staff overview summaries, and public fallback links. Remaining user-facing labels are being covered alongside the navigation configuration work.
+**Status:** Accepted by user direction, 2026-10-21. Terminology configuration is implemented for service, meeting, location, department, and member labels. Department community behavior is governed by D-040.
 
 ### D-033 — Public navigation sections and inline presentation controls
 
@@ -151,11 +151,19 @@ When a question is resolved, record date, decision maker, evidence, alternatives
 
 ### D-035 — Consolidated installation roles and contextual assignments
 
-**Decision:** The installation role catalog is limited to Ministry Administrator, Content & Media Editor, Ministry Operations Coordinator, Care Staff, Finance Staff, Service & Production Team, Children’s Team, Security Administrator, and Super Administrator. Visitor is an unauthenticated public state and Member is ordinary account access, not a staff role. Department member/coordinator/executive, group member/leader, volunteer assignment roles, and meeting participant/host/moderator remain contextual assignments rather than installation-wide roles. Care, finance, security, and children permissions stay separate. Service & Production and Operations are granted only through a scoped assignment workflow, never routine installation-wide invitations. Children’s Team receives no data permissions until the safeguarding specification resolves O-005.
+**Decision:** The installation role catalog is limited to Ministry Administrator, Content & Media Editor, Ministry Operations Coordinator, Care Staff, Finance Staff, Service & Production Team, Children’s Team, Security Administrator, and Super Administrator. Member is ordinary account access, not a staff role. Department member/coordinator/executive and meeting participant/host/moderator remain contextual assignments rather than installation-wide roles. Care, finance, security, and children permissions stay separate. Service & Production and Operations are granted only through a scoped assignment workflow, never routine installation-wide invitations. Children’s Team receives no data permissions until the safeguarding specification resolves O-005.
 
-**Reason:** User direction, 2026-10-26. A smaller role set is easier for ministries to understand while contextual assignments preserve least privilege for department, group, volunteer, service, and meeting work.
+**Reason:** User direction, 2026-10-26 and 2026-11-04. A smaller role set is easier for ministries to understand while contextual assignments preserve least privilege for department, service, and meeting work.
 
 **Status:** Accepted. Legacy site editor, content editor, finance user, and school manager assignments are consolidated by migration. Scope-management screens and child safeguarding remain separate implementation work.
+
+### D-039 — Simplify people and Next Step follow-up
+
+**Decision:** `visitor` and `volunteer` are removed as persisted person statuses and from the installation role vocabulary. Public browsing remains anonymous. Public contact intake may create a consented person record, but that record uses the standard `member` status and a `contact_follow_up` task; account signup also creates or links a Member person. Every selectable Next Step, including Serve, creates the same consented `next_step` follow-up task. There is no serving or volunteer product, schedule, roster, team, assignment, or separate member workflow.
+
+**Reason:** User direction, 2026-11-04. The installation needs one understandable people model and one staff-owned response path for every member expression of interest.
+
+**Status:** Accepted for the pre-launch baseline. The initial schema and installation flow create only Member people; no compatibility migration is required.
 
 ### D-036 — Advanced page-editor code and embed elements
 
@@ -172,6 +180,14 @@ When a question is resolved, record date, decision maker, evidence, alternatives
 **Reason:** User direction, 2026-10-29. The ministry administrator is the installation owner and must be able to operate any ministry role without being blocked by role-specific navigation or permission gates.
 
 **Status:** Accepted and implemented. Sensitive actions remain audited by their owning workflows.
+
+### D-040 — Departments own the community domain
+
+**Decision:** The separate community-space product is removed as an active product concept. Departments own public discovery, member join requests, administrator/coordinator approval, scoped membership roles, department gatherings and attendance, and a member-only discussion space with leader moderation. Ministry administrators create departments, change public availability, and appoint coordinators or executives. Coordinators and executives manage ordinary members, join requests, and discussion moderation only inside their assigned departments. Care, finance, children, and giving records remain separate permission domains and are never exposed through department membership or discussion.
+
+**Reason:** User direction, 2026-11-05. A separate community-space product duplicated the useful community behavior expected from Departments and made ministry configuration harder to understand.
+
+**Status:** Accepted and implemented in the fresh-install source baseline. No superseded community schema or compatibility migration is retained. Database, browser, accessibility, and deployment verification are part of the current release gate.
 
 ### D-038 — Installation-owned email workspace and bounded templates
 

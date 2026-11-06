@@ -10,10 +10,8 @@ final class MinistryTerminology
     /** @var array<string, array{singular: string, plural: string, description: string}> */
     public const TERMS = [
         'service' => ['singular' => 'Service', 'plural' => 'Services', 'description' => 'Scheduled worship and broadcast gatherings. This is separate from interactive meetings.'],
-        'meeting' => ['singular' => 'Meeting', 'plural' => 'Meetings', 'description' => 'Smaller interactive rooms, such as classes or group gatherings.'],
-        'group' => ['singular' => 'Group', 'plural' => 'Groups', 'description' => 'Small groups and ongoing community gatherings.'],
+        'meeting' => ['singular' => 'Meeting', 'plural' => 'Meetings', 'description' => 'Smaller interactive rooms, such as classes or department gatherings.'],
         'location' => ['singular' => 'Location', 'plural' => 'Locations', 'description' => 'Ministry campuses, branches, and gathering places.'],
-        'volunteer' => ['singular' => 'Volunteer', 'plural' => 'Volunteers', 'description' => 'People serving on ministry teams.'],
         'department' => ['singular' => 'Department', 'plural' => 'Departments', 'description' => 'Ministry departments and their teams.'],
         'member' => ['singular' => 'Member', 'plural' => 'Members', 'description' => 'People using the member community area.'],
     ];
@@ -54,9 +52,9 @@ final class MinistryTerminology
         $path = parse_url($url, PHP_URL_PATH) ?: '/';
 
         return match ([$path, $label]) {
-            ['/groups', 'Groups'] => $this->label('group', 'plural'),
+            ['/departments', 'Departments'] => $this->label('department', 'plural'),
             ['/locations', 'Locations'] => $this->label('location', 'plural'),
-            ['/member/groups', 'My groups'] => 'My '.mb_strtolower($this->label('group', 'plural')),
+            ['/member/departments', 'My departments'] => 'My '.mb_strtolower($this->label('department', 'plural')),
             default => $label,
         };
     }

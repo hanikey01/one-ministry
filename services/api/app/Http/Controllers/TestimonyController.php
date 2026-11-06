@@ -8,6 +8,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -35,7 +36,7 @@ class TestimonyController extends Controller
     public function memberIndex(Request $request): View
     {
         $this->enabled(); $person=$this->person($request);
-        return view('member.testimonies',['settings'=>MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID),'features'=>FeatureSetting::query()->where('state','enabled')->pluck('key')->all(),'title'=>'My testimonies','testimonies'=>DB::table('testimonies')->where('person_id',$person->id)->latest()->get(),'categories'=>self::CATEGORIES,'profileImageUrl'=>$person->profile_image_path?\Illuminate\Support\Facades\Storage::disk('public')->url($person->profile_image_path):null]);
+        return view('member.testimonies',['settings'=>MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID),'features'=>FeatureSetting::query()->where('state','enabled')->pluck('key')->all(),'title'=>'My testimonies','testimonies'=>DB::table('testimonies')->where('person_id',$person->id)->latest()->get(),'categories'=>self::CATEGORIES,'profileImageUrl'=>$this->profileImageUrl($person->profile_image_path)]);
     }
 
     public function memberStore(Request $request): RedirectResponse
@@ -89,6 +90,7 @@ class TestimonyController extends Controller
     private function enabled(): void { abort_unless(FeatureSetting::query()->where(['key'=>'testimonies','state'=>'enabled'])->exists(),404); }
     private function person(Request $request): object { $person=DB::table('people')->where('user_id',$request->user()->id)->first(); if($person)return $person;$id=(string)Str::uuid();$names=preg_split('/\s+/',trim($request->user()->name),2);DB::table('people')->insert(['id'=>$id,'user_id'=>$request->user()->id,'first_name'=>$names[0]?:'Member','last_name'=>$names[1]??null,'email'=>$request->user()->email,'status'=>'member','consent_to_contact'=>false,'created_at'=>now(),'updated_at'=>now()]);return DB::table('people')->where('id',$id)->first(); }
     private function publicView(string $view,array $data): View { return view($view,[...$data,'settings'=>MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID),'features'=>FeatureSetting::query()->where('state','enabled')->pluck('key')->all()]); }
-    private function withProfileImages($rows): object { return $rows->map(function ($row) { $row->profile_image_url=$row->profile_image_path?\Illuminate\Support\Facades\Storage::disk('public')->url($row->profile_image_path):null; return $row; }); }
+    private function withProfileImages($rows): object { return $rows->map(function ($row) { $row->profile_image_url=$this->profileImageUrl($row->profile_image_path); return $row; }); }
+    private function profileImageUrl(?string $path): ?string { return $path && Storage::disk('public')->exists($path) ? route('public.storage',['path'=>$path]) : null; }
     private function audit(Request $r,string $action,string $type,string $id,array $changes): void { DB::table('audit_events')->insert(['id'=>(string)Str::uuid(),'actor_user_id'=>$r->user()?->id,'action'=>$action,'subject_type'=>$type,'subject_id'=>$id,'changes_json'=>json_encode($changes,JSON_THROW_ON_ERROR),'ip_address'=>$r->ip(),'created_at'=>now()]); }
 }

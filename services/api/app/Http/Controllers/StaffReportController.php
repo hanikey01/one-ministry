@@ -27,17 +27,11 @@ class StaffReportController extends Controller
                 'completed' => DB::table('follow_up_tasks')->whereBetween('completed_at', [$from, $to])->count(),
                 'overdue' => DB::table('follow_up_tasks')->where('status', '!=', 'completed')->where('due_at', '<', now())->count(),
             ],
-            'groups' => [
-                'definition' => 'Active groups and their current membership count.',
-                'active_groups' => DB::table('groups')->where('status', 'active')->count(),
-                'memberships' => DB::table('group_memberships')->count(),
+            'departments' => [
+                'definition' => 'Active departments and their current membership count.',
+                'active_departments' => DB::table('departments')->where('status', 'active')->count(),
+                'memberships' => DB::table('department_memberships')->where('status', 'active')->count(),
                 'events_registered' => DB::table('event_registrations')->whereBetween('created_at', [$from, $to])->where('status', 'registered')->count(),
-            ],
-            'volunteers' => [
-                'definition' => 'Scheduled volunteer assignments for the selected period.',
-                'scheduled' => DB::table('volunteer_assignments')->whereBetween('starts_at', [$from, $to])->where('status', 'scheduled')->count(),
-                'accepted' => DB::table('volunteer_assignments')->whereBetween('starts_at', [$from, $to])->where('status', 'accepted')->count(),
-                'declined' => DB::table('volunteer_assignments')->whereBetween('starts_at', [$from, $to])->where('status', 'declined')->count(),
             ],
             'giving' => [
                 'definition' => 'Confirmed giving totals. Donor identity is not included in this report.',

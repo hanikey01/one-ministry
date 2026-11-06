@@ -14,29 +14,7 @@ final class PageDocumentService
     private const MAX_ELEMENTS_PER_COLUMN = 60;
     private const MAX_ELEMENTS = 360;
 
-    /** @var array<string, array<int, string>> */
-    private const ELEMENT_FIELDS = [
-        'hero' => ['eyebrow', 'title', 'body', 'button_label', 'button_url'],
-        'html' => ['html', 'css', 'javascript'], 'custom_code' => ['html', 'css', 'javascript'],
-        'heading' => ['text'], 'paragraph' => ['text'], 'rich_text' => ['title', 'text'], 'button' => ['label', 'url'], 'feature_list' => ['title', 'items'], 'testimonial' => ['quote', 'name', 'role'], 'statistics' => ['title', 'stat_one_value', 'stat_one_label', 'stat_two_value', 'stat_two_label', 'stat_three_value', 'stat_three_label'], 'alert' => ['tone', 'title', 'body'], 'progress' => ['title', 'label', 'value'], 'table' => ['title', 'headers', 'rows'], 'image' => ['url', 'alt', 'caption', 'image_hint'],
-        'icon' => ['icon', 'label'], 'icon_box' => ['icon', 'title', 'body', 'button_label', 'button_url'], 'icon_list' => ['title', 'items'], 'image_card' => ['url', 'alt', 'title', 'body', 'button_label', 'button_url'], 'tabs' => ['title', 'tab_one_label', 'tab_one_content', 'tab_two_label', 'tab_two_content', 'tab_three_label', 'tab_three_content'], 'social_links' => ['title', 'facebook_url', 'instagram_url', 'youtube_url'],
-        'contact_form' => ['title', 'body', 'submit_label'], 'map_directions' => ['title', 'address', 'directions_url', 'button_label'],
-        'gallery' => ['images', 'columns', 'caption'], 'video_embed' => ['url', 'title', 'caption'],
-        'audio' => ['url', 'title', 'caption'], 'file' => ['url', 'label', 'description'],
-        'media_text' => ['media_url', 'media_alt', 'placement', 'title', 'body', 'button_label', 'button_url'],
-        'list' => ['title', 'items', 'ordered'],
-        'accordion' => ['title', 'question_one', 'answer_one', 'question_two', 'answer_two', 'question_three', 'answer_three'],
-        'spacer' => ['height'], 'call_to_action' => ['title', 'body', 'button_label', 'button_url'],
-        'quote' => ['text', 'attribution'], 'service_times' => ['title', 'body'], 'events' => ['title', 'body'],
-        'groups' => ['title', 'body'], 'locations' => ['title', 'body', 'button_label', 'button_url'],
-        'carousel' => ['eyebrow', 'title', 'body', 'slides', 'button_label', 'button_url'],
-        'live_service' => ['title', 'body', 'button_label', 'button_url'],
-        'giving' => ['title', 'body', 'button_label', 'button_url'], 'prayer' => ['title', 'body', 'button_label', 'button_url'],
-        'sermon_spotlight' => ['title', 'body', 'button_label', 'button_url'], 'books' => ['title', 'body', 'button_label', 'button_url'],
-        'announcements' => ['title', 'body'], 'volunteer' => ['title', 'body'], 'newsletter' => ['title', 'body'],
-        'next_steps' => ['title', 'body'], 'welcome' => ['title', 'body'], 'custom' => ['title', 'body', 'button_label', 'button_url'], 'divider' => [],
-    ];
-    private const FEATURE_ELEMENTS = ['groups' => 'groups', 'live_service' => 'digital_church', 'giving' => 'giving', 'books' => 'books_library', 'volunteer' => 'volunteers'];
+    public function __construct(private readonly PageElementRegistry $elements) {}
 
     /** @param array<int, string> $enabledFeatures
      * @return array{version: 2, sections: array<int, array<string, mixed>>} */
@@ -44,6 +22,9 @@ final class PageDocumentService
     {
         if (($document['version'] ?? null) !== self::VERSION || ! is_array($document['sections'] ?? null)) $this->invalid('The page document version is not supported.');
         if (count($document['sections']) > self::MAX_SECTIONS) $this->invalid('A page can contain up to 60 sections.');
+        $contracts=$this->elements->objectContracts();
+        $ids=[];
+        $stableId=function(mixed $candidate) use (&$ids): string { $id=$this->id($candidate); if(isset($ids[$id])) $this->invalid('Every section, column, and element must have a unique stable ID.'); $ids[$id]=true; return $id; };
         $sections = []; $elementCount = 0;
         foreach ($document['sections'] as $section) {
             if (! is_array($section) || ($section['type'] ?? 'section') !== 'section') $this->invalid('Each page section must be a section object.');
@@ -59,64 +40,51 @@ final class PageDocumentService
                     if (! is_array($element) || ! is_string($element['type'] ?? null)) $this->invalid('Each page element must have a type.');
                     if (++$elementCount > self::MAX_ELEMENTS) $this->invalid('A page can contain up to 360 elements.');
                     $type = Str::lower(trim($element['type']));
-                    if (! array_key_exists($type, self::ELEMENT_FIELDS)) $this->invalid('The page contains an unsupported element.');
-                    if (isset(self::FEATURE_ELEMENTS[$type]) && ! in_array(self::FEATURE_ELEMENTS[$type], $enabledFeatures, true)) $this->invalid('The page contains an element from a disabled module.');
-                    $normalisedElements[] = ['id' => $this->id($element['id'] ?? null), 'type' => $type, 'content' => $this->content($type, $element['content'] ?? []), 'settings' => $this->settings($element['settings'] ?? [], 200), 'responsive' => $this->responsive($element['responsive'] ?? [])];
+                    if (! $this->elements->supports($type)) $this->invalid('The page contains an unsupported element.');
+                    if (($feature = $this->elements->feature($type)) !== null && ! in_array($feature, $enabledFeatures, true)) $this->invalid('The page contains an element from a disabled module.');
+                    $definition = $this->elements->definition($type);
+                    $normalisedElements[] = ['id' => $stableId($element['id'] ?? null), 'type' => $type, 'content' => $this->content($type, $element['content'] ?? []), 'settings' => $this->settings($element['settings'] ?? [], 200, $definition['settings'] ?? []), 'responsive' => $this->responsive($element['responsive'] ?? [], $definition['responsive'] ?? [])];
                 }
-                $normalisedColumns[] = ['id' => $this->id($column['id'] ?? null), 'settings' => $this->settings($column['settings'] ?? [], 200), 'responsive' => $this->responsive($column['responsive'] ?? []), 'elements' => $normalisedElements];
+                $normalisedColumns[] = ['id' => $stableId($column['id'] ?? null), 'settings' => $this->settings($column['settings'] ?? [], 200, $contracts['column']['settings']), 'responsive' => $this->responsive($column['responsive'] ?? [], $contracts['column']['responsive']), 'elements' => $normalisedElements];
             }
-            $sections[] = ['id' => $this->id($section['id'] ?? null), 'type' => 'section', 'settings' => $this->settings($section['settings'] ?? [], 200), 'responsive' => $this->responsive($section['responsive'] ?? []), 'columns' => $normalisedColumns];
+            $sections[] = ['id' => $stableId($section['id'] ?? null), 'type' => 'section', 'settings' => $this->settings($section['settings'] ?? [], 200, $contracts['section']['settings']), 'responsive' => $this->responsive($section['responsive'] ?? [], $contracts['section']['responsive']), 'columns' => $normalisedColumns];
         }
         return ['version' => self::VERSION, 'sections' => $sections];
     }
 
-    /** Convert a legacy flat block list once, without inventing copy. */
-    public function fromFlat(array $blocks, array $enabledFeatures = []): array
+    /** Build the compatibility/search summary directly from a canonical document. */
+    public function plainText(array $document, array $enabledFeatures = []): string
     {
-        $sections = [];
-        foreach ($blocks as $block) {
-            if (! is_array($block) || ! is_string($block['type'] ?? null)) $this->invalid('The page contains an unsupported block.');
-            $type = Str::lower(trim($block['type'])); $data = is_array($block['data'] ?? null) ? $block['data'] : [];
-            $sections[] = $type === 'section' ? $this->legacySection($data) : ($type === 'media_text' ? $this->mediaTextSection($data) : $this->sectionWithElement($type, $data));
+        $parts = [];
+        foreach ($this->normalise($document, $enabledFeatures)['sections'] as $section) {
+            foreach (['title', 'body'] as $field) if (filled($section['settings'][$field] ?? null)) $parts[] = $section['settings'][$field];
+            foreach ($section['columns'] as $column) foreach ($column['elements'] as $element) {
+                foreach ($element['content'] as $key => $value) {
+                    if ($value === '' || $this->isUrlField($key)) continue;
+                    $parts[] = strip_tags($value);
+                }
+            }
         }
-        return $this->normalise(['version' => self::VERSION, 'sections' => $sections], $enabledFeatures);
+        return Str::limit(implode("\n\n", array_values(array_filter(array_map('trim', $parts)))), 50000, '');
     }
 
-    public function isStructured(mixed $document): bool { return is_array($document) && ($document['version'] ?? null) === self::VERSION && is_array($document['sections'] ?? null); }
-
-    /** @return array<int, array{type: string, data: array<string, string>}> */
-    public function flatten(array $document, array $enabledFeatures = []): array
+    private function isUrlField(string $key): bool
     {
-        $flat = [];
-        foreach ($this->normalise($document, $enabledFeatures)['sections'] as $section) foreach ($section['columns'] as $column) foreach ($column['elements'] as $element) $flat[] = ['type' => $element['type'], 'data' => array_merge($element['content'], $element['settings'])];
-        return $flat;
-    }
-
-    private function sectionWithElement(string $type, array $data): array
-    {
-        return ['id' => (string) Str::uuid(), 'type' => 'section', 'settings' => [], 'responsive' => [], 'columns' => [
-            ['id' => (string) Str::uuid(), 'settings' => [], 'responsive' => [], 'elements' => [
-                ['id' => (string) Str::uuid(), 'type' => $type, 'content' => $data, 'settings' => [], 'responsive' => []],
-            ]],
-        ]];
-    }
-    private function legacySection(array $data): array
-    {
-        $layout = $data['layout'] ?? 'two'; $count = ['one' => 1, 'two' => 2, 'three' => 3][$layout] ?? 2; $columns = [];
-        foreach (range(1, $count) as $position) { $word = ['', 'one', 'two', 'three'][$position]; $columns[] = ['id' => (string) Str::uuid(), 'settings' => [], 'responsive' => [], 'elements' => [['id' => (string) Str::uuid(), 'type' => 'paragraph', 'content' => ['text' => trim((string) (($data['column_'.$word.'_title'] ?? '')."\n".($data['column_'.$word.'_body'] ?? '')))], 'settings' => [], 'responsive' => []]]]; }
-        return ['id' => (string) Str::uuid(), 'type' => 'section', 'settings' => array_filter(['background_color' => $data['background_color'] ?? '', 'padding' => $data['padding'] ?? 'regular', 'title' => $data['title'] ?? '', 'body' => $data['body'] ?? ''], fn ($value) => $value !== ''), 'responsive' => [], 'columns' => $columns];
-    }
-    private function mediaTextSection(array $data): array
-    {
-        return ['id' => (string) Str::uuid(), 'type' => 'section', 'settings' => [], 'responsive' => [], 'columns' => [
-            ['id' => (string) Str::uuid(), 'settings' => [], 'responsive' => [], 'elements' => [['id' => (string) Str::uuid(), 'type' => 'image', 'content' => ['url' => $data['media_url'] ?? '', 'alt' => $data['media_alt'] ?? ''], 'settings' => [], 'responsive' => []]]],
-            ['id' => (string) Str::uuid(), 'settings' => [], 'responsive' => [], 'elements' => [['id' => (string) Str::uuid(), 'type' => 'call_to_action', 'content' => ['title' => $data['title'] ?? '', 'body' => $data['body'] ?? '', 'button_label' => $data['button_label'] ?? '', 'button_url' => $data['button_url'] ?? ''], 'settings' => [], 'responsive' => []]]],
-        ]];
+        return $key === 'url' || $key === 'media_url' || $key === 'images' || str_ends_with($key, '_url');
     }
     private function content(string $type, mixed $content): array
     {
         if (! is_array($content)) $this->invalid('Element content must be an object.'); $result = [];
-        foreach (self::ELEMENT_FIELDS[$type] as $key) { $value = $content[$key] ?? ''; if (! is_scalar($value)) $this->invalid('Element fields must contain plain text.'); $limit = $type === 'custom_code' ? 50000 : (in_array($key, ['body', 'text', 'items', 'images'], true) ? 12000 : 500); $result[$key] = Str::limit(trim((string) $value), $limit, ''); }
+        $definition = $this->elements->definition($type);
+        if (array_diff(array_keys($content), $definition['fields'] ?? []) !== []) $this->invalid('The element contains an unsupported content field.');
+        foreach ($definition['fields'] ?? [] as $key) {
+            $value = $content[$key] ?? '';
+            if (! is_scalar($value)) $this->invalid('Element fields must contain plain text.');
+            $rules = $definition['field_definitions'][$key]['validation'] ?? [];
+            $result[$key] = Str::limit(trim((string) $value), (int) ($rules['max'] ?? 500), '');
+            if (isset($rules['enum']) && ! in_array($result[$key], $rules['enum'], true)) $this->invalid('Choose an approved value for '.str_replace('_', ' ', $key).'.');
+            if (($rules['format'] ?? null) === 'integer' && (! ctype_digit($result[$key]) || (int) $result[$key] < (int) ($rules['min'] ?? 0) || (int) $result[$key] > (int) ($rules['max_value'] ?? PHP_INT_MAX))) $this->invalid('Enter a valid value for '.str_replace('_', ' ', $key).'.');
+        }
         $this->validateContent($type, $result); return $result;
     }
     private function validateContent(string $type, array $content): void
@@ -131,6 +99,19 @@ final class PageDocumentService
         if ($type === 'progress' && (! ctype_digit($content['value']) || (int) $content['value'] > 100)) $this->invalid('Progress must be a whole number from 0 to 100.');
         if ($type === 'table') { $headers = array_values(array_filter(array_map('trim', explode('|', $content['headers'])))); $rows = array_values(array_filter(preg_split('/\R/', $content['rows']) ?: [])); if (count($headers) < 2 || count($headers) > 6 || count($rows) > 20 || collect($rows)->contains(fn (string $row): bool => count(explode('|', $row)) !== count($headers))) $this->invalid('A table needs two to six headers and up to 20 rows with matching columns.'); }
         if (in_array($type, ['icon', 'icon_box'], true) && ! in_array($content['icon'], ['heart', 'people', 'calendar', 'location', 'message', 'book', 'star', 'check', 'hand-heart', 'globe'], true)) $this->invalid('Choose an approved icon.');
+        if (in_array($type, ['html', 'custom_code'], true) && trim($content['reason'] ?? '') === '') $this->invalid('Custom code requires an explanation of why no native element fits.');
+        if (in_array($type, ['html', 'custom_code'], true) && trim($content['fallback'] ?? '') === '') $this->invalid('Custom code requires accessible fallback content.');
+        if (in_array($type, ['html', 'custom_code'], true)) $this->validateSandboxCode($content['html'] ?? '', $content['css'] ?? '', $content['javascript'] ?? '');
+    }
+
+    private function validateSandboxCode(string $html, string $css, string $javascript): void
+    {
+        $combined=$html."\n".$css."\n".$javascript;
+        if(preg_match('/(?:https?:|\/\/|@import|url\s*\(\s*[\'\"]?(?!data:))/i',$combined)) $this->invalid('Custom code cannot load external resources.');
+        if(preg_match('/\b(?:eval|Function|WebAssembly|Worker|SharedWorker|ServiceWorker|fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon|localStorage|sessionStorage|indexedDB|cookieStore|setInterval)\b/i',$javascript)) $this->invalid('Custom JavaScript uses a blocked execution or storage API.');
+        if(preg_match('/\b(?:window\s*\.\s*)?(?:parent|top|opener)\b/i',$javascript)) $this->invalid('Custom JavaScript cannot access another browsing context.');
+        if(preg_match('/\b(?:while|do|for)\s*(?:\(|\{)/i',$javascript)) $this->invalid('Custom JavaScript cannot contain loop statements; use bounded array operations instead.');
+        if(preg_match('/\b(?:import|export)\b|\bnew\s+Function\b/i',$javascript)) $this->invalid('Custom JavaScript cannot load modules or construct executable code.');
     }
 
     private function isSupportedVideoUrl(string $url): bool
@@ -138,12 +119,13 @@ final class PageDocumentService
         return preg_match('~(?:youtu\.be/|youtube\.com/(?:watch\?v=|embed/|shorts/)|vimeo\.com/(?:video/)?)[A-Za-z0-9_-]+~i', $url) === 1
             || preg_match('~/media/[0-9a-f-]{36}(?:\?.*)?$~i', $url) === 1;
     }
-    private function settings(mixed $settings, int $max): array
+    private function settings(mixed $settings, int $max, ?array $supportedKeys = null): array
     {
         if (! is_array($settings)) $this->invalid('Page settings must be an object.'); $result = [];
         foreach ($settings as $key => $value) {
             if (! is_string($key) || ! preg_match('/^[a-zA-Z][a-zA-Z0-9_-]{0,79}$/', $key)) $this->invalid('Page settings must contain named scalar values.');
             $key = Str::snake($key);
+            if ($supportedKeys !== null && ! in_array($key, $supportedKeys, true)) $this->invalid('The element contains an unsupported design setting.');
             if (in_array($key, ['padding', 'margin'], true) && is_array($value)) {
                 $normalisedBox = [];
                 foreach (['top', 'right', 'bottom', 'left'] as $side) {
@@ -156,7 +138,7 @@ final class PageDocumentService
             }
             if (! is_scalar($value)) $this->invalid('Page settings must contain named scalar values.');
             if (in_array($key, ['css', 'style', 'stylesheet', 'html', 'script', 'javascript', 'custom_html'], true)) $this->invalid('Arbitrary markup, scripts, and styles are not allowed in page settings.');
-            $value = Str::limit(trim((string) $value), in_array($key, ['custom_css', 'custom_js'], true) ? 50000 : $max, '');
+            $value = Str::limit(trim((string) $value), $key === 'custom_css' ? 50000 : $max, '');
             if ($key === 'custom_id' && $value !== '' && ! preg_match('/^[A-Za-z][A-Za-z0-9_-]{0,79}$/', $value)) $this->invalid('Custom CSS IDs must start with a letter and contain only letters, numbers, hyphens, or underscores.');
             if ($key === 'custom_class' && $value !== '' && ! preg_match('/^[A-Za-z][A-Za-z0-9_-]*(?:\s+[A-Za-z][A-Za-z0-9_-]*)*$/', $value)) $this->invalid('Custom CSS classes must contain only safe class names separated by spaces.');
             if (in_array($key, ['background_color', 'border_color', 'overlay_color', 'text_color', 'button_background', 'button_hover_background', 'button_text_color', 'button_border_color', 'shadow_color'], true) && $value !== '' && ! preg_match('/^(?:#[0-9a-fA-F]{6}|canvas|surface|surface_muted|action|brand)$/', $value)) $this->invalid('Page colours must use an approved theme token or six-digit hex value.');
@@ -193,7 +175,7 @@ final class PageDocumentService
         }
         return $result;
     }
-    private function responsive(mixed $responsive): array
+    private function responsive(mixed $responsive, ?array $supportedKeys = null): array
     {
         if (! is_array($responsive)) $this->invalid('Responsive settings must be grouped by breakpoint.'); $result = [];
         $allowed = [
@@ -201,12 +183,12 @@ final class PageDocumentService
             'alignment' => ['left', 'center', 'right', 'stretch'],
             'column_count' => ['1', '2', '3', '4'],
             'stack' => ['inline', 'stack'],
-            'padding' => ['compact', 'regular', 'spacious'],
+            'padding' => ['none', 'compact', 'regular', 'spacious'],
             'margin' => ['none', 'compact', 'regular', 'spacious'],
-            'column_gap' => ['compact', 'regular', 'spacious'],
+            'column_gap' => ['none', 'compact', 'regular', 'spacious'],
             'width' => ['full', 'half', 'third', 'custom'],
             'order' => ['1', '2', '3', '4'],
-            'gap' => ['compact', 'regular', 'spacious'],
+            'gap' => ['none', 'compact', 'regular', 'spacious'],
             'font_size' => null,
             'line_height' => null,
             'letter_spacing' => null,
@@ -217,7 +199,7 @@ final class PageDocumentService
             $settings = $this->settings($responsive[$breakpoint], 40);
             foreach ($settings as $key => $value) {
                 if (in_array($key, ['padding', 'margin'], true) && is_array($value)) continue;
-                if (! array_key_exists($key, $allowed) || (is_array($allowed[$key]) && ! in_array($value, $allowed[$key], true))) $this->invalid('Choose a valid responsive setting.');
+                if (($supportedKeys !== null && ! in_array($key, $supportedKeys, true)) || ! array_key_exists($key, $allowed) || (is_array($allowed[$key]) && ! in_array($value, $allowed[$key], true))) $this->invalid('Choose a valid responsive setting.');
             }
             $result[$breakpoint] = $settings;
         }

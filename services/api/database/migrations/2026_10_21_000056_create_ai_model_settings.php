@@ -53,7 +53,7 @@ return new class extends Migration
             $table->foreignUuid('actor_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('action', 100);
             $table->string('subject_type', 80);
-            $table->string('subject_id', 190)->nullable();
+            $table->string('subject_id', 150)->nullable();
             $table->json('changes_json');
             $table->string('ip_address', 45)->nullable();
             $table->timestampTz('created_at')->useCurrent();

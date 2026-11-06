@@ -13,7 +13,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->string('name', 160);
             $table->string('tagline', 240)->nullable();
-            $table->string('public_domain', 253)->unique();
+            $table->string('public_domain', 191)->unique();
             $table->string('contact_email', 254)->nullable();
             $table->string('timezone', 64);
             $table->char('primary_color', 7)->default('#17324D');

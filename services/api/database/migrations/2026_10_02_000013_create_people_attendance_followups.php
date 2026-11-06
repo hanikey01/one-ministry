@@ -12,9 +12,9 @@ return new class extends Migration
             $t->uuid('id')->primary();
             $t->string('first_name', 100);
             $t->string('last_name', 100)->nullable();
-            $t->string('email', 254)->nullable();
+            $t->string('email', 191)->nullable();
             $t->string('phone', 40)->nullable();
-            $t->string('status', 24)->default('visitor');
+            $t->string('status', 24)->default('member');
             $t->boolean('consent_to_contact')->default(false);
             $t->timestamp('birthday')->nullable();
             $t->timestamps();
@@ -38,12 +38,14 @@ return new class extends Migration
             $t->foreignUuid('service_occurrence_id')->nullable()->constrained('service_occurrences')->nullOnDelete();
             $t->foreignUuid('assigned_to')->nullable()->constrained('users')->nullOnDelete();
             $t->string('kind', 40);
+            $t->string('request_key', 40)->nullable();
             $t->string('status', 20)->default('open');
             $t->text('summary');
             $t->timestamp('due_at')->nullable();
             $t->timestamp('completed_at')->nullable();
             $t->timestamps();
             $t->index(['assigned_to', 'status']);
+            $t->index(['person_id', 'kind', 'request_key', 'status']);
         });
     }
 

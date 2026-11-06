@@ -25,7 +25,7 @@
                     </fieldset>
                 @endforeach
             </div>
-            <div class="terminology-preview" aria-live="polite"><strong>Preview</strong><span x-text="`${preview.service.plural} · ${preview.meeting.plural} · ${preview.group.plural} · ${preview.location.plural}`">{{ $values['service']['plural'] }} · {{ $values['meeting']['plural'] }} · {{ $values['group']['plural'] }} · {{ $values['location']['plural'] }}</span></div>
+            <div class="terminology-preview" aria-live="polite"><strong>Preview</strong><span x-text="`${preview.service.plural} · ${preview.meeting.plural} · ${preview.department.plural} · ${preview.location.plural}`">{{ $values['service']['plural'] }} · {{ $values['meeting']['plural'] }} · {{ $values['department']['plural'] }} · {{ $values['location']['plural'] }}</span></div>
             <div class="appearance-actions"><button class="button" type="submit">Save terminology</button></div>
         </section>
     </form>

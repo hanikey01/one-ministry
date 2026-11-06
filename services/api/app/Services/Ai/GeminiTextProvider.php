@@ -13,7 +13,11 @@ final class GeminiTextProvider implements AiTextProvider
 
     public function discoverModels(string $apiKey): array
     {
-        $response = Http::baseUrl(self::BASE_URL)->withHeaders(['x-goog-api-key' => $apiKey])->acceptJson()->timeout(15)->get('/models')->throw()->json('models', []);
+        try {
+            $response = Http::baseUrl(self::BASE_URL)->withHeaders(['x-goog-api-key' => $apiKey])->acceptJson()->connectTimeout(5)->timeout(20)->retry(2, 250)->get('/models', ['pageSize' => 1000])->throw()->json('models', []);
+        } catch (RequestException $exception) {
+            throw $this->catalogException($exception);
+        }
         if (! is_array($response)) throw new RuntimeException('invalid_catalog');
 
         return collect($response)->filter(fn ($item): bool => is_array($item)
@@ -28,6 +32,13 @@ final class GeminiTextProvider implements AiTextProvider
                 'output_modalities' => ['text'],
                 'metadata' => ['output_token_limit' => isset($item['outputTokenLimit']) ? (int) $item['outputTokenLimit'] : null],
             ])->values()->all();
+    }
+
+    private function catalogException(RequestException $exception): RuntimeException
+    {
+        $message = (string) ($exception->response?->json('error.message') ?? 'request rejected');
+        $message = substr((string) preg_replace('/[^a-zA-Z0-9 .:_-]/', '', $message), 0, 180);
+        return new RuntimeException('provider_http_'.($exception->response?->status() ?? 'unknown').': '.$message, previous: $exception);
     }
 
     public function validateStructuredOutput(string $apiKey, string $modelId): array
@@ -54,7 +65,7 @@ final class GeminiTextProvider implements AiTextProvider
     public function generateStructuredOutput(string $apiKey, string $modelId, string $systemPrompt, string $userPrompt, array $schema, string $schemaName, int $maxOutputTokens): array
     {
         $started = microtime(true);
-        $payload = Http::baseUrl(self::BASE_URL)->withHeaders(['x-goog-api-key' => $apiKey])->acceptJson()->timeout(45)->post('/models/'.rawurlencode(preg_replace('#^models/#', '', $modelId)).':generateContent', [
+        $payload = Http::baseUrl(self::BASE_URL)->withHeaders(['x-goog-api-key' => $apiKey])->acceptJson()->connectTimeout(10)->timeout(90)->post('/models/'.rawurlencode(preg_replace('#^models/#', '', $modelId)).':generateContent', [
             'systemInstruction' => ['parts' => [['text' => $systemPrompt]]],
             'contents' => [['parts' => [['text' => $userPrompt]]]],
             'generationConfig' => ['responseFormat' => ['text' => ['mimeType' => 'APPLICATION_JSON', 'schema' => $schema]], 'maxOutputTokens' => $maxOutputTokens, 'temperature' => 0.35],

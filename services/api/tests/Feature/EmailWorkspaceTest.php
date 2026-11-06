@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Actions\InstallMinistry;
+use App\Models\User;
 use App\Services\EmailDeliverySettingsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -36,6 +37,34 @@ class EmailWorkspaceTest extends TestCase
         $this->actingAs($admin)->post('/staff/email/delivery/test', ['test_email' => 'admin@example.org'])->assertRedirect(route('staff.email'));
         $this->assertDatabaseHas('email_delivery_settings', ['last_test_status' => 'succeeded']);
         $this->assertDatabaseHas('audit_events', ['action' => 'email_delivery.tested']);
+    }
+
+    public function test_security_page_sends_administrator_to_the_email_workspace_when_delivery_is_inactive(): void
+    {
+        $admin = $this->install();
+
+        $this->actingAs($admin)->get('/staff/security')
+            ->assertOk()
+            ->assertSee('href="'.route('staff.email').'"', false)
+            ->assertDontSee('staff/settings#email-delivery', false);
+
+        $this->actingAs($admin)->post('/staff/security/email-verification')
+            ->assertRedirect(route('staff.email'));
+    }
+
+    public function test_security_page_does_not_offer_email_configuration_to_user_without_permission(): void
+    {
+        $this->install();
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->get('/staff/security')
+            ->assertOk()
+            ->assertSee('Ask a ministry administrator to activate email delivery')
+            ->assertDontSee('Set up email delivery');
+
+        $this->actingAs($user)->post('/staff/security/email-verification')
+            ->assertRedirect(route('staff.security'))
+            ->assertSessionHas('security_notice');
     }
 
     private function install()

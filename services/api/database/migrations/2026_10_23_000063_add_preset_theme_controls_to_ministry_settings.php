@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('ministry_settings', function (Blueprint $table): void {
-            $table->string('theme_preset', 24)->default('neutral')->after('homepage_page_id');
+            $table->string('theme_preset', 24)->default('tech_blue')->after('homepage_page_id');
             $table->string('chrome_mode', 24)->default('preset')->after('theme_preset');
             $table->char('chrome_color', 7)->nullable()->after('chrome_mode');
             $table->dropColumn([

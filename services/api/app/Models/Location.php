@@ -9,10 +9,10 @@ class Location extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['name', 'slug', 'timezone', 'address', 'is_primary', 'is_public'];
+    protected $fillable = ['name', 'slug', 'timezone', 'address', 'latitude', 'longitude', 'is_primary', 'is_public'];
 
     protected function casts(): array
     {
-        return ['is_primary' => 'boolean', 'is_public' => 'boolean'];
+        return ['is_primary' => 'boolean', 'is_public' => 'boolean', 'latitude' => 'decimal:7', 'longitude' => 'decimal:7'];
     }
 }

@@ -10,7 +10,7 @@ Before packaging, run the complete release gate documented in `docs/06-build-pla
 
 ## 2. Database and environment
 
-Create a dedicated MySQL 8.0+ or MariaDB 10.6+ database and a database user with access only to it. Copy `.env.example` to `.env` outside public web access and set production mode, HTTPS `APP_URL`, MySQL credentials, database session/cache/queue drivers, and the private filesystem disk. Run `php artisan key:generate` once for a new installation. Never replace `APP_KEY` during an upgrade. Configure SMTP before password recovery or staff invitations are used.
+Create a new, empty MySQL 8.0+ or MariaDB 10.6+ database and a database user with access only to it. On a fresh installation, visit `/install.php`: the standalone pre-Laravel installer checks PHP extensions and writable paths, including public-upload storage, verifies the database, creates `.env`, generates a unique `APP_KEY`, uses file-backed session/cache and synchronous queue settings while it runs every migration, verifies the required schema, and attempts to create the public storage link before enabling database-backed session/cache/queue settings and writing its completion lock. Hosts that prohibit symbolic links use the application's `/storage/*` public-file fallback automatically. The installer then redirects to `/setup`; it does not require SSH or a pre-existing application key. An incomplete or reused database is rejected with migration diagnostics instead of being marked installed. Never replace `APP_KEY` during an upgrade. Configure SMTP before password recovery or staff invitations are used.
 
 ## 3. Directory layout
 
@@ -21,11 +21,13 @@ Point the domain document root to the application's `public/` directory and keep
 - **DirectAdmin:** use domain setup or a private application directory and point `public_html` to Laravel `public/` with the host-supported method.
 - **Generic Apache/LiteSpeed:** enable rewrites and allow Laravel's `public/.htaccess`.
 
-If a host forbids changing the document root, use only its documented Laravel deployment method. Do not copy `.env`, `storage`, or the whole application into a public directory.
+If a primary-domain host fixes the document root at `public_html`, use the separately built `one-ministry-public-html` package. It places the public entry files at the archive root and includes Apache/LiteSpeed deny rules for application internals, `.env`, logs, Composer metadata, and private storage paths. Prefer a private application directory whenever the host supports one.
 
 ## 4. Installation commands
 
-Run from the application directory with PHP 8.3+:
+The browser installer is the shared-hosting default. The following commands are the operator alternative for hosts with terminal access.
+
+Run from the application directory with PHP 8.4.1+:
 
 ```text
 php artisan optimize:clear

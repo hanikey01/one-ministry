@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api, type Feature } from "./api";
 
 const labels: Record<string, string> = {
-  digital_church: "Digital church", people: "People", groups: "Groups", giving: "Giving",
+  digital_church: "Digital church", people: "People", giving: "Giving",
 };
 
 export default function FeaturesPanel({ canManage }: { canManage: boolean }) {

@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use App\Services\DepartmentService;
 
 class MemberWorkspaceController extends Controller
 {
@@ -26,14 +27,63 @@ class MemberWorkspaceController extends Controller
         return $this->page($request, 'member.events', 'My events');
     }
 
-    public function groups(Request $request): View
+    public function departments(Request $request): View
     {
-        return $this->page($request, 'member.groups', 'My groups', 'groups');
+        return $this->page($request, 'member.departments', 'My departments');
     }
 
-    public function serving(Request $request): View
+    public function department(Request $request, string $department): View
     {
-        return $this->page($request, 'member.serving', 'Serving');
+        $person = $this->person($request);
+        $item = DB::table('departments')->join('department_memberships', 'department_memberships.department_id', '=', 'departments.id')
+            ->where('departments.id', $department)->where('department_memberships.person_id', $person->id)->where('department_memberships.status', 'active')
+            ->select('departments.*', 'department_memberships.role')->first();
+        abort_unless($item, 404);
+        $messages = DB::table('department_messages')->join('people', 'people.id', '=', 'department_messages.person_id')
+            ->leftJoin('department_messages as parent', 'parent.id', '=', 'department_messages.parent_message_id')
+            ->where('department_messages.department_id', $department)->whereNull('department_messages.moderated_at')
+            ->latest('department_messages.created_at')->limit(100)->get(['department_messages.id','department_messages.person_id','department_messages.parent_message_id','department_messages.content','department_messages.edited_at','department_messages.created_at','people.first_name','people.last_name','parent.content as parent_content'])->reverse()->values();
+        DB::table('department_message_reads')->updateOrInsert(['department_id'=>$department,'person_id'=>$person->id],['last_read_at'=>now(),'created_at'=>now(),'updated_at'=>now()]);
+        return view('member.department', ['settings' => MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID), 'features' => DB::table('feature_settings')->where('state', 'enabled')->pluck('key')->all(), 'user' => $request->user(), 'person' => $person, 'department' => $item, 'messages' => $messages]);
+    }
+
+    public function requestDepartment(Request $request, string $department, DepartmentService $departments): RedirectResponse
+    {
+        $data = $request->validate(['message' => ['nullable', 'string', 'max:2000']]);
+        $departments->requestMembership($department, $request->user(), $data['message'] ?? null, $request->ip());
+        return to_route('member.departments')->with('status', 'Your request was sent to the department leaders.');
+    }
+
+    public function withdrawDepartmentRequest(Request $request, string $department, DepartmentService $departments): RedirectResponse
+    {
+        $departments->withdrawRequest($department, $request->user(), $request->ip());
+        return back()->with('status', 'Join request withdrawn.');
+    }
+
+    public function leaveDepartment(Request $request, string $department, DepartmentService $departments): RedirectResponse
+    {
+        $departments->leave($department, $request->user(), $request->ip());
+        return to_route('member.departments')->with('status', 'You left the department.');
+    }
+
+    public function postDepartmentMessage(Request $request, string $department, DepartmentService $departments): RedirectResponse
+    {
+        $data = $request->validate(['content' => ['required', 'string', 'max:2000'], 'parent_message_id'=>['nullable','uuid']]);
+        $departments->postMessage($department, $request->user(), $data['content'], $request->ip(), $data['parent_message_id']??null);
+        return to_route('member.departments.show', $department)->with('status', 'Message posted.');
+    }
+
+    public function updateDepartmentMessage(Request $request, string $department, string $message, DepartmentService $departments): RedirectResponse
+    {
+        $data=$request->validate(['content'=>['required','string','max:2000']]);
+        $departments->updateOwnMessage($department,$message,$request->user(),$data['content'],$request->ip());
+        return back()->with('status','Message updated.');
+    }
+
+    public function deleteDepartmentMessage(Request $request, string $department, string $message, DepartmentService $departments): RedirectResponse
+    {
+        $departments->deleteOwnMessage($department,$message,$request->user(),$request->ip());
+        return back()->with('status','Message deleted.');
     }
 
     public function activity(Request $request): View
@@ -67,14 +117,12 @@ class MemberWorkspaceController extends Controller
         $features = DB::table('feature_settings')->where('state', 'enabled')->pluck('key')->all();
         abort_if($requiredFeature && ! in_array($requiredFeature, $features, true), 404);
         $isHome = $view === 'member.home';
-        $groups = ($isHome || $view === 'member.groups') && in_array('groups', $features, true)
-            ? DB::table('group_memberships')->join('groups', 'groups.id', '=', 'group_memberships.group_id')->where('person_id', $person->id)->get(['groups.name', 'group_memberships.role'])
+        $departments = ($isHome || $view === 'member.departments')
+            ? DB::table('department_memberships')->join('departments', 'departments.id', '=', 'department_memberships.department_id')->leftJoin('department_message_reads',fn($join)=>$join->on('department_message_reads.department_id','=','departments.id')->on('department_message_reads.person_id','=','department_memberships.person_id'))->where('department_memberships.person_id', $person->id)->where('department_memberships.status', 'active')->select('departments.id','departments.name','departments.description','departments.image_url','departments.category','department_memberships.role')->selectRaw('(select count(*) from department_messages where department_messages.department_id=departments.id and department_messages.moderated_at is null and department_messages.person_id<>? and department_messages.created_at>coalesce(department_message_reads.last_read_at, department_memberships.created_at)) as unread_count',[$person->id])->get()
             : collect();
+        $pendingDepartments = $view === 'member.departments' ? DB::table('department_join_requests')->join('departments','departments.id','=','department_join_requests.department_id')->where('person_id',$person->id)->where('department_join_requests.status','pending')->get(['departments.id','departments.name','departments.image_url','department_join_requests.created_at']) : collect();
         $events = ($isHome || $view === 'member.events')
-            ? DB::table('event_registrations')->join('events', 'events.id', '=', 'event_registrations.event_id')->where('person_id', $person->id)->where('event_registrations.status', 'registered')->where('events.starts_at', '>=', now())->orderBy('events.starts_at')->get(['events.title', 'events.starts_at', 'events.location'])
-            : collect();
-        $serving = ($isHome || $view === 'member.serving')
-            ? DB::table('volunteer_assignments')->join('volunteer_teams', 'volunteer_teams.id', '=', 'volunteer_assignments.team_id')->where('person_id', $person->id)->where('starts_at', '>=', now())->orderBy('starts_at')->get(['volunteer_assignments.role', 'volunteer_assignments.starts_at', 'volunteer_assignments.status', 'volunteer_teams.name as team_name'])
+            ? DB::table('event_registrations')->join('events', 'events.id', '=', 'event_registrations.event_id')->where('person_id', $person->id)->whereIn('event_registrations.status', ['registered','waitlisted','checked_in'])->where('events.starts_at', '>=', now())->orderBy('events.starts_at')->get(['events.id','events.slug','events.title','events.image_url','events.starts_at','events.location','events.cancelled_at','event_registrations.status as registration_status'])
             : collect();
         $donations = ($isHome || $view === 'member.giving') && in_array('giving', $features, true)
             ? DB::table('donations')->join('giving_funds', 'giving_funds.id', '=', 'donations.fund_id')->where('donations.person_id', $person->id)->whereIn('donations.status', ['confirmed', 'refunded', 'reversed'])->latest('donations.confirmed_at')->limit(10)->get(['donations.amount_minor', 'donations.currency', 'donations.status', 'donations.confirmed_at', 'giving_funds.name as fund_name'])
@@ -82,11 +130,8 @@ class MemberWorkspaceController extends Controller
         $attendance = ($isHome || $view === 'member.activity')
             ? DB::table('attendance_records')->where('person_id', $person->id)->whereIn('status', ['present', 'confirmed', 'self_reported', 'corrected'])->latest('observed_at')->limit(6)->get(['source', 'status', 'observed_at'])
             : collect();
-        $journeys = ($isHome || $view === 'member.next-steps')
-            ? DB::table('member_journeys')->where('person_id', $person->id)->latest('created_at')->get(['type', 'status', 'created_at', 'completed_at'])
-            : collect();
         $journeyOptions = ($isHome || $view === 'member.next-steps')
-            ? DB::table('member_journey_options')->where('active', true)->orderBy('display_order')->orderBy('label')->get(['key', 'label', 'description'])
+            ? DB::table('next_step_options')->where('active', true)->orderBy('display_order')->orderBy('label')->get(['key', 'label', 'description'])
             : collect();
         $prayers = ($isHome || $view === 'member.prayer')
             ? DB::table('prayer_requests')->where('person_id', $person->id)->latest('created_at')->get(['id', 'visibility', 'status', 'created_at'])
@@ -98,11 +143,11 @@ class MemberWorkspaceController extends Controller
             'person' => $person,
             'preferences' => $view === 'member.profile' ? DB::table('notification_preferences')->where('person_id', $person->id)->first() : null,
             'birthday' => $view === 'member.profile' && $person->birthday ? CarbonImmutable::parse($person->birthday) : null,
-            'groups' => $groups, 'events' => $events, 'serving' => $serving, 'donations' => $donations,
-            'attendance' => $attendance, 'journeys' => $journeys, 'journeyOptions' => $journeyOptions, 'prayers' => $prayers,
+            'departments' => $departments, 'pendingDepartments'=>$pendingDepartments, 'events' => $events, 'donations' => $donations,
+            'attendance' => $attendance, 'journeyOptions' => $journeyOptions, 'prayers' => $prayers,
             'nextEvent' => $events->first(),
             'features' => $features,
-            'metrics' => ['groups' => $groups->count(), 'events' => $events->count(), 'serving' => $serving->count(), 'journeys' => $journeys->whereIn('status', ['requested', 'contacted', 'enrolled'])->count()],
+            'metrics' => ['departments' => $departments->count(), 'events' => $events->count(), 'journeys' => DB::table('follow_up_tasks')->where('person_id', $person->id)->where('kind', 'next_step')->whereIn('status', ['open', 'in_progress'])->count()],
             'title' => $title,
         ]);
     }
@@ -116,21 +161,17 @@ class MemberWorkspaceController extends Controller
         return to_route('member.prayer.page')->with('status', 'Your private prayer request was received.');
     }
 
-    public function journey(Request $request): RedirectResponse
+    public function requestNextStep(Request $request): RedirectResponse
     {
         $person = $this->person($request);
-        $data = $request->validate(['type' => ['required', Rule::exists('member_journey_options', 'key')->where(fn ($query) => $query->where('active', true))], 'consent_to_contact' => ['accepted']]);
-        $label = DB::table('member_journey_options')->where('key', $data['type'])->value('label');
-        $duplicate = DB::table('member_journeys')->where('person_id', $person->id)->where('type', $data['type'])->whereIn('status', ['requested', 'contacted', 'enrolled'])->exists();
+        $data = $request->validate(['type' => ['required', Rule::exists('next_step_options', 'key')->where(fn ($query) => $query->where('active', true))], 'consent_to_contact' => ['accepted']]);
+        $label = DB::table('next_step_options')->where('key', $data['type'])->value('label');
+        $duplicate = DB::table('follow_up_tasks')->where('person_id', $person->id)->where('kind', 'next_step')->where('request_key', $data['type'])->whereIn('status', ['open', 'in_progress'])->exists();
         if ($duplicate) {
             return to_route('member.next-steps')->withErrors(['type' => 'You already have an active request for this next step.']);
         }
-        $journeyId = (string) Str::uuid();
         $taskId = (string) Str::uuid();
-        DB::transaction(function () use ($person, $request, $data, $journeyId, $taskId, $label): void {
-            DB::table('follow_up_tasks')->insert(['id' => $taskId, 'person_id' => $person->id, 'kind' => 'journey_'.$data['type'], 'status' => 'open', 'summary' => 'Member requested '.$label.' follow-up.', 'due_at' => now()->addDays(3), 'created_at' => now(), 'updated_at' => now()]);
-            DB::table('member_journeys')->insert(['id' => $journeyId, 'person_id' => $person->id, 'user_id' => $request->user()->id, 'follow_up_task_id' => $taskId, 'type' => $data['type'], 'status' => 'requested', 'consent_to_contact' => true, 'created_at' => now(), 'updated_at' => now()]);
-        });
+        DB::table('follow_up_tasks')->insert(['id' => $taskId, 'person_id' => $person->id, 'kind' => 'next_step', 'request_key' => $data['type'], 'status' => 'open', 'summary' => 'Next Step request: '.$label, 'due_at' => now()->addDays(3), 'created_at' => now(), 'updated_at' => now()]);
 
         return to_route('member.next-steps')->with('status', 'Your next-step request was sent to the ministry team.');
     }
@@ -138,6 +179,8 @@ class MemberWorkspaceController extends Controller
     public function update(Request $request): RedirectResponse
     {
         $person = $this->person($request);
+        $previousProfileImagePath = $person->profile_image_path;
+        $newProfileImagePath = null;
         $profile = $request->validate([
             'first_name' => ['required', 'string', 'max:100'],
             'preferred_name' => ['nullable', 'string', 'max:100'],
@@ -150,10 +193,11 @@ class MemberWorkspaceController extends Controller
             'profile_image' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
         if ($request->hasFile('profile_image')) {
-            if ($person->profile_image_path) {
-                Storage::disk('public')->delete($person->profile_image_path);
+            $newProfileImagePath = $request->file('profile_image')->store('profiles', 'public');
+            if (! is_string($newProfileImagePath) || ! Storage::disk('public')->exists($newProfileImagePath)) {
+                throw ValidationException::withMessages(['profile_image' => 'The profile photo could not be stored. Please try again.']);
             }
-            $profile['profile_image_path'] = $request->file('profile_image')->store('profiles', 'public');
+            $profile['profile_image_path'] = $newProfileImagePath;
         }
         unset($profile['profile_image']);
         $month = (int) $profile['birthday_month'];
@@ -170,6 +214,9 @@ class MemberWorkspaceController extends Controller
         $before = DB::table('people')->where('id', $person->id)->first();
         $changedFields = collect($profile)->filter(fn ($value, $field) => (string) ($before->{$field} ?? '') !== (string) ($value ?? ''))->keys()->values()->all();
         DB::table('people')->where('id', $person->id)->update([...$profile, 'updated_at' => now()]);
+        if ($newProfileImagePath && $previousProfileImagePath && $previousProfileImagePath !== $newProfileImagePath) {
+            Storage::disk('public')->delete($previousProfileImagePath);
+        }
         $preferenceValues = [
             'email_marketing' => $request->boolean('email_marketing'),
             'sms_marketing' => $request->boolean('sms_marketing'),

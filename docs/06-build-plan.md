@@ -19,7 +19,7 @@ For each slice: read the Product Master and the applicable owners in the source-
 - The shared shell resolves a fixed preset palette consistently across staff, member, public, and worship surfaces; ministry customisation is limited to the shared navigation chrome.
 - An administrator can set singular and plural ministry-facing labels for supported concepts; shared UI surfaces use the override while route names, permission keys, data values, and public/API identifiers remain stable.
 - A representative enhanced settings save shows pending and completion/failure feedback in the current viewport without a page reload, while its server-rendered fallback still works.
-- Unauthorized location/group access is denied through direct API calls.
+- Unauthorized location/department access is denied through direct API calls.
 - Backup is restored into a clean test installation and compared with expected records and media manifests.
 - Clean migration and upgrade migration pass; queued jobs and scheduler run; failing dependency appears in operator health.
 - A fresh installation works without Node.js, Redis, Docker, a persistent worker, or a realtime server.
@@ -41,7 +41,7 @@ The bounded AI page editor is a separately feature-gated content-authoring enhan
 
 ## 4. Phase 2 — People, attendance, and follow-up
 
-**Build:** Person and household records; visitor intake and consent; identified presence; in-person check-in; attendance derivation/correction; prayer and care queues; tasks, assignment and escalation; member profile and communication preferences; scoped reports.
+**Build:** Person and household records; public-contact intake and consent; identified presence; in-person check-in; attendance derivation/correction; prayer and care queues; tasks, assignment and escalation; member profile and communication preferences; scoped reports.
 
 **Gate:**
 
@@ -53,12 +53,12 @@ The bounded AI page editor is a separately feature-gated content-authoring enhan
 
 ## 5. Phase 3 — Community and communication
 
-**Build:** Groups, events, registrations, volunteer teams and schedules, announcements, email/SMS adapters, birthday preferences, and celebration scheduling.
+**Build:** Departments, join requests, member discussion, gatherings, attendance, events, registrations, announcements, email/SMS adapters, birthday preferences, and celebration scheduling.
 
 **Gate:**
 
-- A member joins a group and event; leader records group attendance only within assigned scope.
-- Volunteer accepts a shift and receives a reminder; cancellation or substitution updates the schedule.
+- A member joins a department and event; a coordinator records department attendance only within assigned scope.
+- A member submits a Next Step request and staff can assign, schedule, complete, or close it from Follow-up.
 - Birthday display and greetings occur only for opted-in people and obey local time/quiet hours.
 - Campaign excludes unsubscribed people and logs provider failures for retry.
 
@@ -68,7 +68,7 @@ The bounded AI page editor is a separately feature-gated content-authoring enhan
 
 **Gate:**
 
-- A group runs a meeting with host controls and room-scoped access. An expired or unrelated token cannot join.
+- A department runs a meeting with host controls and room-scoped access. An expired or unrelated token cannot join.
 - Recording notice appears to participants; rejected or failed recordings do not publish.
 - Provider callback replay results in one confirmed gift and one receipt. Browser redirect alone cannot confirm a gift.
 - Finance user can reconcile giving but cannot read pastoral care. Care worker cannot see donation details.

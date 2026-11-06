@@ -23,7 +23,7 @@ Sections and columns are editable layout objects. Elements are editable content 
 - Selecting an object makes its hierarchy clear: Page, Section, Column, or Element.
 - Every setting has a safe default and an explicit responsive behavior.
 - Desktop, tablet, and mobile values can be independently overridden.
-- The editor never accepts arbitrary HTML, CSS, JavaScript, or iframe markup.
+- The editor accepts only validated native-element settings and bounded custom code rendered in the documented sandbox; it never injects provider markup into the application document.
 - The public renderer uses an approved recursive renderer, not editor-generated markup.
 - Ministry branding uses shared semantic theme tokens. Editor controls remain neutral unless a ministry-selected accent is required for an action state.
 - Manual editing remains complete when AI is unavailable.
@@ -138,14 +138,14 @@ Selecting a column opens the column settings panel without opening the section s
 
 ## 6. Element contract
 
-Elements are placed inside columns. The first supported groups are:
+Elements are placed inside columns. The first supported categories are:
 
 - Text: heading, paragraph, rich text, quote, list, accordion, tabs, feature list, testimonial, statistics, alert/callout, progress, and accessible table.
 - Actions: standalone button and call to action.
 - Media: image, gallery, video, audio, file download, media and text.
-- Ministry content: events, service times, groups, locations, giving, prayer, next steps, announcements, volunteer, sermon spotlight, books, newsletter, and welcome.
+- Ministry content: events, service times, departments, locations, giving, prayer, next steps, announcements, volunteer, sermon spotlight, books, newsletter, and welcome.
 - Feature content: a native carousel with staff-provided slides and an explicit content card.
-- Advanced content: a distinct HTML widget plus a custom-code element with bounded HTML, CSS, and JavaScript. Their code runs only in the documented opaque-origin sandbox, never in the ministry application document. Every ordinary element may also carry bounded element-scoped Custom CSS and Custom JavaScript in Advanced.
+- Advanced content: a distinct HTML widget plus a custom-code element with bounded HTML, CSS, and JavaScript. Their code runs only in the documented opaque-origin sandbox, never in the ministry application document. Every ordinary section, column, and element may carry bounded scoped Custom CSS in Advanced; executable JavaScript is rejected outside the sandboxed widgets.
 - Layout helpers: divider, spacer, and one-, two-, three-, or four-column grid presets.
 
 Each element owns its content, accessibility fields, visibility, alignment, spacing, and approved style settings. An element cannot change its parent section or column settings through its own content form.
@@ -214,13 +214,13 @@ The inspector never displays unrelated controls from another hierarchy level.
 
 ## 9. AI behavior
 
-Page planning may propose sections, columns, and approved elements. It cannot invent media URLs, destinations, ministry facts, arbitrary HTML, CSS, or scripts. The application compiles and validates every plan into the same versioned document used by the manual editor before staff can review or apply it; AI output never becomes page markup directly.
+Page planning may propose sections, columns, approved elements, every validated setting available to those elements, and bounded custom code when no native element fits. It cannot invent media URLs, destinations, or ministry facts. The application validates every plan through the same versioned document boundary used by the manual editor before staff can review or apply it; AI output never becomes application markup directly.
 
-Section AI receives the page purpose, neighboring sections, the selected section, and the current theme context. It may change only the selected section after staff approval.
+Section AI receives the page purpose, neighboring sections, the selected section, and the current theme context. It may return a complete redesigned section, including columns and child elements, but may change only that selected section after staff approval.
 
 Column AI receives the selected column and its surrounding section context. It may change only the selected column layout or its approved child arrangement.
 
-Element AI receives the selected element and page context. It may change only the selected element’s content and approved settings.
+Element AI receives the selected element and page context. It may change the element type, content, and approved settings while preserving the selected object identity and scope.
 
 Applying a proposal creates an undo point. Applying is not saving, and saving is not publishing.
 
@@ -241,16 +241,9 @@ The server validates the complete document recursively:
 
 Disabled modules remain hidden and server-blocked even if a stale document contains their elements.
 
-## 11. Legacy migration
+## 11. Document baseline
 
-Existing flat documents remain readable. The migration converter maps:
-
-- A top-level element into a section with one column.
-- A current section block into a section with generated columns and child elements.
-- A media-and-text block into a two-column section.
-- Existing saved content into equivalent structured objects without inventing new content.
-
-The original document remains available in the page revision history. Migration is repeatable and must not duplicate sections.
+The editor supports version-2 structured documents only. No legacy flat-document compatibility is required for this pre-release implementation.
 
 ## 12. Performance and portability
 
@@ -265,7 +258,7 @@ The original document remains available in the page revision history. Migration 
 
 ## 13. Implementation batches
 
-1. **Document foundation:** version 2 contract, recursive validation, legacy conversion, and revision compatibility.
+1. **Document foundation:** version 2 contract, recursive validation, and revision compatibility.
 2. **Recursive renderer:** sections, columns, child elements, responsive CSS variables, and public output.
 3. **Manual structure editor:** hierarchy selection, add/move/duplicate/delete, and section/column settings.
 4. **Responsive controls:** breakpoint overrides, inheritance, stacking, ordering, spacing, and visibility.

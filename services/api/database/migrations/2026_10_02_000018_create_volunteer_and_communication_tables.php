@@ -9,25 +9,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('volunteer_teams', function (Blueprint $table): void {
-            $table->uuid('id')->primary();
-            $table->string('name', 160);
-            $table->text('description')->nullable();
-            $table->timestamps();
-        });
-        Schema::create('volunteer_assignments', function (Blueprint $table): void {
-            $table->uuid('id')->primary();
-            $table->foreignUuid('team_id')->constrained('volunteer_teams')->cascadeOnDelete();
-            $table->foreignUuid('person_id')->constrained('people')->restrictOnDelete();
-            $table->foreignUuid('service_occurrence_id')->nullable()->constrained('service_occurrences')->nullOnDelete();
-            $table->string('role', 80);
-            $table->timestamp('starts_at');
-            $table->timestamp('ends_at')->nullable();
-            $table->string('status', 24)->default('scheduled');
-            $table->foreignUuid('substituted_by')->nullable()->constrained('people')->nullOnDelete();
-            $table->timestamps();
-            $table->unique(['team_id', 'person_id', 'starts_at']);
-        });
         Schema::create('notification_preferences', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->foreignUuid('person_id')->constrained('people')->cascadeOnDelete();
@@ -42,7 +23,7 @@ return new class extends Migration
             $table->unique('person_id');
         });
         DB::table('permissions')->insertOrIgnore([
-            'key' => 'community.manage', 'description' => 'Manage groups, volunteers, and communications',
+            'key' => 'community.manage', 'description' => 'Manage events and community operations',
             'created_at' => now(), 'updated_at' => now(),
         ]);
         if (DB::table('roles')->where('key', 'ministry_administrator')->exists()) {
@@ -55,7 +36,5 @@ return new class extends Migration
         DB::table('role_permissions')->where('permission_key', 'community.manage')->delete();
         DB::table('permissions')->where('key', 'community.manage')->delete();
         Schema::dropIfExists('notification_preferences');
-        Schema::dropIfExists('volunteer_assignments');
-        Schema::dropIfExists('volunteer_teams');
     }
 };

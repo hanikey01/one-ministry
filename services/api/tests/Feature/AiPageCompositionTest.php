@@ -23,6 +23,7 @@ class AiPageCompositionTest extends TestCase
             'password' => 'long-private-password',
         ]);
         DB::table('feature_settings')->where('key', 'ai_page_editor')->update(['state' => 'enabled']);
+        DB::table('feature_settings')->where('key', 'giving')->update(['state' => 'disabled']);
         DB::table('ai_provider_connections')->insert([
             'provider_key' => 'gemini', 'api_key_encrypted' => Crypt::encryptString('test-key'), 'enabled' => true,
             'connection_status' => 'connected', 'created_at' => now(), 'updated_at' => now(),
@@ -42,29 +43,54 @@ class AiPageCompositionTest extends TestCase
         $output = [
             'title' => 'Plan a visit', 'seo_title' => 'Plan a visit | Hope Community',
             'seo_description' => 'What to expect when you visit Hope Community.',
-            'hero_eyebrow' => 'WELCOME', 'hero_heading' => 'You are welcome here',
-            'hero_body' => 'Find the practical information you need before your first visit.',
-            'call_to_action_title' => 'We would love to meet you', 'call_to_action_body' => 'Choose a next step that works for you.',
-            'call_to_action_label' => 'Get in touch',
-            'sections' => [
-                $this->section('story', ['heading' => 'What to expect', 'body' => 'A warm welcome and clear information.']),
-                $this->section('split', ['heading' => 'Find your way', 'body' => 'Add arrival details here.', 'image_alt' => 'Entrance to the ministry building']),
-                $this->section('image', ['image_hint' => 'A welcoming community gathering', 'image_alt' => 'People greeting one another']),
-                $this->section('quote', ['body' => 'We felt at home from the first visit.', 'attribution' => 'A visitor']),
-                $this->section('list', ['heading' => 'Helpful details', 'items' => "Parking\nAccessibility"]),
-                $this->section('faq', ['heading' => 'Common questions', 'question_one' => 'What should I wear?', 'answer_one' => 'Come as you are.']),
-            ],
+            'document' => ['version' => 2, 'sections' => [[
+                'id' => 'visit-hero', 'type' => 'section',
+                'settings' => ['background_color' => '#17324d', 'content_width' => 'wide'],
+                'responsive' => ['mobile' => ['stack' => 'stack']],
+                'columns' => [[
+                    'id' => 'visit-main', 'settings' => [], 'responsive' => [], 'elements' => [
+                        ['id' => 'visit-heading', 'type' => 'hero', 'content' => ['eyebrow' => 'WELCOME', 'title' => 'You are welcome here', 'body' => 'Find the practical information you need before your first visit.', 'button_label' => '', 'button_url' => ''], 'settings' => ['text_color' => '#ffffff'], 'responsive' => []],
+                        ['id' => 'visit-stats', 'type' => 'statistics', 'content' => ['title' => 'Plan your visit', 'stat_one_value' => '', 'stat_one_label' => '', 'stat_two_value' => '', 'stat_two_label' => '', 'stat_three_value' => '', 'stat_three_label' => ''], 'settings' => ['background_color' => '#ffffff', 'radius_top_left' => '16px'], 'responsive' => []],
+                    ],
+                ]],
+            ]]],
         ];
 
         $provider = new class($output) implements AiTextProvider
         {
             public string $lastPrompt = '';
+            public array $lastSchema = [];
+            public array $prompts = [];
+            public array $schemas = [];
             public function __construct(private readonly array $output) {}
             public function discoverModels(string $apiKey): array { return []; }
             public function validateStructuredOutput(string $apiKey, string $modelId): array { return ['model' => $modelId, 'latency_ms' => 1, 'output' => ['ok' => true]]; }
             public function generateStructuredOutput(string $apiKey, string $modelId, string $systemPrompt, string $userPrompt, array $schema, string $schemaName, int $maxOutputTokens): array
             {
                 $this->lastPrompt = $userPrompt;
+                $this->lastSchema = $schema;
+                $this->prompts[$schemaName] = $userPrompt;
+                $this->schemas[$schemaName] = $schema;
+                if ($schemaName === 'ministry_public_page_design_plan') {
+                    return ['model' => $modelId, 'latency_ms' => 1, 'output' => [
+                        'page_strategy' => 'Move visitors from reassurance to practical details and one clear next step.',
+                        'visitor_journey' => ['Understand the welcome', 'Learn what to expect', 'Plan a visit'],
+                        'sections' => [[
+                            'purpose' => 'Welcome first-time visitors', 'element_types' => ['hero', 'statistics'],
+                            'hierarchy' => 'Lead with one promise and supporting practical information.',
+                            'layout' => 'Wide hero followed by a compact supporting panel.',
+                            'responsive' => 'Stack content and reduce heading scale on mobile.', 'cta' => 'Plan your visit',
+                        ]],
+                        'visual_direction' => 'Warm editorial design with confident contrast.',
+                        'typography_strategy' => 'Expressive heading with restrained body typography.',
+                        'spacing_rhythm' => 'Generous section spacing and compact related content.',
+                        'responsive_strategy' => 'Single-column mobile flow with touch-friendly actions.',
+                        'cta_strategy' => 'Use one primary visit action.',
+                        'accessibility_priorities' => ['Readable contrast', 'Logical headings'],
+                        'factual_constraints' => ['Use only confirmed ministry facts'],
+                        'custom_code_needed' => false, 'custom_code_reason' => '',
+                    ]];
+                }
                 if ($schemaName === 'ministry_public_page_section_revision') {
                     $revision = [];
                     foreach (array_keys($schema['properties']) as $key) {
@@ -79,11 +105,25 @@ class AiPageCompositionTest extends TestCase
                     return ['model' => $modelId, 'latency_ms' => 2, 'output' => $revision];
                 }
                 if ($schemaName === 'ministry_public_page_object_revision') {
-                    $revision = [];
-                    foreach ($schema['properties'] as $target => $definition) {
-                        $revision[$target] = array_fill_keys(array_keys($definition['properties']), '<b>'.str_repeat('A', 700).'</b>');
-                    }
-                    return ['model' => $modelId, 'latency_ms' => 2, 'output' => $revision];
+                    return ['model' => $modelId, 'latency_ms' => 2, 'output' => ['proposal' => [
+                        'id' => 'model-tried-to-change-the-id',
+                        'type' => 'hero',
+                        'content' => [
+                            'eyebrow' => 'FIRST VISIT',
+                            'title' => 'Everything you need for Sunday',
+                            'body' => 'A clear, welcoming introduction for first-time guests.',
+                            'button_label' => 'Plan your visit',
+                            'button_url' => 'https://invented.example/visit',
+                        ],
+                        'settings' => ['background_color' => '#102a43', 'text_color' => '#ffffff', 'font_size' => '42px'],
+                        'responsive' => ['mobile' => ['font_size' => '32px', 'padding' => ['top' => '24px', 'right' => '20px', 'bottom' => '24px', 'left' => '20px']]],
+                    ]]];
+                }
+                if ($schemaName === 'ministry_public_page_design_review') {
+                    return ['model' => $modelId, 'latency_ms' => 1, 'output' => [
+                        'findings' => [['category'=>'spacing','severity'=>'improvement','issue'=>'Related content was too loose.','correction'=>'Tightened spacing within the supporting content group.']],
+                        'document' => $this->output['document'],
+                    ]];
                 }
                 return ['model' => $modelId, 'latency_ms' => 1, 'output' => $this->output];
             }
@@ -92,40 +132,50 @@ class AiPageCompositionTest extends TestCase
 
         $draft = app(AiPageDraftService::class)->generate([
             'brief' => 'Help first-time visitors prepare for a visit and understand what to expect.',
-            'title' => null, 'public_details' => null,
+            'title' => null, 'public_details' => null, 'page_goal' => 'Increase confident visit planning',
+            'audience' => 'First-time visitors', 'tone' => 'Warm and confident', 'visual_direction' => 'Editorial and spacious',
+            'content_density' => 'balanced', 'primary_action' => 'Plan a visit', 'required_sections' => 'Welcome and practical details',
+            'forbidden_patterns' => 'No carousel', 'brand_constraints' => 'Use restrained colors',
         ], $admin, '127.0.0.1');
 
         $sections = $draft['document']['sections'];
-        $this->assertSame(['hero', 'heading', 'media_text', 'image', 'quote', 'list', 'accordion', 'call_to_action'], [
-            $sections[0]['columns'][0]['elements'][0]['type'], $sections[1]['columns'][0]['elements'][0]['type'],
-            $sections[2]['columns'][0]['elements'][0]['type'], $sections[3]['columns'][0]['elements'][0]['type'],
-            $sections[4]['columns'][0]['elements'][0]['type'], $sections[5]['columns'][0]['elements'][0]['type'],
-            $sections[6]['columns'][0]['elements'][0]['type'], $sections[7]['columns'][0]['elements'][0]['type'],
-        ]);
-        $this->assertSame('', $sections[2]['columns'][0]['elements'][0]['content']['media_url']);
-        $this->assertSame('A welcoming community gathering', $sections[3]['columns'][0]['elements'][0]['content']['image_hint']);
-        $this->assertSame('', $sections[7]['columns'][0]['elements'][0]['content']['button_url']);
+        $this->assertSame(['hero', 'statistics'], array_column($sections[0]['columns'][0]['elements'], 'type'));
+        $this->assertSame('#17324d', $sections[0]['settings']['background_color']);
+        $this->assertSame('16px', $sections[0]['columns'][0]['elements'][1]['settings']['radius_top_left']);
+        $this->assertSame('Move visitors from reassurance to practical details and one clear next step.', $draft['design_plan']['page_strategy']);
+        $this->assertStringContainsString('Primary audience:', $provider->prompts['ministry_public_page_design_plan']);
+        $this->assertStringContainsString('Approved architecture plan:', $provider->prompts['ministry_public_page_draft']);
+        $this->assertSame('spacing', $draft['design_review'][0]['category']);
+        $this->assertStringContainsString('Review and repair', $provider->prompts['ministry_public_page_design_review']);
+        $draftSchema = $provider->schemas['ministry_public_page_draft'];
+        $this->assertSame(['title', 'seo_title', 'seo_description', 'document'], array_keys($draftSchema['properties']));
+        $this->assertArrayNotHasKey('hero_eyebrow', $draftSchema['properties']);
+        $this->assertFalse($draftSchema['properties']['document']['additionalProperties']);
+        $elementSchema = $draftSchema['properties']['document']['properties']['sections']['items']['properties']['columns']['items']['properties']['elements']['items'];
+        $elementTypes=array_map(fn(array $variant): string=>$variant['properties']['type']['enum'][0],$elementSchema['oneOf']);
+        $this->assertContains('statistics', $elementTypes);
+        $this->assertNotContains('giving', $elementTypes);
+        $statisticsSchema=collect($elementSchema['oneOf'])->first(fn(array $variant): bool=>$variant['properties']['type']['enum']===['statistics']);
+        $this->assertArrayHasKey('background_color', $statisticsSchema['properties']['settings']['properties']);
+        $this->assertSame(['none','solid','dashed','dotted'], $statisticsSchema['properties']['settings']['properties']['border_style']['enum']);
+        $this->assertArrayHasKey('pattern', $statisticsSchema['properties']['settings']['properties']['font_size']);
+        $this->assertArrayNotHasKey('custom_js', $statisticsSchema['properties']['settings']['properties']);
+        $this->assertArrayHasKey('mobile', $statisticsSchema['properties']['responsive']['properties']);
 
         $revision = app(AiPageDraftService::class)->reviseObject([
             'title' => $draft['title'], 'instruction' => 'Make the hero clearer.', 'page_purpose' => null,
             'document' => $draft['document'], 'kind' => 'element', 'section' => 0, 'column' => 0, 'element' => 0,
         ], $admin, '127.0.0.1');
-        $this->assertSame(str_repeat('A', 500), $revision['edits']['c0e0']['eyebrow']);
-        $this->assertSame(str_repeat('A', 700), $revision['edits']['c0e0']['body']);
+        $this->assertSame('visit-heading', $revision['proposal']['id']);
+        $this->assertSame('FIRST VISIT', $revision['proposal']['content']['eyebrow']);
+        $this->assertSame('', $revision['proposal']['content']['button_url']);
+        $this->assertSame('#102a43', $revision['proposal']['settings']['background_color']);
+        $this->assertSame('32px', $revision['proposal']['responsive']['mobile']['font_size']);
+        $this->assertSame('24px', $revision['proposal']['responsive']['mobile']['padding']['top']);
         $this->assertSame('WELCOME', $draft['document']['sections'][0]['columns'][0]['elements'][0]['content']['eyebrow']);
         $this->assertSame(0, DB::table('pages')->count());
         $this->assertDatabaseHas('audit_events', ['action' => 'content.page_ai_draft_generated']);
         $this->assertDatabaseHas('audit_events', ['action' => 'content.page_ai_object_revision_generated']);
     }
 
-    /** @param array<string,string> $values
-     *  @return array<string,string>
-     */
-    private function section(string $kind, array $values): array
-    {
-        return array_merge([
-            'kind' => $kind, 'heading' => '', 'body' => '', 'items' => '', 'image_hint' => '', 'image_alt' => '', 'attribution' => '',
-            'question_one' => '', 'answer_one' => '', 'question_two' => '', 'answer_two' => '', 'question_three' => '', 'answer_three' => '',
-        ], $values);
-    }
 }

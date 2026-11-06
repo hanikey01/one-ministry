@@ -70,7 +70,7 @@ class InteractiveMeetingLobbyTest extends TestCase
         ]);
 
         $this->actingAs($admin)->postJson('/api/v1/staff/service-schedule', [
-            'title' => 'Prayer group', 'service_type' => 'meeting', 'timezone' => 'UTC', 'frequency' => 'weekly',
+            'title' => 'Prayer gathering', 'service_type' => 'meeting', 'timezone' => 'UTC', 'frequency' => 'weekly',
             'weekdays' => [0], 'starts_on' => now()->toDateString(), 'starts_at_local' => '10:00', 'duration_minutes' => 60,
         ])->assertUnprocessable();
     }

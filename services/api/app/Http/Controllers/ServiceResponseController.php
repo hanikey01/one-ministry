@@ -15,7 +15,7 @@ class ServiceResponseController extends Controller
     {
         $this->guard($service);
         $data = $request->validate([
-            'kind' => ['required', 'string', 'in:newcomer,speak_to_someone,join_group,decision'],
+            'kind' => ['required', 'string', 'in:newcomer,speak_to_someone,join_department,decision'],
             'name' => ['nullable', 'string', 'max:160'],
             'email' => ['nullable', 'email', 'max:254'],
             'phone' => ['nullable', 'string', 'max:40'],

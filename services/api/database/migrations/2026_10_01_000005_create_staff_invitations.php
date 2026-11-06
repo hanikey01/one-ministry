@@ -11,7 +11,7 @@ return new class extends Migration
     {
         Schema::create('staff_invitations', function (Blueprint $table): void {
             $table->uuid('id')->primary();
-            $table->string('email', 254);
+            $table->string('email', 191);
             $table->string('name', 160);
             $table->string('role_key', 80);
             $table->foreign('role_key')->references('key')->on('roles')->restrictOnDelete();
@@ -21,7 +21,7 @@ return new class extends Migration
             $table->timestamp('accepted_at')->nullable();
             $table->timestamp('revoked_at')->nullable();
             $table->timestamps();
-            $table->index(['email', 'accepted_at', 'revoked_at']);
+            $table->index(['email', 'accepted_at', 'revoked_at'], 'staff_inv_email_status_idx');
         });
 
         DB::table('roles')->insertOrIgnore([

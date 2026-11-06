@@ -14,7 +14,7 @@ return new class extends Migration
             $table->foreignUuid('user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('kind', 40);
             $table->string('name', 160)->nullable();
-            $table->string('email', 254)->nullable();
+            $table->string('email', 191)->nullable();
             $table->string('phone', 40)->nullable();
             $table->boolean('consent_to_contact')->default(false);
             $table->string('idempotency_key', 80)->nullable();

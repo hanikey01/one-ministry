@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('email_delivery_settings', function (Blueprint $table): void {
             $table->uuid('id')->primary();
-            $table->string('provider', 32)->default('hosting');
+            $table->string('provider', 32)->default('custom_smtp');
             $table->boolean('enabled')->default(false);
             $table->string('from_address', 254)->nullable();
             $table->string('from_name', 160)->nullable();

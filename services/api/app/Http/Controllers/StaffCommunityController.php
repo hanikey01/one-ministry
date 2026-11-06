@@ -9,20 +9,6 @@ use Illuminate\Support\Str;
 
 class StaffCommunityController extends Controller
 {
-    public function groups(): JsonResponse
-    {
-        return response()->json(['data' => DB::table('groups')->latest()->get()]);
-    }
-
-    public function group(Request $request): JsonResponse
-    {
-        $data = $request->validate(['name' => ['required', 'string', 'max:160'], 'description' => ['nullable', 'string', 'max:5000']]);
-        $id = (string) Str::uuid();
-        DB::table('groups')->insert([...$data, 'id' => $id, 'created_at' => now(), 'updated_at' => now()]);
-
-        return response()->json(['data' => DB::table('groups')->where('id', $id)->first()], 201);
-    }
-
     public function events(): JsonResponse
     {
         return response()->json(['data' => DB::table('events')->orderBy('starts_at')->get()]);

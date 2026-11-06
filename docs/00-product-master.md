@@ -43,16 +43,16 @@ Historical audits and status notes describe context; they do not override the do
 
 | User | Primary needs |
 | --- | --- |
-| Public visitor | Learn about the ministry, watch a service, find a location, submit a request, and make contact without mandatory registration. |
-| Member or regular attendee | Join worship and groups, manage profile and preferences, see events and serving commitments, and request care. |
+| Public guest | Learn about the ministry, watch a service, find a location, submit a request, and make contact without mandatory registration. |
+| Member or regular attendee | Join worship and departments, manage profile and preferences, see events and commitments, and request care. |
 | Online host or moderator | Welcome attendees, moderate chat, assist with prayer and next steps, and handle disruptions. |
-| Group or ministry leader | Manage an assigned group or team, attendance, schedules, and follow-up within their scope. |
+| Department or ministry leader | Manage an assigned department, attendance, membership requests, discussion, and follow-up within their scope. |
 | Care team member | Receive assigned requests and record restricted care actions. |
 | Content or service producer | Publish content, prepare service schedules, operate live sessions, and review recordings. |
 | Administrator | Configure the ministry, permissions, locations, forms, policies, and reports. |
 | Finance user | Manage giving and financial reports without access to unrelated pastoral records. |
 
-Roles are permission bundles, not a rigid hierarchy. A person may hold more than one role. Every sensitive action must be checked against both permission and assigned scope, such as campus, group, or care case.
+Roles are permission bundles, not a rigid hierarchy. A person may hold more than one role. Every sensitive action must be checked against both permission and assigned scope, such as location, department, or care case.
 
 ## 4. Ministry setup and public presence
 
@@ -63,7 +63,7 @@ Roles are permission bundles, not a rigid hierarchy. A person may hold more than
 - Administrators can configure terminology such as *campus* versus *branch*, and can enable or hide modules. Core interface terms use installation-owned singular/plural display overrides; these never change internal route names, permission keys, or stored domain values.
 - Site navigation, homepage sections, footer, social links, and public contact methods are editable.
 - Administrators select a feature-aware homepage preset and arrange approved sections. The available section set is derived from activated modules, while branding, content, and section order remain ministry-owned.
-- The homepage editor provides four theme families and four lead layouts. It supports up to four curated carousel slides, each using a ministry-owned image, hosted video, or approved external video URL, with accessible text and an optional action. Below the lead, ministries select and configure approved sections such as service times, locations, events, groups, sermons, libraries, giving, prayer, volunteering, announcements, newsletter, FAQ, and custom welcome content.
+- The homepage editor provides four theme families and four lead layouts. It supports up to four curated carousel slides, each using a ministry-owned image, hosted video, or approved external video URL, with accessible text and an optional action. Below the lead, ministries select and configure approved sections such as service times, locations, events, departments, sermons, libraries, giving, prayer, volunteering, announcements, newsletter, FAQ, and custom welcome content.
 - The application ships with sample content that can be removed before launch.
 
 ### 4.2 Public pages and content
@@ -105,7 +105,7 @@ The live state depends on the actual service state and stream health, not only a
 - Broadcast player; full-screen and lower-bandwidth playback choices where supported.
 - Public chat with moderation, optional slow mode, and clear host identification.
 - Service notes, scripture references, captions when available, polls, and reactions.
-- **I’m new**, **Request prayer**, **Speak to someone**, **Join a group**, and other configurable response actions.
+- **I’m new**, **Request prayer**, **Speak to someone**, **Join a department**, and other configurable response actions.
 - Private conversation or prayer handoff to an available authorized host.
 - Anonymous viewing is allowed unless the ministry explicitly makes a particular event private. Participation actions may ask for contact details with clear consent.
 - Hosts can mute or remove a disruptive user, delete chat content, and pause interaction during an incident. Moderation actions are logged.
@@ -115,7 +115,7 @@ The live state depends on the actual service state and stream health, not only a
 - Smaller meetings support participant camera and microphone, screen sharing, hand raising, chat, waiting room, host controls, and breakout rooms.
 - Meeting privacy options: public registration, invited members, or invitation only.
 - Recording is off by default and requires visible notice when enabled.
-- Group, class, prayer, and pastoral meeting templates may choose different defaults.
+- Department, class, prayer, and pastoral meeting templates may choose different defaults.
 
 ### 5.4 After the service
 
@@ -132,23 +132,23 @@ A large service uses a broadcast viewing experience with app-based chat and resp
 
 ### 6.1 People records
 
-- Individual profiles, households, preferred name, contact methods, consent, location, groups, ministry teams, and optional milestones.
-- Visitor, regular attendee, member, volunteer, and leader are configurable relationship states; one person may satisfy several.
+- Individual profiles, households, preferred name, contact methods, consent, location, departments, ministry teams, and optional milestones.
+- Member and regular attendee are configurable relationship states; one person may satisfy several. Volunteer and leader responsibilities are contextual assignments, not person states.
 - Duplicate detection and a reviewed merge process preserve attendance, donations, and care history.
 - People can update their own basic profile and communication preferences. Staff edits are audited.
 
 ### 6.2 Attendance and participation
 
-- Track in-person service check-in, identified online service attendance, anonymous viewer totals, group attendance, event attendance, and serving separately.
+- Track in-person service check-in, identified online service attendance, anonymous viewer totals, department attendance, event attendance, and serving separately.
 - Attendance records include event, channel, source, time window, and whether the record was automatic, self-reported, or manually corrected.
 - A page view alone must not be recorded as confirmed individual attendance. An anonymous stream viewer contributes only to aggregate viewing figures.
 - Household viewing cannot automatically imply that every household member attended.
 - Staff can correct attendance with a reason and audit history.
-- A person's timeline may show ministry-relevant actions such as service attendance, group participation, volunteering, registrations, prayer requests, and follow-up. Confidential details appear only to authorized users.
+- A person's timeline may show ministry-relevant actions such as service attendance, department participation, volunteering, registrations, prayer requests, and follow-up. Confidential details appear only to authorized users.
 
 ### 6.3 Follow-up workflows
 
-- Configurable workflows for first-time visitors, connection requests, prayer requests, missed gatherings, membership interest, baptism or discipleship interest, and serving interest.
+- Configurable workflows for new contacts, connection requests, prayer requests, missed gatherings, membership interest, baptism or discipleship interest, and serving interest.
 - Each task has an assignee, scope, due date, status, contact history, and next action.
 - Suggestions such as repeated absences are review prompts, not automatic declarations that a person needs pastoral intervention.
 - Members can state preferred contact channel and opt out of nonessential outreach.
@@ -164,12 +164,12 @@ A large service uses a broadcast viewing experience with app-based chat and resp
 
 ## 7. Community and operations
 
-- **Groups and discipleship:** group discovery, applications or invitations, schedules, resources, attendance, leader tools, and configurable learning pathways.
+- **Departments and discipleship:** public discovery, applications or invitations, member discussion, schedules, resources, attendance, leader tools, and configurable learning pathways.
 - **Volunteering:** teams, opportunities, availability, rosters, substitutions, reminders, and service history.
 - **Events:** registration, capacity, waitlist, ticket or fee settings where applicable, attendance, and communications.
 - **Messaging:** announcements and targeted email or SMS, templates, delivery history, unsubscribe and preference controls.
 - **Giving:** ministry-defined funds and campaigns, online and manually recorded gifts, receipts, donor statements, reconciliation, and finance-only reports. Payment credentials belong to the installing ministry.
-- **Reports:** service attendance by channel, visitor follow-up completion, group participation, volunteer coverage, content reach, and giving. Reports show definitions and time periods so numbers are interpretable.
+- **Reports:** service attendance by channel, contact follow-up completion, department participation, volunteer coverage, content reach, and giving. Reports show definitions and time periods so numbers are interpretable.
 - **Digital school:** optional course catalogues, enrolment policies, ordered modules and lessons, learner progress, assessments, completion certificates, instructor tools, and live classes linked to the ministry's interactive meeting provider.
 
 ## 8. Cross-cutting rules
@@ -205,9 +205,9 @@ A large service uses a broadcast viewing experience with app-based chat and resp
 | --- | --- | --- |
 | 0 — Foundation | Install, configuration, identity, roles, audit, backups, public site shell | A ministry deploys a fresh instance, brands it, creates an administrator, and restores a backup. |
 | 1 — Digital church | Schedule, dynamic homepage, online worship room, hosting, chat, response forms | A ministry prepares and runs a live service; the homepage enters and exits live mode correctly. |
-| 2 — People and care | Profiles, attendance definitions, visitor intake, prayer, assigned follow-up | A visitor joins, submits a request, and an assigned team member completes a documented follow-up. |
-| 3 — Community | Groups, events, volunteering, messaging, celebrations | A member joins a group and event; a leader records attendance; opted-in birthdays are recognized. |
-| 4 — Advanced media and giving | Interactive meetings, recordings, content library expansion, giving | A group holds a private meeting and a finance user reconciles a gift without accessing pastoral notes. |
+| 2 — People and care | Profiles, attendance definitions, public-contact intake, prayer, assigned follow-up | A public guest submits a request, receives a member record when consented, and an assigned team member completes a documented follow-up. |
+| 3 — Community | Departments, events, volunteering, messaging, celebrations | A member joins a department and event; a coordinator records attendance; opted-in birthdays are recognized. |
+| 4 — Advanced media and giving | Interactive meetings, recordings, content library expansion, giving | A department holds a private meeting and a finance user reconciles a gift without accessing pastoral notes. |
 | 5 — Scale and extensions | Capacity improvements, additional provider adapters, advanced reporting | A larger ministry validates peak service capacity and disaster recovery against agreed targets. |
 
 The phases express dependencies, not a promise that a ministry must wait until Phase 4 to collect offerings or run interactive meetings. The first release scope should be set after the capacity and hosting decisions in §12.

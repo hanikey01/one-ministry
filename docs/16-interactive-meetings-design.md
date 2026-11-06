@@ -6,7 +6,7 @@
 
 ## 1. Product decision and boundary
 
-An interactive meeting is for a bounded group where participants may publish camera, microphone, screen share, chat, and reactions. Examples include small groups, discipleship classes, prayer appointments, counselling intake calls, leadership meetings, and online training.
+An interactive meeting is for a bounded gathering where participants may publish camera, microphone, screen share, chat, and reactions. Examples include department gatherings, discipleship classes, prayer appointments, counselling intake calls, leadership meetings, and online training.
 
 A broadcast worship service remains a different experience. It distributes one composed program feed to a potentially large audience. It does not permit every viewer to publish video. A meeting must never be used as an unbounded substitute for a broadcast.
 
@@ -21,7 +21,7 @@ Invitation / member event → device check → waiting room → meeting room
                                                      ↘ declined / meeting closed
 ```
 
-1. A member opens a meeting from an event, group, invitation, or member dashboard.
+1. A member opens a meeting from an event, department, invitation, or member dashboard.
 2. The pre-join screen checks camera, microphone, speaker, and network. It shows the ministry name, meeting name, scheduled start, recording notice, and join policy.
 3. The participant selects a display name and chooses camera and microphone state. A participant may join muted or camera-off.
 4. Where enabled, the participant waits for a host. They see an accurate waiting-room status but cannot see or hear meeting participants.
@@ -58,7 +58,7 @@ A host can silence an existing audio publication, remove a participant, or preve
 
 ### 2.4 Prayer and pastoral handoff
 
-A public or group meeting may show a **Request private prayer** action. The request contains minimal contact/consent information and becomes a restricted request. An authorized host can offer a private prayer room to the requester and an eligible prayer-team member.
+A public or department meeting may show a **Request private prayer** action. The request contains minimal contact/consent information and becomes a restricted request. An authorized host can offer a private prayer room to the requester and an eligible prayer-team member.
 
 The private room is a new access-scoped meeting, not a breakout room visible to ordinary hosts. Care details, prayer text, and private-room participant records retain the existing care permission domain and audit requirements.
 
@@ -74,7 +74,7 @@ Each meeting stores the following controlled choices.
 | Screen sharing | All participants, presenter/host only, disabled | Presenter/host only |
 | Chat | Enabled, host-only, disabled | Enabled |
 | Recording | Off, host-start with notice, automatic with notice | Off |
-| Breakouts | Enabled/disabled | Enabled for groups/classes only |
+| Breakouts | Enabled/disabled | Enabled for departments/classes only |
 | Attendance | Off, self-confirmed, identified room admission | Identified admission for registered/member meetings |
 | Capacity | Declared maximum, provider-supported maximum | Installation-selected safe default |
 | Joining window | Early-open and late-join minutes | 15 minutes before; 30 minutes after start |
@@ -268,7 +268,7 @@ A batch is complete only when it demonstrates these user journeys on a configure
 ## 14. Decisions required before coding M-1
 
 1. Confirm the initial provider adapter: **Zoom Video SDK is selected by product direction**.
-2. Set the initial meeting categories and default limits for group, class, prayer, and leadership meetings.
+2. Set the initial meeting categories and default limits for department, class, prayer, and leadership meetings.
 3. Choose the initial data-retention duration for meeting presence and control events.
 4. Set which role bundles receive `meetings.manage`, `meetings.host`, `meetings.moderate`, and `meetings.record`.
 5. Set an installation-default provider usage warning and hard-stop policy.

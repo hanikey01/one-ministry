@@ -17,7 +17,7 @@ use Illuminate\View\View;
 
 class PageWorkspaceController extends Controller
 {
-    private const RESERVED = ['admin', 'api', 'events', 'groups', 'give', 'login', 'member', 'pages', 'resources', 'setup', 'staff', 'worship', 'books', 'sermons', 'media', 'dashboard-preview'];
+    private const RESERVED = ['admin', 'api', 'departments', 'events', 'give', 'login', 'member', 'pages', 'resources', 'setup', 'staff', 'worship', 'books', 'sermons', 'media', 'dashboard-preview'];
 
     private const STARTERS = [
         'homepage' => ['label' => 'Homepage', 'slug' => 'home', 'summary' => 'A polished ministry homepage with welcome, gatherings, connection, and next steps.'],
@@ -42,7 +42,9 @@ class PageWorkspaceController extends Controller
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
         $starter = self::STARTERS[$request->string('template')->toString()] ?? self::STARTERS['blank'];
 
-        return view('staff.pages.form', compact('settings', 'starter') + ['user' => $request->user(), 'page' => null, 'canPublish' => app(PermissionChecker::class)->allows($request->user(), 'content.publish'), 'blocks' => $this->starterDocument($request->string('template')->toString()), 'features' => $this->enabledFeatures(), 'aiDraftAvailable' => app(ModuleAvailability::class)->visibleToStaff('ai_page_editor', $request->user()), 'aiDraftRoute' => DB::table('ai_task_routes')->where('task_key', 'page_editor')->first()]);
+        $features = $this->enabledFeatures();
+        $elementRegistry = app(\App\Services\PageElementRegistry::class);
+        return view('staff.pages.form', compact('settings', 'starter', 'features') + ['user' => $request->user(), 'page' => null, 'canPublish' => app(PermissionChecker::class)->allows($request->user(), 'content.publish'), 'blocks' => $this->starterDocument($request->string('template')->toString()), 'elementCatalog' => $elementRegistry->available($features), 'elementCategories' => $elementRegistry->categories(), 'aiDraftAvailable' => app(ModuleAvailability::class)->visibleToStaff('ai_page_editor', $request->user()), 'aiDraftRoute' => DB::table('ai_task_routes')->where('task_key', 'page_editor')->first()]);
     }
 
     public function preview(Request $request): View
@@ -51,13 +53,12 @@ class PageWorkspaceController extends Controller
             'title' => ['required', 'string', 'max:200'],
             'blocks' => ['required', 'string', 'max:100000'],
         ]);
-        $document = $this->document($input['blocks'], null);
-        $blocks = app(\App\Services\PageDocumentService::class)->flatten($document, $this->enabledFeatures());
+        $document = $this->document($input['blocks']);
         $page = (object) [
             'title' => $input['title'],
             'seo_title' => $input['title'],
             'blocks' => json_encode($document, JSON_THROW_ON_ERROR),
-            'body' => $this->plainTextFromBlocks($blocks),
+            'body' => app(\App\Services\PageDocumentService::class)->plainText($document, $this->enabledFeatures()),
         ];
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
         $features = $this->enabledFeatures();
@@ -104,7 +105,9 @@ class PageWorkspaceController extends Controller
         $revisions = DB::table('content_revisions')->where('page_id', $page->id)->orderByDesc('revision')->get(['revision', 'created_at']);
         $canPublish = app(PermissionChecker::class)->allows($request->user(), 'content.publish');
 
-        return view('staff.pages.form', compact('settings', 'page', 'revisions', 'canPublish') + ['user' => $request->user(), 'starter' => null, 'blocks' => $this->editorDocument($page->blocks ?? null, $page->body), 'features' => $this->enabledFeatures(), 'aiDraftAvailable' => app(ModuleAvailability::class)->visibleToStaff('ai_page_editor', $request->user()), 'aiDraftRoute' => DB::table('ai_task_routes')->where('task_key', 'page_editor')->first()]);
+        $features = $this->enabledFeatures();
+        $elementRegistry = app(\App\Services\PageElementRegistry::class);
+        return view('staff.pages.form', compact('settings', 'page', 'revisions', 'canPublish', 'features') + ['user' => $request->user(), 'starter' => null, 'blocks' => $this->editorDocument($page->blocks ?? null), 'elementCatalog' => $elementRegistry->available($features), 'elementCategories' => $elementRegistry->categories(), 'aiDraftAvailable' => app(ModuleAvailability::class)->visibleToStaff('ai_page_editor', $request->user()), 'aiDraftRoute' => DB::table('ai_task_routes')->where('task_key', 'page_editor')->first()]);
     }
 
     public function mediaCatalog(): JsonResponse
@@ -119,17 +122,20 @@ class PageWorkspaceController extends Controller
     public function update(Request $request, string $page): RedirectResponse|JsonResponse
     {
         $record = DB::table('pages')->where('id', $page)->firstOrFail();
+        if (! hash_equals((string) $record->updated_at, (string) $request->input('document_version', ''))) {
+            throw ValidationException::withMessages(['blocks' => 'This page changed in another session. Reload it before saving so those edits are not overwritten.']);
+        }
         $publish = $request->boolean('publish');
         if ($publish) {
             abort_unless(app(PermissionChecker::class)->allows($request->user(), 'content.publish'), 403);
             abort_if($request->user()->email_verified_at === null, 403, 'Verify your email address before publishing.');
         }
         $data = $this->data($request, $page);
-        $migrationRevision = $this->requiresDocumentMigration($record->blocks ?? null);
-        $revision = (int) DB::table('content_revisions')->where('page_id', $page)->max('revision') + ($migrationRevision ? 2 : 1);
-        DB::transaction(function () use ($request, $page, $data, $revision, $record, $migrationRevision, $publish): void {
-            if ($migrationRevision) $this->revision($page, $revision - 1, $this->legacyRevisionPayload($record), $request->user()->id);
-            DB::table('pages')->where('id', $page)->update([...$data, 'status' => $publish ? 'published' : 'draft', 'review_notes' => null, 'published_at' => $publish ? now() : null, 'published_by' => $publish ? $request->user()->id : null, 'updated_by' => $request->user()->id, 'updated_at' => now()]);
+        $revision = (int) DB::table('content_revisions')->where('page_id', $page)->max('revision') + 1;
+        $savedAt=now();
+        DB::transaction(function () use ($request, $page, $data, $revision, $record, $publish, $savedAt): void {
+            $updated=DB::table('pages')->where('id', $page)->where('updated_at', $record->updated_at)->update([...$data, 'status' => $publish ? 'published' : 'draft', 'review_notes' => null, 'published_at' => $publish ? $savedAt : null, 'published_by' => $publish ? $request->user()->id : null, 'updated_by' => $request->user()->id, 'updated_at' => $savedAt]);
+            if($updated!==1) throw ValidationException::withMessages(['blocks'=>'This page changed while it was being saved. Reload it before trying again.']);
             $this->revision($page, $revision, $data, $request->user()->id);
             $this->audit($request, $publish ? 'content.page_published' : 'content.page_updated', $page, ['revision' => $revision, 'previous_status' => $record->status, 'status' => $publish ? 'published' : 'draft']);
         });
@@ -144,6 +150,7 @@ class PageWorkspaceController extends Controller
                     'revision' => $revision,
                     'status' => $publish ? 'published' : 'draft',
                     'document' => json_decode($data['blocks'], true, 512, JSON_THROW_ON_ERROR),
+                    'document_version' => $savedAt->format('Y-m-d H:i:s'),
                 ],
             ]);
         }
@@ -216,10 +223,7 @@ class PageWorkspaceController extends Controller
     {
         $record = DB::table('pages')->where('id', $page)->first();
         abort_unless($record, 404);
-        $blocks = $this->normaliseBlocks($record->blocks ?? null, $record->body ?? null);
-        foreach ($blocks as $block) {
-            $data = $block['data'];
-        }
+        $this->editorDocument($record->blocks ?? null);
         DB::transaction(function () use ($request, $page): void {
             DB::table('pages')->where('id', $page)->update(['status' => 'published', 'review_notes' => null, 'published_at' => now(), 'published_by' => $request->user()->id, 'updated_at' => now()]);
             $this->audit($request, 'content.page_reviewed', $page, ['status' => 'published']);
@@ -234,188 +238,42 @@ class PageWorkspaceController extends Controller
         $data = $request->validate([
             'title' => ['required', 'string', 'max:200'],
             'slug' => ['required', 'string', 'max:160', Rule::unique('pages', 'slug')->ignore($page)],
-            'body' => ['nullable', 'string', 'max:50000'],
-            'blocks' => ['nullable', 'string', 'max:100000'],
+            'blocks' => ['required', 'string', 'max:100000'],
             'seo_title' => ['nullable', 'string', 'max:70'],
             'seo_description' => ['nullable', 'string', 'max:160'],
         ]);
         abort_if(in_array($data['slug'], self::RESERVED, true), 422, 'This page address is reserved.');
 
-        $document = $this->document($data['blocks'] ?? null, $data['body'] ?? null);
-        $blocks = app(\App\Services\PageDocumentService::class)->flatten($document, $this->enabledFeatures());
+        $document = $this->document($data['blocks']);
         $data['blocks'] = json_encode($document, JSON_THROW_ON_ERROR);
-        $data['body'] = $this->plainTextFromBlocks($blocks);
+        $data['body'] = app(\App\Services\PageDocumentService::class)->plainText($document, $this->enabledFeatures());
 
         return $data;
     }
 
-    /** @return array<int, array{type: string, data: array<string, string>}> */
-    private function editorBlocks(?string $encodedBlocks, ?string $body): array
+    /** Return only a canonical version-2 document to the structured canvas. */
+    private function editorDocument(?string $encodedBlocks): array
     {
-        if ($encodedBlocks) {
-            try {
-                $decoded = json_decode($encodedBlocks, true, 512, JSON_THROW_ON_ERROR);
-
-                if (is_array($decoded)) {
-                    if (($decoded['version'] ?? null) === 2) {
-                        return app(\App\Services\PageDocumentService::class)->flatten($decoded, $this->enabledFeatures());
-                    }
-                    return $decoded;
-                }
-            } catch (\JsonException) {
-                // Legacy content continues to open in the editor as readable text blocks.
-            }
+        if (! is_string($encodedBlocks) || trim($encodedBlocks) === '') {
+            throw ValidationException::withMessages(['blocks' => 'This page does not contain a supported version-2 document.']);
         }
 
-        return $this->normaliseBlocks(null, $body);
+        return $this->document($encodedBlocks);
     }
 
-    /** Return version 2 content to the structured canvas without flattening saved hierarchy. */
-    private function editorDocument(?string $encodedBlocks, ?string $body): array
+    /** Decode and validate the only supported page-document format. */
+    private function document(string $encodedBlocks): array
     {
-        $service = app(\App\Services\PageDocumentService::class);
-        if ($encodedBlocks) {
-            try {
-                $decoded = json_decode($encodedBlocks, true, 512, JSON_THROW_ON_ERROR);
-                if ($service->isStructured($decoded)) return $service->normalise($decoded, $this->enabledFeatures());
-            } catch (\JsonException) {
-                // Recover legacy text content through the normal editor boundary.
-            }
-        }
-
-        return $service->fromFlat($this->editorBlocks($encodedBlocks, $body), $this->enabledFeatures());
-    }
-
-    /** @return array<int, array{type: string, data: array<string, string>}> */
-    private function normaliseBlocks(?string $encodedBlocks, ?string $legacyBody): array
-    {
-        if (! $encodedBlocks) {
-            $paragraphs = array_values(array_filter(preg_split('/\R\s*\R/', (string) $legacyBody) ?: [], fn (string $part): bool => trim($part) !== ''));
-
-            return $paragraphs === []
-                ? [['type' => 'paragraph', 'data' => ['text' => 'Start writing your page here.']]]
-                : array_map(fn (string $text): array => ['type' => 'paragraph', 'data' => ['text' => trim($text)]], $paragraphs);
-        }
-
         try {
             $decoded = json_decode($encodedBlocks, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
             throw ValidationException::withMessages(['blocks' => 'The page layout could not be read. Refresh the editor and try again.']);
         }
-
-        if (! is_array($decoded) || count($decoded) > 60) {
-            throw ValidationException::withMessages(['blocks' => 'A page can contain up to 60 blocks.']);
+        if (! is_array($decoded)) {
+            throw ValidationException::withMessages(['blocks' => 'The page layout must be a version-2 document.']);
         }
 
-        if (($decoded['version'] ?? null) === 2) {
-            return app(\App\Services\PageDocumentService::class)->flatten($decoded, $this->enabledFeatures());
-        }
-
-        $allowed = [
-            'hero' => ['eyebrow', 'title', 'body', 'button_label', 'button_url'],
-            'heading' => ['text'],
-            'paragraph' => ['text'],
-            'image' => ['url', 'alt', 'caption', 'image_hint'],
-            'gallery' => ['images', 'columns', 'caption'],
-            'video_embed' => ['url', 'title', 'caption'],
-            'audio' => ['url', 'title', 'caption'],
-            'file' => ['url', 'label', 'description'],
-            'media_text' => ['media_url', 'media_alt', 'placement', 'title', 'body', 'button_label', 'button_url'],
-            'list' => ['title', 'items', 'ordered'],
-            'accordion' => ['title', 'question_one', 'answer_one', 'question_two', 'answer_two', 'question_three', 'answer_three'],
-            'spacer' => ['height'],
-            'call_to_action' => ['title', 'body', 'button_label', 'button_url'],
-            'quote' => ['text', 'attribution'],
-            'service_times' => ['title', 'body'],
-            'events' => ['title', 'body'],
-            'groups' => ['title', 'body'],
-            'carousel' => ['eyebrow', 'title', 'body', 'slides', 'button_label', 'button_url'],
-            'live_service' => ['title', 'body', 'button_label', 'button_url'],
-            'locations' => ['title', 'body', 'button_label', 'button_url'],
-            'giving' => ['title', 'body', 'button_label', 'button_url'],
-            'prayer' => ['title', 'body', 'button_label', 'button_url'],
-            'sermon_spotlight' => ['title', 'body', 'button_label', 'button_url'],
-            'books' => ['title', 'body', 'button_label', 'button_url'],
-            'announcements' => ['title', 'body', 'button_label', 'button_url'],
-            'volunteer' => ['title', 'body', 'button_label', 'button_url'],
-            'newsletter' => ['title', 'body', 'button_label', 'button_url'],
-            'next_steps' => ['title', 'body', 'button_label', 'button_url'],
-            'welcome' => ['title', 'body', 'button_label', 'button_url'],
-            'custom' => ['title', 'body', 'button_label', 'button_url'],
-            'section' => ['layout', 'title', 'body', 'column_one_title', 'column_one_body', 'column_two_title', 'column_two_body', 'column_three_title', 'column_three_body', 'background_color', 'padding'],
-            'divider' => [],
-        ];
-        if (! in_array('groups', $this->enabledFeatures(), true)) {
-            unset($allowed['groups']);
-        }
-        foreach (['live_service' => 'digital_church', 'giving' => 'giving', 'books' => 'books_library', 'volunteer' => 'volunteers'] as $blockType => $feature) {
-            if (! in_array($feature, $this->enabledFeatures(), true)) {
-                unset($allowed[$blockType]);
-            }
-        }
-
-        $blocks = [];
-        foreach ($decoded as $block) {
-            if (! is_array($block) || ! is_string($block['type'] ?? null) || ! array_key_exists($block['type'], $allowed)) {
-                throw ValidationException::withMessages(['blocks' => 'The page contains an unsupported block.']);
-            }
-            $source = is_array($block['data'] ?? null) ? $block['data'] : [];
-            $data = [];
-            foreach ($allowed[$block['type']] as $key) {
-                $value = $source[$key] ?? '';
-                if (! is_scalar($value)) {
-                    throw ValidationException::withMessages(['blocks' => 'Block fields must contain plain text.']);
-                }
-                $data[$key] = Str::limit(trim((string) $value), $key === 'body' || $key === 'text' ? 12000 : 500);
-                if ($key === 'background_color' && $data[$key] !== '' && ! preg_match('/^#[0-9a-fA-F]{6}$/', $data[$key])) throw ValidationException::withMessages(['blocks' => 'Section background colours must use a six-digit hex value.']);
-                if ($key === 'layout' && ! in_array($data[$key], ['one', 'two', 'three'], true)) throw ValidationException::withMessages(['blocks' => 'Choose a valid section column layout.']);
-                if ($key === 'padding' && ! in_array($data[$key], ['compact', 'regular', 'spacious'], true)) throw ValidationException::withMessages(['blocks' => 'Choose a valid section spacing option.']);
-                if (in_array($key, ['url', 'media_url'], true) && $data[$key] !== '' && ! preg_match('#^https?://#i', $data[$key])) throw ValidationException::withMessages(['blocks' => 'Media links must use an HTTP or HTTPS URL.']);
-                if ($key === 'images' && $data[$key] !== '') {
-                    $images = array_values(array_filter(preg_split('/\R/', $data[$key]) ?: []));
-                    if (count($images) > 12 || collect($images)->contains(fn (string $url): bool => ! preg_match('#^https?://#i', trim($url)))) throw ValidationException::withMessages(['blocks' => 'A gallery accepts up to 12 HTTP or HTTPS image links.']);
-                }
-            }
-            if ($block['type'] === 'video_embed' && $data['url'] !== '' && ! $this->isSupportedVideoUrl($data['url'])) throw ValidationException::withMessages(['blocks' => 'Video embeds currently support YouTube and Vimeo links only.']);
-            if ($block['type'] === 'gallery' && ! in_array($data['columns'], ['two', 'three', 'four'], true)) throw ValidationException::withMessages(['blocks' => 'Choose a valid gallery column layout.']);
-            if ($block['type'] === 'media_text' && ! in_array($data['placement'], ['left', 'right'], true)) throw ValidationException::withMessages(['blocks' => 'Choose a valid media placement.']);
-            if ($block['type'] === 'list' && ! in_array($data['ordered'], ['yes', 'no'], true)) throw ValidationException::withMessages(['blocks' => 'Choose a valid list style.']);
-            if ($block['type'] === 'spacer' && ! in_array($data['height'], ['small', 'medium', 'large'], true)) throw ValidationException::withMessages(['blocks' => 'Choose a valid spacer height.']);
-            $blocks[] = ['type' => $block['type'], 'data' => $data];
-        }
-
-        return $blocks === [] ? [['type' => 'paragraph', 'data' => ['text' => 'Start writing your page here.']]] : $blocks;
-    }
-
-    /** Preserve an incoming v2 hierarchy; legacy drafts convert only at this boundary. */
-    private function document(?string $encodedBlocks, ?string $legacyBody): array
-    {
-        $service = app(\App\Services\PageDocumentService::class);
-        if ($encodedBlocks) {
-            try {
-                $decoded = json_decode($encodedBlocks, true, 512, JSON_THROW_ON_ERROR);
-            } catch (\JsonException) {
-                throw ValidationException::withMessages(['blocks' => 'The page layout could not be read. Refresh the editor and try again.']);
-            }
-            if ($service->isStructured($decoded)) return $service->normalise($decoded, $this->enabledFeatures());
-        }
-        return $service->fromFlat($this->normaliseBlocks($encodedBlocks, $legacyBody), $this->enabledFeatures());
-    }
-
-    private function requiresDocumentMigration(?string $encodedBlocks): bool
-    {
-        if (! $encodedBlocks) return true;
-        try { return ! app(\App\Services\PageDocumentService::class)->isStructured(json_decode($encodedBlocks, true, 512, JSON_THROW_ON_ERROR)); } catch (\JsonException) { return true; }
-    }
-
-    private function legacyRevisionPayload(object $page): array
-    {
-        return ['title' => $page->title, 'slug' => $page->slug, 'body' => $page->body, 'blocks' => $page->blocks, 'seo_title' => $page->seo_title, 'seo_description' => $page->seo_description, 'migration_snapshot' => 'legacy_flat_document'];
-    }
-
-    private function isSupportedVideoUrl(string $url): bool
-    {
-        return preg_match('#^https?://(?:(?:www\.)?(?:youtube\.com|youtu\.be)|(?:www\.)?vimeo\.com)/#i', $url) === 1;
+        return app(\App\Services\PageDocumentService::class)->normalise($decoded, $this->enabledFeatures());
     }
 
     /** @return \Illuminate\Support\Collection<int, object> */
@@ -448,7 +306,7 @@ class PageWorkspaceController extends Controller
     }
 
     /** @return array{version:int,sections:array<int,array<string,mixed>>} */
-    private function starterDocument(string $template): array
+    public function starterDocument(string $template = 'homepage'): array
     {
         $hero = fn (string $eyebrow, string $title, string $body, string $label = '', string $url = '') => $this->starterElement('hero', compact('eyebrow', 'title', 'body') + ['button_label' => $label, 'button_url' => $url], [
             'text_color' => '#ffffff', 'button_background' => 'surface', 'button_hover_background' => 'surface_muted', 'button_text_color' => '#17324d', 'button_radius' => '999px', 'button_padding_x' => '28px', 'button_padding_y' => '14px',
@@ -459,14 +317,14 @@ class PageWorkspaceController extends Controller
             'custom_css' => 'selector .public-page-icon-box { height: 100%; box-sizing: border-box; border: 1px solid rgb(23 50 77 / 9%); border-radius: 22px; padding: clamp(26px, 3vw, 38px); box-shadow: 0 16px 44px rgb(16 42 67 / 9%); } selector .public-page-icon-box .ui-icon { box-sizing: content-box; border-radius: 15px; padding: 12px; background: #e9f3ef; color: #2f6f73; } selector .public-page-icon-box h2 { margin-top: 10px; font-family: Georgia, serif; font-size: clamp(1.35rem, 2vw, 1.75rem); letter-spacing: -.025em; } selector .public-page-icon-box p { font-size: .98rem; line-height: 1.75; }',
         ], ['desktop' => ['padding' => ['top' => '0px', 'right' => '0px', 'bottom' => '0px', 'left' => '0px']]]);
         $leadSettings = ['content_width' => 'wide', 'min_height' => '72vh', 'vertical_alignment' => 'center', 'background_color' => 'action', 'padding' => 'spacious', 'overflow' => 'hidden'];
-        $standardSettings = ['content_width' => 'standard', 'padding' => 'spacious', 'column_gap' => 'regular'];
-        $compactSettings = ['content_width' => 'standard', 'padding' => 'regular', 'column_gap' => 'regular'];
+        $standardSettings = ['content_width' => 'standard', 'padding' => 'none', 'column_gap' => 'regular'];
+        $compactSettings = ['content_width' => 'standard', 'padding' => 'none', 'column_gap' => 'regular'];
 
         $documents = [
             'homepage' => [
                 $this->starterSection([$this->starterColumn([$hero('WELCOME HOME', 'Faith grows best in community.', 'A warm, confident introduction to your ministry—created to help every visitor feel seen, find a gathering, and take a meaningful next step.', 'Plan your visit', '/visit')])], [...$leadSettings, 'background_color' => '#f4f0e8'], ['desktop' => ['padding' => ['top' => '34px', 'right' => '34px', 'bottom' => '34px', 'left' => '34px']], 'mobile' => ['padding' => ['top' => '12px', 'right' => '12px', 'bottom' => '12px', 'left' => '12px']]]),
                 $this->starterSection([
-                    $this->starterColumn([$feature('people', 'Find your people', 'Discover relationships, small groups, and ministry spaces where you can belong and grow.')]),
+                    $this->starterColumn([$feature('people', 'Find your people', 'Discover relationships, departments, and ministry spaces where you can belong and grow.')]),
                     $this->starterColumn([$feature('calendar', 'Join us this week', 'Choose a gathering and arrive with everything you need for a relaxed first visit.')]),
                     $this->starterColumn([$feature('hand-heart', 'Take your next step', 'Explore simple ways to connect, serve, ask for prayer, or learn more about faith.')]),
                 ], $standardSettings + ['title' => 'There is a place for you here', 'body' => 'Three clear paths help newcomers move from browsing to belonging.', 'background_color' => '#f7f9fb', 'custom_css' => 'selector .public-page-structured-heading { margin-bottom: 18px; } selector .public-page-structured-heading h2 { max-width: 15ch; font-family: Georgia, serif; font-size: clamp(2rem, 4vw, 3.4rem); color: #102a43; } selector .public-page-structured-heading p { max-width: 54ch; font-size: 1.05rem; }'], ['tablet' => ['column_count' => '2'], 'mobile' => ['stack' => 'stack']]),
@@ -484,7 +342,7 @@ class PageWorkspaceController extends Controller
                 ], $standardSettings + ['title' => 'This week at the ministry', 'body' => 'Live ministry information keeps the homepage useful without manual duplication.', 'background_color' => '#edf4f2', 'custom_css' => 'selector .public-page-structured-heading h2 { font-family: Georgia, serif; font-size: clamp(2rem, 4vw, 3.2rem); color: #102a43; }'], ['mobile' => ['stack' => 'stack']]),
                 $this->starterSection([
                     $this->starterColumn([$this->starterElement('welcome', ['title' => 'Come as you are', 'body' => 'You do not need to have everything figured out. Begin with a visit and meet people who will be glad to welcome you.'], ['custom_css' => 'selector .public-page-callout { height: 100%; box-sizing: border-box; border: 1px solid #d7e4df; border-radius: 24px; padding: clamp(28px, 4vw, 46px); background: #f4f8f6; } selector .public-page-callout h2 { font-family: Georgia, serif; font-size: clamp(1.8rem, 3vw, 2.6rem); color: #102a43; }'])]),
-                    $this->starterColumn([$this->starterElement('next_steps', ['title' => 'Ready for what is next?', 'body' => 'Connect with a team, join a group, discover faith, or find a place to serve.'], ['custom_css' => 'selector .public-page-callout { height: 100%; box-sizing: border-box; border: 0; border-radius: 24px; padding: clamp(28px, 4vw, 46px); background: #f4f0e8; } selector .public-page-callout h2 { font-family: Georgia, serif; font-size: clamp(1.8rem, 3vw, 2.6rem); color: #102a43; }'])]),
+                    $this->starterColumn([$this->starterElement('next_steps', ['title' => 'Ready for what is next?', 'body' => 'Connect with a team, join a department, discover faith, or find a place to serve.'], ['custom_css' => 'selector .public-page-callout { height: 100%; box-sizing: border-box; border: 0; border-radius: 24px; padding: clamp(28px, 4vw, 46px); background: #f4f0e8; } selector .public-page-callout h2 { font-family: Georgia, serif; font-size: clamp(1.8rem, 3vw, 2.6rem); color: #102a43; }'])]),
                 ], $standardSettings + ['title' => 'Start where you are', 'background_color' => '#ffffff', 'custom_css' => 'selector .public-page-structured-heading h2 { font-family: Georgia, serif; font-size: clamp(2rem, 4vw, 3.2rem); color: #102a43; }'], ['mobile' => ['stack' => 'stack']]),
                 $this->starterSection([$this->starterColumn([$this->starterElement('call_to_action', ['title' => 'Your story can begin here.', 'body' => 'Join us this week and discover a community where faith, hope, and everyday life come together.', 'button_label' => 'Plan your visit', 'button_url' => '/visit'], ['button_background' => 'surface', 'button_hover_background' => 'surface_muted', 'button_text_color' => '#17324d', 'button_radius' => '999px', 'button_padding_x' => '28px', 'button_padding_y' => '14px', 'custom_css' => 'selector .public-page-cta { min-height: 360px; align-content: center; border-radius: 28px; padding: clamp(38px, 7vw, 86px); background: radial-gradient(circle at 90% 10%, rgb(255 255 255 / 18%), transparent 30%), linear-gradient(135deg, #2f6f73, #173f5f); box-shadow: 0 26px 64px rgb(16 42 67 / 20%); } selector .public-page-cta h2 { max-width: 14ch; font-family: Georgia, serif; font-size: clamp(2.2rem, 5vw, 4.4rem); line-height: 1; } selector .public-page-cta p { font-size: 1.05rem; }'])])], $compactSettings + ['background_color' => '#f4f0e8'], ['desktop' => ['padding' => ['top' => '64px', 'right' => '34px', 'bottom' => '64px', 'left' => '34px']], 'mobile' => ['padding' => ['top' => '32px', 'right' => '12px', 'bottom' => '32px', 'left' => '12px']]]),
             ],
@@ -533,7 +391,7 @@ class PageWorkspaceController extends Controller
                     $this->starterColumn([$this->starterElement('map_directions', ['title' => 'Visit in person', 'address' => 'Add the public ministry address.', 'directions_url' => '', 'button_label' => 'Get directions'])]),
                 ], $standardSettings + ['title' => 'We would be glad to hear from you'], ['mobile' => ['stack' => 'stack']]),
             ],
-            'blank' => [$this->starterSection([$this->starterColumn([])], ['content_width' => 'standard', 'padding' => 'regular'])],
+            'blank' => [$this->starterSection([$this->starterColumn([])], ['content_width' => 'standard', 'padding' => 'none'])],
         ];
 
         $document = ['version' => 2, 'sections' => $documents[$template] ?? $documents['blank']];
@@ -558,28 +416,6 @@ class PageWorkspaceController extends Controller
     private function starterElement(string $type, array $content, array $settings = [], array $responsive = []): array
     {
         return ['id' => (string) Str::uuid(), 'type' => $type, 'content' => $content, 'settings' => $settings, 'responsive' => $responsive];
-    }
-
-    /** @param array<int, array{type: string, data: array<string, string>}> $blocks */
-    private function plainTextFromBlocks(array $blocks): string
-    {
-        $copy = collect($blocks)->map(function (array $block): string {
-            $data = $block['data'];
-
-            return match ($block['type']) {
-                'hero', 'call_to_action' => trim(($data['title'] ?? '')."\n".($data['body'] ?? '')),
-                'heading', 'paragraph', 'quote' => $data['text'] ?? '',
-                'image', 'gallery', 'audio', 'file' => $data['caption'] ?? $data['description'] ?? '',
-                'video_embed' => $data['title'] ?? $data['caption'] ?? '',
-                'media_text' => trim(($data['title'] ?? '')."\n".($data['body'] ?? '')),
-                'list' => trim(($data['title'] ?? '')."\n".($data['items'] ?? '')),
-                'accordion' => trim(($data['title'] ?? '')."\n".($data['question_one'] ?? '')."\n".($data['answer_one'] ?? '')."\n".($data['question_two'] ?? '')."\n".($data['answer_two'] ?? '')."\n".($data['question_three'] ?? '')."\n".($data['answer_three'] ?? '')),
-                'section' => trim(($data['title'] ?? '')."\n".($data['body'] ?? '')."\n".($data['column_one_body'] ?? '')."\n".($data['column_two_body'] ?? '')."\n".($data['column_three_body'] ?? '')), 
-                default => $data['body'] ?? $data['title'] ?? '',
-            };
-        })->filter()->implode("\n\n");
-
-        return Str::limit($copy, 50000, '');
     }
 
     private function revision(string $page, int $revision, array $payload, string $user): void

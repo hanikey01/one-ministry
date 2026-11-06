@@ -70,4 +70,24 @@ class AdministrationTest extends TestCase
         $this->postJson('/api/v1/staff/locations', ['name' => 'East', 'timezone' => 'Africa/Lagos'])->assertForbidden();
         $this->patchJson('/api/v1/staff/features/giving', ['state' => 'staff_preview'])->assertForbidden();
     }
+
+    public function test_modules_can_be_updated_in_place_and_in_bulk(): void
+    {
+        $admin = $this->install();
+        $this->actingAs($admin);
+
+        $this->putJson('/staff/modules/giving', ['state' => 'disabled'])
+            ->assertOk()
+            ->assertJsonPath('data.key', 'giving')
+            ->assertJsonPath('data.state', 'disabled');
+
+        $this->putJson('/staff/modules', [
+            'state' => 'disabled',
+            'keys' => ['testimonies', 'people'],
+        ])->assertOk()->assertJsonPath('meta.changed', 2);
+
+        $this->assertDatabaseHas('feature_settings', ['key' => 'testimonies', 'state' => 'disabled']);
+        $this->assertDatabaseHas('feature_settings', ['key' => 'people', 'state' => 'disabled']);
+        $this->assertDatabaseCount('audit_events', 3);
+    }
 }

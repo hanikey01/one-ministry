@@ -59,10 +59,10 @@ class NavigationWorkspaceController extends Controller
         }
         $rules['icons'] = ['nullable', 'array'];
         $rules['positions'] = ['nullable', 'array'];
-        $rules['groups'] = ['sometimes', 'array'];
+        $rules['sections'] = ['sometimes', 'array'];
         foreach (NavigationLayout::SURFACES as $surface) {
-            $rules["groups.{$surface}.sidebar"] = ['sometimes', 'array'];
-            $rules["groups.{$surface}.sidebar.*"] = ['sometimes', 'string', 'max:60'];
+            $rules["sections.{$surface}.sidebar"] = ['sometimes', 'array'];
+            $rules["sections.{$surface}.sidebar.*"] = ['sometimes', 'string', 'max:60'];
         }
         $validated = $request->validate($rules);
         $menuData = [];
@@ -90,7 +90,7 @@ class NavigationWorkspaceController extends Controller
                         throw ValidationException::withMessages(['menus' => 'Menu order must be within the available range.']);
                     }
                     $section = $slot === 'sidebar'
-                        ? data_get($validated, "groups.{$surface}.sidebar.{$fieldKey}", $options[$key]['group'])
+                        ? data_get($validated, "sections.{$surface}.sidebar.{$fieldKey}", $options[$key]['group'])
                         : null;
                     $allowedSections = array_values(array_unique(array_column($options, 'group')));
                     if ($slot === 'sidebar' && ! in_array($section, $allowedSections, true)) {
@@ -229,11 +229,10 @@ class NavigationWorkspaceController extends Controller
             ['label' => 'Home', 'url' => '/', 'icon' => 'home', 'group' => 'Public pages', 'required_feature' => null],
             ['label' => 'Events', 'url' => '/events', 'icon' => 'calendar', 'group' => 'Public pages', 'required_feature' => null],
             ['label' => 'Locations', 'url' => '/locations', 'icon' => 'location', 'group' => 'Public pages', 'required_feature' => null],
-            ['label' => 'Groups', 'url' => '/groups', 'icon' => 'groups', 'group' => 'Public pages', 'required_feature' => 'groups'],
+            ['label' => 'Departments', 'url' => '/departments', 'icon' => 'departments', 'group' => 'Public pages', 'required_feature' => null],
             ['label' => 'Member dashboard', 'url' => '/member', 'icon' => 'people', 'group' => 'Member area', 'required_feature' => null],
             ['label' => 'My events', 'url' => '/member/events', 'icon' => 'calendar', 'group' => 'Member area', 'required_feature' => null],
-            ['label' => 'My groups', 'url' => '/member/groups', 'icon' => 'groups', 'group' => 'Member area', 'required_feature' => 'groups'],
-            ['label' => 'My serving', 'url' => '/member/serving', 'icon' => 'volunteer', 'group' => 'Member area', 'required_feature' => null],
+            ['label' => 'My departments', 'url' => '/member/departments', 'icon' => 'departments', 'group' => 'Member area', 'required_feature' => null],
             ['label' => 'Prayer', 'url' => '/member/prayer', 'icon' => 'care', 'group' => 'Member area', 'required_feature' => null],
             ['label' => 'My profile', 'url' => '/member/profile', 'icon' => 'settings', 'group' => 'Member area', 'required_feature' => null],
         ];

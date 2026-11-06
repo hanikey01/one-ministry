@@ -34,7 +34,17 @@ class StaffDepartmentController extends Controller
 
     public function store(Request $request, DepartmentService $departments): RedirectResponse
     {
-        $data = $request->validate(['name' => ['required', 'string', 'max:160', 'unique:departments,name'], 'description' => ['nullable', 'string', 'max:2000']]);
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:160', 'unique:departments,name'],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'image_url'=>['nullable','string','max:1000'], 'image_alt'=>['nullable','string','max:255'],
+            'category'=>['nullable','string','max:80'], 'contact_email'=>['nullable','email','max:191'], 'featured'=>['nullable','boolean'],
+            'is_public' => ['nullable', 'boolean'], 'accepting_requests' => ['nullable', 'boolean'], 'discussion_enabled' => ['nullable', 'boolean'],
+        ]);
+        $data['is_public'] = $request->boolean('is_public');
+        $data['accepting_requests'] = $request->boolean('accepting_requests');
+        $data['discussion_enabled'] = $request->boolean('discussion_enabled');
+        $data['featured'] = $request->boolean('featured');
         $departments->createDepartment($data, $request->user(), $request->ip());
 
         return to_route('staff.departments')->with('status', 'Department created.');
@@ -52,8 +62,14 @@ class StaffDepartmentController extends Controller
             ->orderByRaw("case department_memberships.role when 'executive' then 1 when 'coordinator' then 2 else 3 end")
             ->orderBy('people.first_name')->select('department_memberships.*', 'people.first_name', 'people.last_name', 'people.email', 'users.id as user_id')->get();
         $people = DB::table('people')->orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name', 'email', 'user_id']);
+        $joinRequests = DB::table('department_join_requests')->join('people', 'people.id', '=', 'department_join_requests.person_id')
+            ->where('department_join_requests.department_id', $department)->where('department_join_requests.status', 'pending')
+            ->orderBy('department_join_requests.created_at')->get(['department_join_requests.*', 'people.first_name', 'people.last_name', 'people.email']);
+        $messages = DB::table('department_messages')->join('people', 'people.id', '=', 'department_messages.person_id')
+            ->where('department_messages.department_id', $department)->whereNull('department_messages.moderated_at')
+            ->latest('department_messages.created_at')->limit(50)->get(['department_messages.*', 'people.first_name', 'people.last_name']);
 
-        return view('staff.department', ['settings' => $settings, 'department' => $item, 'members' => $members, 'people' => $people, 'user' => $request->user(), 'isAdministrator' => $permissions->allows($request->user(), 'departments.manage')]);
+        return view('staff.department', compact('settings', 'members', 'people', 'joinRequests', 'messages') + ['department' => $item, 'user' => $request->user(), 'isAdministrator' => $permissions->allows($request->user(), 'departments.manage')]);
     }
 
     public function addMember(Request $request, string $department, DepartmentService $departments): RedirectResponse
@@ -69,6 +85,33 @@ class StaffDepartmentController extends Controller
         $departments->removeMember($department, $membership, $request->user(), $request->ip());
 
         return to_route('staff.departments.show', $department)->with('status', 'Team member removed.');
+    }
+
+    public function update(Request $request, string $department, DepartmentService $departments): RedirectResponse
+    {
+        $data = $request->validate([
+            'name'=>['sometimes','required','string','max:160','unique:departments,name,'.$department],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'image_url'=>['nullable','string','max:1000'], 'image_alt'=>['nullable','string','max:255'],
+            'category'=>['nullable','string','max:80'], 'contact_email'=>['nullable','email','max:191'], 'featured'=>['nullable','boolean'],
+            'is_public' => ['nullable', 'boolean'], 'accepting_requests' => ['nullable', 'boolean'], 'discussion_enabled' => ['nullable', 'boolean'],
+        ]);
+        $departments->updateDepartment($department, [...$data, 'featured'=>$request->boolean('featured'), 'is_public' => $request->boolean('is_public'), 'accepting_requests' => $request->boolean('accepting_requests'), 'discussion_enabled' => $request->boolean('discussion_enabled')], $request->user(), $request->ip());
+        return to_route('staff.departments.show', $department)->with('status', 'Department settings saved.');
+    }
+
+    public function reviewJoinRequest(Request $request, string $department, string $joinRequest, DepartmentService $departments): RedirectResponse
+    {
+        $data = $request->validate(['status' => ['required', Rule::in(['approved', 'declined'])]]);
+        $departments->reviewRequest($department, $joinRequest, $data['status'], $request->user(), $request->ip());
+        return to_route('staff.departments.show', $department)->with('status', 'Join request reviewed.');
+    }
+
+    public function removeMessage(Request $request, string $department, string $message, DepartmentService $departments): RedirectResponse
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'max:240']]);
+        $departments->removeMessage($department, $message, $request->user(), $data['reason'], $request->ip());
+        return to_route('staff.departments.show', $department)->with('status', 'Discussion message removed.');
     }
 }
 

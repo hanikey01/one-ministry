@@ -17,16 +17,62 @@ class PublicWorkspaceController extends Controller
         return $this->view('public.locations', ['locations' => Location::query()->where('is_public', true)->orderByDesc('is_primary')->orderBy('name')->get()]);
     }
 
-    public function events(): View
+    public function location(string $slug): View
     {
-        return $this->view('public.events', ['events' => DB::table('events')->where('starts_at', '>=', now())->orderBy('starts_at')->paginate(18)]);
+        $location = Location::query()->where('slug', $slug)->where('is_public', true)->firstOrFail();
+        return $this->view('public.location', compact('location'));
     }
 
-    public function groups(): View
+    public function serviceTimes(): View
     {
-        $this->enabled('groups');
+        $services = DB::table('service_occurrences')
+            ->leftJoin('locations', function ($join): void {
+                $join->on('locations.id', '=', 'service_occurrences.location_id')
+                    ->where('locations.is_public', true);
+            })
+            ->where('service_occurrences.rehearsal_mode', false)
+            ->whereIn('service_occurrences.state', ['scheduled', 'ready', 'live', 'interrupted'])
+            ->where('service_occurrences.starts_at', '>=', now()->subMinutes(30))
+            ->orderBy('service_occurrences.starts_at')
+            ->limit(60)
+            ->get(['service_occurrences.id', 'service_occurrences.title', 'service_occurrences.service_type', 'service_occurrences.state', 'service_occurrences.starts_at', 'service_occurrences.timezone', 'locations.name as location_name', 'locations.address as location_address']);
 
-        return $this->view('public.groups', ['groups' => DB::table('groups')->where('status', 'active')->orderBy('name')->paginate(18)]);
+        return $this->view('public.service-times', compact('services'));
+    }
+
+    public function events(): View
+    {
+        return $this->view('public.events', ['events' => DB::table('events')->where('status', 'published')->whereNull('cancelled_at')->where('starts_at', '>=', now())->orderByDesc('featured')->orderBy('starts_at')->paginate(18)]);
+    }
+
+    public function event(string $slug): View
+    {
+        $event = DB::table('events')->where('slug', $slug)->where('status', 'published')->first();
+        abort_unless($event, 404);
+        $registered = DB::table('event_registrations')->where('event_id', $event->id)->whereIn('status', ['registered','checked_in'])->count();
+        return $this->view('public.event', compact('event', 'registered'));
+    }
+
+    public function departments(): View
+    {
+        return $this->view('public.departments', ['departments' => DB::table('departments')->where('status', 'active')->where('is_public', true)->orderByDesc('featured')->orderBy('name')->paginate(18)]);
+    }
+
+    public function department(string $slug): View
+    {
+        $department = DB::table('departments')->where('slug', $slug)->where('status', 'active')->where('is_public', true)->first();
+        abort_unless($department, 404);
+        $memberCount = DB::table('department_memberships')->where('department_id', $department->id)->where('status', 'active')->count();
+        $relationship = null;
+        if (auth()->check()) {
+            $personId = DB::table('people')->where('user_id', auth()->id())->value('id');
+            if ($personId && DB::table('department_memberships')->where(['department_id' => $department->id, 'person_id' => $personId, 'status' => 'active'])->exists()) {
+                $relationship = 'member';
+            } elseif ($personId && DB::table('department_join_requests')->where(['department_id' => $department->id, 'person_id' => $personId, 'status' => 'pending'])->exists()) {
+                $relationship = 'pending';
+            }
+        }
+        return $this->view('public.department', compact('department', 'memberCount', 'relationship'));
     }
 
     public function giving(): View
@@ -98,7 +144,7 @@ class PublicWorkspaceController extends Controller
         if ($types->contains('events')) $data['events'] = DB::table('events')->whereNull('cancelled_at')->where('starts_at', '>=', now())->orderBy('starts_at')->limit(3)->get(['id', 'title', 'description', 'starts_at', 'location']);
         if ($types->contains('locations')) $data['locations'] = Location::query()->where('is_public', true)->orderByDesc('is_primary')->orderBy('name')->limit(3)->get(['id', 'name', 'address']);
         if ($types->contains('announcements')) $data['announcements'] = DB::table('announcements')->where('published', true)->where(fn ($query) => $query->whereNull('publish_at')->orWhere('publish_at', '<=', now()))->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))->latest()->limit(3)->get(['id', 'title', 'body']);
-        if ($types->contains('groups') && in_array('groups', $features, true)) $data['groups'] = DB::table('groups')->where('status', 'active')->orderBy('name')->limit(3)->get(['id', 'name', 'description']);
+        if ($types->contains('departments')) $data['departments'] = DB::table('departments')->where('status', 'active')->where('is_public', true)->orderBy('name')->limit(3)->get(['id', 'name', 'slug', 'description']);
         if ($types->contains('service_times')) $data['services'] = DB::table('service_occurrences')->leftJoin('locations', 'locations.id', '=', 'service_occurrences.location_id')->where('service_occurrences.rehearsal_mode', false)->whereIn('service_occurrences.state', ['scheduled', 'ready'])->where('service_occurrences.starts_at', '>=', now())->orderBy('service_occurrences.starts_at')->limit(24)->get(['service_occurrences.id', 'service_occurrences.service_schedule_id', 'service_occurrences.title', 'service_occurrences.starts_at', 'service_occurrences.timezone', 'locations.name as location_name'])->unique(fn (object $service): string => $service->service_schedule_id ?: $service->id)->take(3)->values();
         if ($types->contains('live_service') && in_array('digital_church', $features, true)) $data['liveService'] = DB::table('service_occurrences')->where('rehearsal_mode', false)->whereIn('state', ['live', 'interrupted'])->orderByDesc('starts_at')->first(['id', 'title', 'state']);
         if ($types->contains('giving') && in_array('giving', $features, true)) $data['funds'] = DB::table('giving_funds')->where('active', true)->orderBy('name')->limit(3)->get(['id', 'name', 'description']);

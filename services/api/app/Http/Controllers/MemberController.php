@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class MemberController extends Controller
@@ -80,12 +81,9 @@ class MemberController extends Controller
     public function dashboard(Request $request): JsonResponse
     {
         $person = $this->person($request);
-        $modules = app(\App\Services\ModuleAvailability::class);
-
         return response()->json(['data' => [
-            'groups' => $modules->enabled('groups') ? DB::table('group_memberships')->join('groups', 'groups.id', '=', 'group_memberships.group_id')->where('person_id', $person->id)->get(['groups.id', 'groups.name', 'group_memberships.role']) : collect(),
+            'departments' => DB::table('department_memberships')->join('departments', 'departments.id', '=', 'department_memberships.department_id')->where('person_id', $person->id)->where('department_memberships.status', 'active')->get(['departments.id', 'departments.name', 'department_memberships.role']),
             'events' => DB::table('event_registrations')->join('events', 'events.id', '=', 'event_registrations.event_id')->where('person_id', $person->id)->where('event_registrations.status', 'registered')->orderBy('events.starts_at')->get(['events.id', 'events.title', 'events.starts_at', 'events.location']),
-            'volunteer_assignments' => DB::table('volunteer_assignments')->join('volunteer_teams', 'volunteer_teams.id', '=', 'volunteer_assignments.team_id')->where('person_id', $person->id)->where('starts_at', '>=', now())->orderBy('starts_at')->get(['volunteer_assignments.id', 'volunteer_assignments.role', 'volunteer_assignments.starts_at', 'volunteer_assignments.status', 'volunteer_teams.name as team_name']),
             'attendance' => DB::table('attendance_records')->join('service_occurrences', 'service_occurrences.id', '=', 'attendance_records.service_occurrence_id')->where('person_id', $person->id)->latest('attendance_records.observed_at')->limit(10)->get(['service_occurrences.title', 'attendance_records.status', 'attendance_records.observed_at']),
             'tasks' => DB::table('follow_up_tasks')->where('person_id', $person->id)->where('status', '!=', 'completed')->get(['id', 'summary', 'status', 'due_at']),
         ]]);
@@ -107,6 +105,17 @@ class MemberController extends Controller
             ]);
 
         return response()->json(['data' => $items]);
+    }
+
+    public function requestNextStep(Request $request): JsonResponse
+    {
+        $data = $request->validate(['type' => ['required', Rule::exists('next_step_options', 'key')->where(fn ($query) => $query->where('active', true))], 'consent_to_contact' => ['accepted']]);
+        $person = $this->person($request);
+        abort_if(DB::table('follow_up_tasks')->where('person_id', $person->id)->where('kind', 'next_step')->where('request_key', $data['type'])->whereIn('status', ['open', 'in_progress'])->exists(), 409, 'You already have an active request for this next step.');
+        $label = DB::table('next_step_options')->where('key', $data['type'])->value('label');
+        DB::table('follow_up_tasks')->insert(['id' => (string) Str::uuid(), 'person_id' => $person->id, 'kind' => 'next_step', 'request_key' => $data['type'], 'status' => 'open', 'summary' => 'Next Step request: '.$label, 'due_at' => now()->addDays(3), 'created_at' => now(), 'updated_at' => now()]);
+
+        return response()->json(['data' => ['type' => $data['type'], 'status' => 'received']], 201);
     }
 
     private function person(Request $request): object

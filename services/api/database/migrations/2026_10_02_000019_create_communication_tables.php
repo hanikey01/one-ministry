@@ -33,7 +33,7 @@ return new class extends Migration
             $table->foreignUuid('person_id')->constrained('people')->restrictOnDelete();
             $table->string('channel', 16);
             $table->string('status', 24)->default('queued');
-            $table->string('provider_message_id', 255)->nullable()->unique();
+            $table->string('provider_message_id', 191)->nullable()->unique();
             $table->string('idempotency_key', 100)->unique();
             $table->unsignedSmallInteger('attempts')->default(0);
             $table->timestamp('sent_at')->nullable();

@@ -20,12 +20,12 @@ class MinistryTheme
             'dark_ink' => '#F4F5F7', 'dark_muted' => '#AAADB5', 'dark_line' => '#383C44',
             'action' => '#343A40', 'chrome' => '#24262A',
         ],
-        'slate' => [
-            'light_canvas' => '#F5F7FA', 'light_surface' => '#FFFFFF', 'light_raised' => '#FFFFFF',
-            'light_ink' => '#172033', 'light_muted' => '#5F6B7C', 'light_line' => '#D9E0EA',
-            'dark_canvas' => '#0E1420', 'dark_surface' => '#161F2E', 'dark_raised' => '#202B3C',
-            'dark_ink' => '#F3F6FB', 'dark_muted' => '#A8B3C4', 'dark_line' => '#344155',
-            'action' => '#315B96', 'chrome' => '#1D2A3D',
+        'tech_blue' => [
+            'light_canvas' => '#F6F9FF', 'light_surface' => '#FFFFFF', 'light_raised' => '#FFFFFF',
+            'light_ink' => '#10213D', 'light_muted' => '#53637C', 'light_line' => '#D7E2F3',
+            'dark_canvas' => '#071426', 'dark_surface' => '#0C1D35', 'dark_raised' => '#132947',
+            'dark_ink' => '#F3F7FF', 'dark_muted' => '#A8BAD4', 'dark_line' => '#29415F',
+            'action' => '#2563EB', 'chrome' => '#0B1F3A',
         ],
         'warm' => [
             'light_canvas' => '#FAF8F5', 'light_surface' => '#FFFFFF', 'light_raised' => '#FFFEFC',
@@ -51,7 +51,7 @@ class MinistryTheme
         $tokens = self::tokens($settings);
 
         return [
-            'preset' => $settings?->theme_preset ?? 'neutral',
+            'preset' => $settings?->theme_preset ?? 'tech_blue',
             'chrome_mode' => $settings?->chrome_mode ?? 'preset',
             'chrome_color' => $tokens['--theme-chrome-color'],
             'chrome_foreground' => $tokens['--theme-chrome-foreground'],
@@ -77,13 +77,13 @@ class MinistryTheme
     /** @return array<string, string> */
     private static function tokens(?MinistrySetting $settings): array
     {
-        $preset = self::PRESETS[$settings?->theme_preset ?? 'neutral'] ?? self::PRESETS['neutral'];
+        $preset = self::PRESETS[$settings?->theme_preset ?? 'tech_blue'] ?? self::PRESETS['tech_blue'];
         $chrome = $settings?->chrome_mode === 'custom' && $settings?->chrome_color
             ? strtoupper($settings->chrome_color)
             : $preset['chrome'];
 
         $values = [
-            '--theme-preset' => $settings?->theme_preset ?? 'neutral',
+            '--theme-preset' => $settings?->theme_preset ?? 'tech_blue',
             '--theme-light-canvas-color' => $preset['light_canvas'],
             '--theme-light-surface-color' => $preset['light_surface'],
             '--theme-light-raised-color' => $preset['light_raised'],

@@ -22,7 +22,7 @@ return new class extends Migration
             $t->unsignedBigInteger('amount_minor');
             $t->char('currency', 3)->default('USD');
             $t->string('provider', 40);
-            $t->string('provider_reference', 255)->nullable();
+            $t->string('provider_reference', 191)->nullable();
             $t->string('status', 24)->default('pending');
             $t->string('receipt_email', 254)->nullable();
             $t->timestamp('confirmed_at')->nullable();
@@ -33,7 +33,7 @@ return new class extends Migration
         Schema::create('giving_webhooks', function (Blueprint $t): void {
             $t->uuid('id')->primary();
             $t->string('provider', 40);
-            $t->string('event_id', 255);
+            $t->string('event_id', 191);
             $t->string('event_type', 100);
             $t->json('payload');
             $t->string('status', 20)->default('received');
@@ -45,7 +45,7 @@ return new class extends Migration
             $t->uuid('id')->primary();
             $t->foreignUuid('donation_id')->constrained('donations')->cascadeOnDelete();
             $t->string('receipt_number', 80)->unique();
-            $t->string('email', 254);
+            $t->string('email', 191);
             $t->timestamp('sent_at')->nullable();
             $t->timestamps();
         });

@@ -7,7 +7,6 @@ use App\Models\FeatureSetting;
 use App\Models\HomepageSection;
 use App\Models\HomepageSlide;
 use App\Services\HomepageService;
-use App\Services\LiveStreamService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,7 +16,7 @@ use Illuminate\Validation\Rule;
 
 class HomepageController extends Controller
 {
-    public function show(HomepageService $homepage, LiveStreamService $streams): View|RedirectResponse
+    public function show(): View|RedirectResponse
     {
         if (! MinistrySetting::query()->exists()) {
             return to_route('setup.create');
@@ -31,7 +30,22 @@ class HomepageController extends Controller
             return view('public.page', ['page' => $central, 'settings' => $settings, 'features' => FeatureSetting::query()->where('state', 'enabled')->pluck('key')->all()]);
         }
 
-        return view('public.home', ['ministry' => $settings, ...$homepage->publicConfiguration($streams)]);
+        // A fresh installation normally has an assigned editable homepage. Keep
+        // an editor-compatible fallback for installations created before that
+        // default was added, instead of resolving a missing public.home view.
+        $document = app(PageWorkspaceController::class)->starterDocument('homepage');
+        $page = (object) [
+            'title' => $settings->name,
+            'seo_title' => $settings->name,
+            'blocks' => json_encode($document, JSON_THROW_ON_ERROR),
+            'body' => $settings->tagline ?: 'Welcome to our ministry.',
+        ];
+
+        return view('public.page', [
+            'page' => $page,
+            'settings' => $settings,
+            'features' => FeatureSetting::query()->where('state', 'enabled')->pluck('key')->all(),
+        ]);
     }
 
     public function editor(Request $request, HomepageService $homepage): View

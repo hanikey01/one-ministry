@@ -9,7 +9,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 
-return Application::configure(basePath: dirname(__DIR__))
+$application = Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
@@ -25,3 +25,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         //
     })->create();
+
+// Shared-hosting packages place the public entry files and compiled assets
+// directly in the hosting document root instead of a nested public/ folder.
+$basePath = dirname(__DIR__);
+if (is_file($basePath.'/build/manifest.json') && ! is_file($basePath.'/public/build/manifest.json')) {
+    $application->usePublicPath($basePath);
+}
+
+return $application;

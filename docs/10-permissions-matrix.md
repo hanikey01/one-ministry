@@ -6,11 +6,10 @@
 
 | Role | Intended scope |
 | --- | --- |
-| Visitor | Unauthenticated public state; not an assigned role |
-| Member | Standard member access to own profile, consent, registrations, groups, and donations; not a staff role |
+| Member | Standard member access to own profile, consent, registrations, departments, and donations; not a staff role |
 | Ministry administrator | Broad nonrestricted ministry administration, settings, locations, modules, content, people operations, events, departments, services, and reports; never implicitly grants care, finance, audit, or security-role control |
 | Content & media editor | Draft, edit, and publish public pages, media, sermons, announcements, recordings, and communications; cannot change core settings |
-| Ministry operations coordinator | Directly assigned, scope-bound people follow-up, groups, volunteers, departments, events, service planning, and school operations within the granted area |
+| Ministry operations coordinator | Directly assigned, scope-bound people follow-up, departments, events, service planning, and school operations within the granted area |
 | Care staff | Assigned private prayer/care cases |
 | Finance staff | Giving, receipts, reconciliation, and finance reports |
 | Service & production team | Directly assigned service/meeting production, host, and moderation responsibilities within the granted service or meeting |
@@ -21,13 +20,13 @@
 
 A user can hold several roles. High-risk roles require multifactor authentication and may require dual approval for bulk export or finance changes. Default roles are templates; an installation can add narrower bundles, but cannot disable core server-side object checks.
 
-The following are contextual assignments, not installation-wide role bundles: department member/coordinator/executive; group member/leader; volunteer team member/team lead/shift lead; and meeting participant/host/moderator. Only a ministry administrator can create a department or grant/revoke coordinator and executive assignments. Coordinators and executives can only add or remove ordinary members from their own department. A person can hold several contextual assignments at once.
+The following are contextual assignments, not installation-wide role bundles: department member/coordinator/executive and meeting participant/host/moderator. Only a ministry administrator can create a department or grant/revoke coordinator and executive assignments. Coordinators and executives can only add or remove ordinary members from their own department. A person can hold several contextual assignments at once.
 
 ## 2. Permission map
 
 Legend: **O** own record; **S** assigned scope; **A** all nonrestricted ministry records; **R** restricted assignment; **—** no default grant.
 
-| Capability | Member | Group leader | Host | Producer | People staff | Care staff | Finance | Admin | Security admin |
+| Capability | Member | Department coordinator | Host | Producer | People staff | Care staff | Finance | Admin | Security admin |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | View/edit own profile | O | O | O | O | O | O | O | O | O |
 | View people directory | — | S | S (minimal) | S (minimal) | A or S | S (minimal) | — | A (minimal) | — |
@@ -50,7 +49,7 @@ The matrix grants are intentionally narrow. For example, a host may see the name
 
 ## 3. Scope representation
 
-An assignment records role, grantee, scope type (`installation`, `location`, `group`, `service`, `team`, `care_case`), scope ID, grantor, start, and expiry/revocation. `installation` scope is disallowed for restricted care and child records unless an explicit emergency-access process is defined. Every policy checks current assignment and object membership on each request. Removing an assignment invalidates cached authorization promptly.
+An assignment records role, grantee, scope type (`installation`, `location`, `department`, `service`, `team`, `care_case`), scope ID, grantor, start, and expiry/revocation. `installation` scope is disallowed for restricted care and child records unless an explicit emergency-access process is defined. Every policy checks current assignment and object membership on each request. Removing an assignment invalidates cached authorization promptly.
 
 ## 4. Sensitive actions
 
@@ -73,7 +72,7 @@ Emergency access, if later approved, must be time-limited, reasoned, prominently
 
 ## 5. Authorization test matrix
 
-For each resource, test: unauthenticated access, correct role and scope, wrong location, wrong group, former assignment, direct ID access, list filtering, search, export, and disabled module. For restricted data, additionally test broad administrator, finance, host, and system-operator denial. Do not infer access from frontend navigation visibility.
+For each resource, test: unauthenticated access, correct role and scope, wrong location, wrong department, former assignment, direct ID access, list filtering, search, export, and disabled module. For restricted data, additionally test broad administrator, finance, host, and system-operator denial. Do not infer access from frontend navigation visibility.
 # Digital school permissions
 
 | Permission | Default role | Scope |

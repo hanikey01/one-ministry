@@ -2,10 +2,15 @@
 (() => {
     const form = document.querySelector('[data-page-block-editor]');
     if (!form) return;
+    const persistedDocumentVersion = @json($page->updated_at ?? null);
+    if (persistedDocumentVersion) { const versionField=document.createElement('input'); versionField.type='hidden'; versionField.name='document_version'; versionField.value=persistedDocumentVersion; form.append(versionField); }
 
     const canvas = form.querySelector('[data-canvas]');
     const inspector = form.querySelector('[data-inspector]');
     const navigator = form.querySelector('[data-page-navigator]');
+    const floatingNavigator = form.querySelector('[data-floating-navigator]');
+    const floatingNavigatorTree = form.querySelector('[data-floating-page-navigator]');
+    const floatingNavigatorTrigger = form.querySelector('[data-floating-navigator-open]');
     const inspectorPanel = form.querySelector('.page-block-inspector');
     const inspectorBackdrop = form.querySelector('.page-block-inspector-backdrop');
     const libraryPanel = form.querySelector('.page-block-library');
@@ -17,6 +22,8 @@
     const media = [];
     const mediaCatalogUrl = @json(route('staff.pages.media'));
     const mediaUploadUrl = @json(route('staff.media-library.upload'));
+    let elementCatalog = {};
+    try { elementCatalog = JSON.parse(form.dataset.elementCatalog || '{}'); } catch { elementCatalog = {}; }
     const objectAiUrl = form.dataset.objectAiEndpoint || '';
     const aiAvailable = form.dataset.aiAvailable === 'true';
     const id = () => `editor-${crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`}`;
@@ -45,29 +52,29 @@
         return document;
     };
     const escape = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[character]));
-    const names = { hero:'Hero', custom_code:'Custom code', heading:'Heading', paragraph:'Paragraph', rich_text:'Rich text', button:'Button', feature_list:'Feature list', testimonial:'Testimonial', statistics:'Statistics', alert:'Alert', progress:'Progress', table:'Table', icon:'Icon', icon_box:'Icon box', icon_list:'Icon list', image:'Image', image_card:'Image card', gallery:'Gallery', video_embed:'Video embed', audio:'Audio', file:'File download', media_text:'Media & text', list:'List', accordion:'Accordion', tabs:'Tabs', social_links:'Social links', contact_form:'Contact form', map_directions:'Map & directions', spacer:'Spacer', quote:'Quote', call_to_action:'Call to action', service_times:'Service times', events:'Events', groups:'Groups', locations:'Locations', carousel:'Carousel', giving:'Giving', prayer:'Prayer', sermon_spotlight:'Sermon spotlight', announcements:'Announcements', next_steps:'Next steps', newsletter:'Newsletter', welcome:'Welcome', custom:'Content card', live_service:'Live service', books:'Books & resources', volunteer:'Volunteer', divider:'Divider' };
-    const defaults = { custom_code:{html:'<section class="custom-card"><h2>Custom content</h2><p>Add a bespoke design, then review it before publishing.</p></section>',css:'.custom-card { padding: 2rem; border-radius: 1rem; background: #f4f4f5; color: #18181b; }',javascript:'',fallback:'Custom content is available on this page.'}, hero:{eyebrow:'WELCOME',title:'A place to belong',body:'Share the invitation people should see first.',button_label:'Plan your visit',button_url:''}, heading:{text:'A meaningful heading'}, paragraph:{text:'Write a clear paragraph that helps people understand your ministry.'}, rich_text:{title:'Tell your story',text:'Use clear, readable paragraphs to help people understand what matters.'}, button:{label:'Learn more',url:''}, feature_list:{title:'What you can expect',items:'A warm welcome\nHelpful people\nA clear next step'}, testimonial:{quote:'A short story of encouragement and connection.',name:'Name',role:'Community member'}, statistics:{title:'Our ministry at a glance',stat_one_value:'1',stat_one_label:'Community',stat_two_value:'2',stat_two_label:'Locations',stat_three_value:'3',stat_three_label:'Ways to connect'}, alert:{tone:'info',title:'Helpful information',body:'Use this callout to share an important update.'}, progress:{title:'Progress update',label:'Completed',value:'60'}, table:{title:'Weekly schedule',headers:'Day|Time|Location',rows:'Sunday|10:00 AM|Main auditorium\nWednesday|7:00 PM|Community room'}, icon:{icon:'heart',label:'You are welcome here'}, icon_box:{icon:'people',title:'Find community',body:'Connect with people and take a next step.',button_label:'Learn more',button_url:''}, icon_list:{title:'What you will find',items:'A warm welcome\nPractical support\nA place to belong'}, image:{url:'',alt:'',caption:''}, image_card:{url:'',alt:'',title:'A meaningful image',body:'Pair a visual with a clear message.',button_label:'Learn more',button_url:''}, gallery:{images:'',columns:'three',caption:''}, video_embed:{url:'',title:'A message to watch',caption:''}, audio:{url:'',title:'Listen now',caption:''}, file:{url:'',label:'Download resource',description:''}, media_text:{media_url:'',media_alt:'',placement:'left',title:'A message beside your media',body:'Use this layout to combine a visual with a clear invitation.',button_label:'Learn more',button_url:''}, list:{title:'What to expect',items:'A warm welcome\nHelpful information\nA clear next step',ordered:'no'}, accordion:{title:'Frequently asked questions',question_one:'What should I expect?',answer_one:'Add a helpful, reassuring answer.',question_two:'Where do I park?',answer_two:'Share the practical details visitors need.',question_three:'Is there something for children?',answer_three:'Explain the ministry options available.'}, tabs:{title:'Explore more',tab_one_label:'First step',tab_one_content:'Share the first helpful detail.',tab_two_label:'What to expect',tab_two_content:'Share practical information for visitors.',tab_three_label:'Stay connected',tab_three_content:'Explain the next step.'}, social_links:{title:'Stay connected',facebook_url:'',instagram_url:'',youtube_url:''}, contact_form:{title:'Get in touch',body:'Share your details and our team can follow up.',submit_label:'Send request'}, map_directions:{title:'Find us',address:'Add the address visitors should use.',directions_url:'',button_label:'Get directions'}, spacer:{height:'medium'}, quote:{text:'A short quote or testimony.',attribution:''}, call_to_action:{title:'Take your next step',body:'Give people a clear way to respond.',button_label:'Get connected',button_url:''}, service_times:{title:'Join us this week',body:'Add a helpful invitation alongside your service times.'}, events:{title:'What is happening next',body:'Share upcoming events and ways to get involved.'}, groups:{title:'Find your community',body:'Invite people into groups and meaningful connection.'}, locations:{title:'Find us',body:'Help people find a location and plan your visit.',button_label:'View locations',button_url:'/locations'}, giving:{title:'Support the ministry',body:'Make it simple to give safely and confidently.',button_label:'Give now',button_url:'/give'}, prayer:{title:'How can we pray for you?',body:'Share a prayer request with our ministry team.',button_label:'Request prayer',button_url:''}, announcements:{title:'Latest announcements',body:'Share the news people need to know.'}, next_steps:{title:'Take your next step',body:'Help people find a clear next step.'}, newsletter:{title:'Stay connected',body:'Invite people to receive ministry updates.'}, carousel:{eyebrow:'FEATURED',title:'A featured moment',body:'Use short slides to highlight a message, event, or next step.',slides:'A practical welcome for every visitor\nA simple way to take your next step',button_label:'Learn more',button_url:''}, sermon_spotlight:{title:'Featured teaching',body:'Highlight a message that helps people take a next step.',button_label:'Watch message',button_url:''}, welcome:{title:'There is room for you',body:'Offer a warm, personal welcome to everyone visiting this page.'}, custom:{title:'Content card',body:'Add a focused message that fits this page.',button_label:'Learn more',button_url:''}, live_service:{title:'Join us online',body:'Watch and participate in our live service.',button_label:'Watch now',button_url:''}, books:{title:'Books and resources',body:'Explore trusted resources for your journey.',button_label:'Browse resources',button_url:''}, volunteer:{title:'Serve with purpose',body:'Find a place to use your gifts and serve.',button_label:'Start serving',button_url:''}, divider:{} };
-    names.html = 'HTML';
-    defaults.html = { html:'<section><h2>Custom content</h2><p>Add your HTML here.</p></section>', css:'', javascript:'' };
+    const names = Object.fromEntries(Object.entries(elementCatalog).map(([type, definition]) => [type, definition.label || type.replaceAll('_', ' ')]));
+    const defaults = Object.fromEntries(Object.entries(elementCatalog).map(([type, definition]) => [type, objectValue(definition.defaults)]));
     const column = () => ({ id:id(), settings:{}, responsive:{}, elements:[] });
-    const customCodeLibraryButton = document.createElement('button');
-    customCodeLibraryButton.type = 'button';
-    customCodeLibraryButton.textContent = 'HTML';
-    customCodeLibraryButton.addEventListener('click', () => {
-        const target = currentColumn() || documentState.sections[0]?.columns[0];
-        if (!target) return;
-        mutate(() => { target.elements.push(element('html')); selectionActive = true; selected = {kind:'element',section:selected.section,column:selected.column,element:target.elements.length - 1}; });
-        openInspector();
+    const firstLibraryGroup = libraryPanel?.querySelector('.page-block-library-group');
+    Object.entries(elementCatalog).forEach(([type, definition]) => {
+        let button = libraryPanel?.querySelector(`[data-add="${type}"]`);
+        if (!button && firstLibraryGroup) {
+            button = document.createElement('button');
+            button.type = 'button';
+            button.dataset.add = type;
+            firstLibraryGroup.append(button);
+        }
+        if (button) button.textContent = definition.label || names[type];
     });
-    libraryPanel?.querySelector('.page-block-library-group')?.append(customCodeLibraryButton);
-    const section = () => ({ id:id(), type:'section', settings:{ padding:'regular', content_width:'standard', column_gap:'regular', grid_preset:'one' }, responsive:{}, columns:[column()] });
-    const gridSection = (count = 3) => ({ ...section(), settings:{ padding:'regular', content_width:'standard', column_gap:'regular', grid_preset:['one','two','three','four'][count - 1] || 'three' }, columns:Array.from({length:count}, () => column()) });
+    libraryPanel?.querySelectorAll('[data-add]').forEach((button) => {
+        if (!['grid', 'section'].includes(button.dataset.add) && !Object.hasOwn(elementCatalog, button.dataset.add)) button.remove();
+    });
+    const section = () => ({ id:id(), type:'section', settings:{ padding:'none', content_width:'standard', column_gap:'regular', grid_preset:'one' }, responsive:{}, columns:[column()] });
+    const gridSection = (count = 3) => ({ ...section(), settings:{ padding:'none', content_width:'standard', column_gap:'regular', grid_preset:['one','two','three','four'][count - 1] || 'three' }, columns:Array.from({length:count}, () => column()) });
     const element = (type) => ({ id:id(), type, content:clone(defaults[type] || {}), settings:{}, responsive:{} });
-    const fromFlat = (blocks) => ({ version:2, sections:(blocks || []).map((block) => ({ id:id(), type:'section', settings:{}, responsive:{}, columns:[{...column(), elements:[elementFromFlat(block)]}] })) });
-    const elementFromFlat = (block) => ({ id:id(), type:block?.type || 'paragraph', content:clone(block?.data || defaults.paragraph), settings:{}, responsive:{} });
     let documentState;
     try { documentState = JSON.parse(form.dataset.blocks || '{}'); } catch { documentState = {}; }
-    if (documentState?.version !== 2 || !Array.isArray(documentState.sections)) documentState = fromFlat(Array.isArray(documentState) ? documentState : []);
+    if (documentState?.version !== 2 || !Array.isArray(documentState.sections)) documentState = { version:2, sections:[] };
     documentState = prepareDocument(documentState);
     if (!documentState.sections.length) documentState.sections.push(section());
     let savedDocument = JSON.stringify(documentState);
@@ -77,6 +84,7 @@
     saveState.textContent = 'Saved';
     form.querySelector('.page-editor-actions > div')?.append(saveState);
     let selected = { kind:'section', section:0, column:0, element:0 };
+    const collapsedNavigatorNodes = new Set();
     let selectionActive = false;
     let breakpoint = 'desktop';
     let inspectorTab = 'content';
@@ -95,7 +103,13 @@
     };
     const snapshot = () => { history.push(JSON.stringify(documentState)); future = []; syncHistory(); };
     const syncHistory = () => { undo.disabled = !history.length; redo.disabled = !future.length; };
+    const closeFloatingNavigator = () => {
+        floatingNavigator?.classList.remove('is-open');
+        floatingNavigator?.setAttribute('aria-hidden', 'true');
+        floatingNavigatorTrigger?.setAttribute('aria-expanded', 'false');
+    };
     const openInspector = () => {
+        closeFloatingNavigator();
         libraryPanel?.classList.remove('is-open');
         libraryBackdrop?.classList.remove('is-open');
         document.body.classList.remove('page-library-is-open');
@@ -136,7 +150,28 @@
         if (!navigator) return;
         navigator.innerHTML = documentState.sections.map((sectionItem, sectionIndex) => `<div><button type="button" data-navigator-kind="section" data-section="${sectionIndex}">Section ${sectionIndex + 1}${sectionItem.settings?.title ? ` · ${escape(sectionItem.settings.title)}` : ''}</button>${sectionItem.columns.map((columnItem, columnIndex) => `<div><button type="button" data-navigator-kind="column" data-section="${sectionIndex}" data-column="${columnIndex}">Column ${columnIndex + 1}</button>${columnItem.elements.map((elementItem, elementIndex) => `<button type="button" data-navigator-kind="element" data-section="${sectionIndex}" data-column="${columnIndex}" data-element="${elementIndex}">${escape(names[elementItem.type] || elementItem.type)}</button>`).join('')}</div>`).join('')}</div>`).join('');
     };
-    const presetSpacing = { none:'0', compact:'12px', regular:'24px', spacious:'48px' };
+    const renderFloatingNavigator = () => {
+        if (!floatingNavigatorTree) return;
+        const node = (kind, label, attributes, level, icon, key) => { const expandable = kind !== 'element'; const collapsed = expandable && collapsedNavigatorNodes.has(key); return `<button type="button" class="page-editor-floating-navigator-node is-${kind}" data-floating-navigator-kind="${kind}" data-level="${level}" ${expandable ? `data-floating-navigator-toggle="${key}" aria-expanded="${collapsed ? 'false' : 'true'}"` : ''} ${attributes}><span class="page-editor-floating-navigator-chevron${expandable ? ' is-toggle' : ''}" aria-hidden="true">${expandable ? (collapsed ? '▸' : '▾') : '·'}</span><span class="page-editor-floating-navigator-icon" aria-hidden="true">${icon}</span><span class="page-editor-floating-navigator-label">${escape(label)}</span></button>`; };
+        floatingNavigatorTree.innerHTML = documentState.sections.map((sectionItem, sectionIndex) => {
+            const sectionKey = `section:${sectionIndex}`;
+            const sectionCollapsed = collapsedNavigatorNodes.has(sectionKey);
+            const columns = sectionCollapsed ? '' : sectionItem.columns.map((columnItem, columnIndex) => {
+                const columnKey = `column:${sectionIndex}:${columnIndex}`;
+                const columnCollapsed = collapsedNavigatorNodes.has(columnKey);
+                const elements = columnCollapsed ? '' : columnItem.elements.map((elementItem, elementIndex) => node('element', names[elementItem.type] || elementItem.type, `data-section="${sectionIndex}" data-column="${columnIndex}" data-element="${elementIndex}"`, 2, elementItem.type === 'heading' ? 'T' : '≡', '')).join('');
+                return `<div>${node('column', `Column ${columnIndex + 1}`, `data-section="${sectionIndex}" data-column="${columnIndex}"`, 1, '▦', columnKey)}${elements}</div>`;
+            }).join('');
+            return `<div>${node('section', `Section ${sectionIndex + 1}${sectionItem.settings?.title ? ` · ${sectionItem.settings.title}` : ''}`, `data-section="${sectionIndex}"`, 0, '▧', sectionKey)}${columns}</div>`;
+        }).join('');
+        floatingNavigatorTree.querySelectorAll('[data-floating-navigator-kind]').forEach((button) => {
+            const kind = button.dataset.floatingNavigatorKind;
+            const active = selected.kind === kind && selected.section === Number(button.dataset.section) && (kind === 'section' || selected.column === Number(button.dataset.column)) && (kind !== 'element' || selected.element === Number(button.dataset.element));
+            button.classList.toggle('is-selected', active);
+            button.setAttribute('aria-current', active ? 'true' : 'false');
+        });
+    };
+    const presetSpacing = { none:'0', compact:'4px', regular:'8px', spacious:'24px' };
     const inheritedValue = (object, key, fallback = '') => {
         const values = objectValue(object?.responsive);
         return values[breakpoint]?.[key] ?? (breakpoint === 'mobile' ? values.tablet?.[key] ?? values.desktop?.[key] : breakpoint === 'tablet' ? values.desktop?.[key] : undefined) ?? fallback;
@@ -145,15 +180,15 @@
         canvas.querySelectorAll('.page-canvas-section-object').forEach((node, sectionIndex) => {
             const section = documentState.sections[sectionIndex];
             const settings = objectValue(section?.settings);
-            const padding = inheritedValue(section, 'padding', settings.padding || 'regular');
+            const padding = inheritedValue(section, 'padding', settings.padding || 'none');
             const margin = inheritedValue(section, 'margin', settings.margin || 'none');
             const columns = inheritedValue(section, 'column_count', String(section.columns.length));
             const stack = inheritedValue(section, 'stack', 'inline');
             node.style.setProperty('--editor-section-width', settings.content_width === 'full' ? '100%' : settings.content_width === 'wide' ? '1240px' : settings.content_width === 'narrow' ? '760px' : settings.content_width === 'custom' ? (settings.content_max_width || '1120px') : '1120px');
-            node.style.setProperty('--editor-section-padding', presetSpacing[padding] || padding || '24px');
+            node.style.setProperty('--editor-section-padding', presetSpacing[padding] || padding || '0');
             node.style.setProperty('--editor-section-margin', presetSpacing[margin] || margin || '0');
             node.style.setProperty('--editor-section-columns', stack === 'stack' ? '1' : columns || String(section.columns.length));
-            node.style.setProperty('--editor-section-gap', presetSpacing[settings.column_gap || 'regular'] || '24px');
+            node.style.setProperty('--editor-section-gap', presetSpacing[settings.column_gap || 'regular'] || '8px');
             if (settings.min_height) node.style.minHeight = settings.min_height;
             if (settings.background_color) node.style.backgroundColor = settings.background_color;
             if (settings.border_width) node.style.borderWidth = settings.border_width;
@@ -166,7 +201,7 @@
                 const customWidth = inheritedValue(column, 'custom_width', columnSettings.custom_width || '100%');
                 columnNode.style.width = width === 'half' ? '50%' : width === 'third' ? '33.333%' : width === 'custom' ? customWidth : '100%';
                 columnNode.style.minHeight = columnSettings.min_height || '';
-                columnNode.style.gap = presetSpacing[columnSettings.element_gap || inheritedValue(column, 'gap', 'regular')] || columnSettings.element_gap || '18px';
+                columnNode.style.gap = presetSpacing[columnSettings.element_gap || inheritedValue(column, 'gap', 'regular')] || columnSettings.element_gap || '8px';
                 columnNode.querySelectorAll('.page-canvas-element-object').forEach((elementNode, elementIndex) => {
                     const element = column.elements[elementIndex];
                     const elementSettings = objectValue(element?.settings);
@@ -251,9 +286,9 @@
     const unitSelect = (unit) => `<select data-spacing-unit>${spacingUnits.map(([value,label]) => `<option value="${value}" ${unit===value?'selected':''}>${label}</option>`).join('')}</select>`;
     const spacingField = (object, key, label) => { const value = object.responsive?.[breakpoint]?.[key]; const sides = typeof value === 'object' && value ? value : {}; const unit = unitOf(Object.values(sides)[0]); return `<fieldset class="page-spacing-field"><legend>${label}</legend><div class="page-spacing-unit">${unitSelect(unit)}</div><div>${['top','right','bottom','left'].map((side) => `<label>${side}<input inputmode="decimal" placeholder="inherit" data-spacing-field="${key}" data-spacing-side="${side}" value="${escape(numericOf(sides[side]))}"></label>`).join('')}</div></fieldset>`; };
     const responsiveControls = (object) => {
-        const common = [['visibility','Visibility',[['visible','Visible'],['hidden','Hidden']]], ['padding','Padding',[['compact','Compact'],['regular','Regular'],['spacious','Spacious']]], ['margin','Margin',[['none','None'],['compact','Compact'],['regular','Regular'],['spacious','Spacious']]]];
+        const common = [['visibility','Visibility',[['visible','Visible'],['hidden','Hidden']]], ['padding','Padding',[['none','None'],['compact','Compact'],['regular','Regular'],['spacious','Spacious']]], ['margin','Margin',[['none','None'],['compact','Compact'],['regular','Regular'],['spacious','Spacious']]]];
         const fields = selected.kind === 'section'
-            ? [...common, ['column_count','Columns',[['1','One'],['2','Two'],['3','Three'],['4','Four']]], ['stack','Column flow',[['inline','Keep columns inline'],['stack','Stack columns']]], ['column_gap','Column gap',[['compact','Compact'],['regular','Regular'],['spacious','Spacious']]]]
+            ? [...common, ['column_count','Columns',[['1','One'],['2','Two'],['3','Three'],['4','Four']]], ['stack','Column flow',[['inline','Keep columns inline'],['stack','Stack columns']]], ['column_gap','Column gap',[['none','None'],['compact','Compact'],['regular','Regular'],['spacious','Spacious']]]]
             : selected.kind === 'column'
                 ? common
                 : [...common, ['order','Order',[['1','First'],['2','Second'],['3','Third'],['4','Fourth']]]];
@@ -264,7 +299,7 @@
         if (selected.kind !== 'element' || columns.length < 2) return '';
         return `<section class="page-object-move"><strong>Move element</strong><label>Destination column<select data-move-element-to>${columns.map((item, index) => `<option value="${index}" ${index===selected.column?'selected':''}>Column ${index + 1}${index===selected.column?' (current)':''}</option>`).join('')}</select></label><small>Move this element to another column in the selected section.</small></section>`;
     };
-    const objectAiControls = () => `<section class="page-object-ai"><strong>AI assist</strong><p>AI receives the full page for context and can suggest copy changes only for this selected ${selected.kind}.</p><textarea data-object-ai-instruction rows="3" minlength="10" maxlength="1500" placeholder="Describe what you want changed…" ${aiAvailable ? '' : 'disabled'}></textarea><button class="button" type="button" data-object-ai-ask ${aiAvailable ? '' : 'disabled'}>${aiAvailable ? 'Suggest changes' : 'AI route unavailable'}</button><p class="page-object-ai-status" data-object-ai-status role="status" aria-live="polite">${aiAvailable ? '' : 'An administrator must verify an AI page-editor route first.'}</p></section>`;
+    const objectAiControls = () => `<section class="page-object-ai"><strong>AI assist</strong><p>AI receives the full page for context and can redesign this selected ${selected.kind}, including its content, layout, style, spacing, responsive settings, and permitted children.</p><textarea data-object-ai-instruction rows="3" minlength="10" maxlength="1500" placeholder="Describe the design or content change you want…" ${aiAvailable ? '' : 'disabled'}></textarea><button class="button" type="button" data-object-ai-ask ${aiAvailable ? '' : 'disabled'}>${aiAvailable ? 'Design this selection' : 'AI route unavailable'}</button><p class="page-object-ai-status" data-object-ai-status role="status" aria-live="polite">${aiAvailable ? '' : 'An administrator must verify an AI page-editor route first.'}</p></section>`;
     let mediaTarget = null;
     const mediaDialog = document.createElement('div');
     mediaDialog.className = 'page-media-dialog';
@@ -336,36 +371,116 @@
             const backgroundControls = selected.kind === 'section' ? `${selectField('background_position','Background position',object.settings?.background_position || 'center_center',[['left_top','Left top'],['center_top','Centre top'],['right_top','Right top'],['left_center','Left centre'],['center_center','Centre centre'],['right_center','Right centre'],['left_bottom','Left bottom'],['center_bottom','Centre bottom'],['right_bottom','Right bottom']],'settings')}${selectField('background_size','Background size',object.settings?.background_size || 'cover',[['auto','Auto'],['cover','Cover'],['contain','Contain']],'settings')}${selectField('background_repeat','Background repeat',object.settings?.background_repeat || 'no_repeat',[['no_repeat','No repeat'],['repeat','Repeat'],['repeat_x','Repeat horizontally'],['repeat_y','Repeat vertically']],'settings')}${selectField('background_attachment','Background attachment',object.settings?.background_attachment || 'scroll',[['scroll','Scroll'],['fixed','Fixed']],'settings')}` : '';
             return `<section class="page-object-appearance"><div class="page-responsive-heading"><strong>Appearance</strong><div class="page-breakpoint-tabs" role="tablist">${['desktop','tablet','mobile'].map((item) => `<button type="button" data-breakpoint="${item}" class="${breakpoint===item?'is-active':''}" aria-selected="${breakpoint===item}">${item[0].toUpperCase()+item.slice(1)}</button>`).join('')}</div></div><div class="page-object-control-grid">${responsiveField(object, 'alignment', 'Alignment', alignmentOptions)}${mediaField('background_image', 'Background image', object.settings?.background_image || '', object.type || 'section', 'settings')}${backgroundControls}${selectField('overflow', 'Content overflow', object.settings?.overflow || 'visible', [['visible','Visible'],['hidden','Hidden']], 'settings')}</div>${styleDetailControls()}</section>`;
         };
-        const customCodeControls = () => ['custom_code','html'].includes(object.type) ? `<section class="page-object-custom-code"><strong>Custom CSS and JavaScript</strong><p>These fields run only inside this element’s isolated public sandbox. They cannot access the ministry application, forms, or network.</p>${input('css', 'Custom CSS', object.content?.css || '', true)}${input('javascript', 'Custom JavaScript', object.content?.javascript || '', true)}</section>` : '';
-        const elementCustomControls = () => ['section','column','element'].includes(selected.kind) ? `<section class="page-object-custom-code"><strong>${selected.kind[0].toUpperCase() + selected.kind.slice(1)} identity and code</strong><p>Use these fields to target this ${selected.kind} in custom CSS. Code is reviewed before publishing.</p>${input('custom_id', 'CSS ID', object.settings?.custom_id || '', false, 'settings')}${input('custom_class', 'CSS classes', object.settings?.custom_class || '', false, 'settings')}${!['custom_code','html'].includes(object.type) ? `${input('custom_css', 'Custom CSS', object.settings?.custom_css || '', true, 'settings')}${input('custom_js', 'Custom JavaScript', object.settings?.custom_js || '', true, 'settings')}` : ''}</section>` : '';
+        const customCodeControls = () => ['custom_code','html'].includes(object.type) ? `<section class="page-object-custom-code"><strong>Custom-code safety review</strong><p role="note"><strong>Preview warning:</strong> custom code runs only inside this element’s isolated sandbox. It cannot access the ministry application, submit forms, use storage, or make network requests. Keep the design responsive and keyboard operable. HTML, CSS, and JavaScript are each limited to 50,000 characters.</p>${input('css', 'Custom CSS', object.content?.css || '', true)}${input('javascript', 'Custom JavaScript', object.content?.javascript || '', true)}</section>` : '';
+        const elementCustomControls = () => ['section','column','element'].includes(selected.kind) ? `<section class="page-object-custom-code"><strong>${selected.kind[0].toUpperCase() + selected.kind.slice(1)} identity and CSS</strong><p>Use these fields for scoped CSS only. Executable JavaScript is confined to the isolated Custom HTML / CSS / JavaScript element.</p>${input('custom_id', 'CSS ID', object.settings?.custom_id || '', false, 'settings')}${input('custom_class', 'CSS classes', object.settings?.custom_class || '', false, 'settings')}${!['custom_code','html'].includes(object.type) ? input('custom_css', 'Custom CSS', object.settings?.custom_css || '', true, 'settings') : ''}</section>` : '';
         if (selected.kind === 'section') content = input('title', 'Section title', object.settings?.title || '', false, 'settings') + input('body', 'Introduction', object.settings?.body || '', true, 'settings') + selectField('content_width', 'Content width', object.settings?.content_width || 'standard', [['full','Full width'],['wide','Wide'],['standard','Standard'],['narrow','Narrow'],['custom','Custom']], 'settings') + input('content_max_width','Custom content width',object.settings?.content_max_width || '',false,'settings') + input('min_height','Minimum height',object.settings?.min_height || '',false,'settings') + selectField('vertical_alignment','Vertical alignment',object.settings?.vertical_alignment || 'start',[['start','Top'],['center','Centre'],['end','Bottom'],['stretch','Stretch']],'settings') + input('row_gap','Row gap',object.settings?.row_gap || '',false,'settings') + selectField('grid_preset', 'Grid preset', object.settings?.grid_preset || (object.columns.length === 1 ? 'one' : object.columns.length === 2 ? 'two' : object.columns.length === 4 ? 'four' : 'three'), [['one','One column'],['two','Two columns'],['three','Three columns'],['four','Four columns']], 'settings');
-        if (selected.kind === 'column') content = responsiveField(object, 'width', 'Column width', [['full','Full'],['half','Half'],['third','One third'],['custom','Custom']]) + responsiveDimensionField(object,'custom_width','Custom width') + input('min_height','Minimum height',object.settings?.min_height || '',false,'settings') + selectField('vertical_alignment','Vertical alignment',object.settings?.vertical_alignment || 'start',[['start','Top'],['center','Centre'],['end','Bottom'],['stretch','Stretch']],'settings') + input('element_gap','Element gap',object.settings?.element_gap || '',false,'settings') + responsiveField(object, 'order', 'Column order', [['1','First'],['2','Second'],['3','Third'],['4','Fourth']]) + responsiveField(object, 'gap', 'Element gap preset', [['compact','Compact'],['regular','Regular'],['spacious','Spacious']]);
-        if (selected.kind === 'element') content = Object.entries(object.content || {}).map(([key, value]) => {
-            const label = key.replaceAll('_',' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+        if (selected.kind === 'column') content = responsiveField(object, 'width', 'Column width', [['full','Full'],['half','Half'],['third','One third'],['custom','Custom']]) + responsiveDimensionField(object,'custom_width','Custom width') + input('min_height','Minimum height',object.settings?.min_height || '',false,'settings') + selectField('vertical_alignment','Vertical alignment',object.settings?.vertical_alignment || 'start',[['start','Top'],['center','Centre'],['end','Bottom'],['stretch','Stretch']],'settings') + input('element_gap','Element gap',object.settings?.element_gap || '',false,'settings') + responsiveField(object, 'order', 'Column order', [['1','First'],['2','Second'],['3','Third'],['4','Fourth']]) + responsiveField(object, 'gap', 'Element gap preset', [['none','None'],['compact','Compact'],['regular','Regular'],['spacious','Spacious']]);
+        if (selected.kind === 'element') content = (elementCatalog[object.type]?.fields || Object.keys(object.content || {})).map((key) => {
+            const value = object.content?.[key] ?? '';
+            const fieldDefinition = elementCatalog[object.type]?.field_definitions?.[key] || {};
+            const label = fieldDefinition.label || key.replaceAll('_',' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
             if (['custom_code','html'].includes(object.type) && ['css','javascript'].includes(key)) return '';
             if (['custom_code','html'].includes(object.type)) return input(key, label, value, true);
-            if (['media_url','images'].includes(key) || (key === 'url' && object.type !== 'button')) return mediaField(key, key === 'media_url' ? 'Media' : key === 'images' ? 'Gallery images' : 'Media source', value, object.type);
-            if (key === 'tone') return selectField(key, label, value, [['info','Information'],['success','Success'],['warning','Warning']]);
-            if (key === 'icon') return selectField(key, label, value, [['heart','Heart'],['people','People'],['calendar','Calendar'],['location','Location'],['message','Message'],['book','Book'],['star','Star'],['check','Check'],['hand-heart','Care'],['globe','Globe']]);
-            if (key === 'columns') return selectField(key, label, value, [['two','Two'],['three','Three'],['four','Four']]);
-            if (key === 'placement') return selectField(key, label, value, [['left','Media left'],['right','Media right']]);
-            if (key === 'ordered') return selectField(key, label, value, [['no','Bulleted'],['yes','Numbered']]);
-            if (key === 'height' && object.type === 'spacer') return selectField(key, label, value, [['small','Small'],['medium','Medium'],['large','Large']]);
-            return input(key, label, value, ['body','text','caption','description','items','rows','answer_one','answer_two','answer_three','slides','quote','tab_one_content','tab_two_content','tab_three_content'].includes(key));
+            if (fieldDefinition.media) return mediaField(key, key === 'media_url' ? 'Media' : key === 'images' ? 'Gallery images' : 'Media source', value, object.type);
+            if (Array.isArray(fieldDefinition.options) && fieldDefinition.options.length) return selectField(key, label, value, fieldDefinition.options);
+            return input(key, label, value, fieldDefinition.control === 'textarea');
         }).join('');
         inspector.innerHTML = `<div class="page-inspector-selected"><span>${escape(heading)}</span><strong>${selected.kind === 'element' ? 'Element settings' : selected.kind[0].toUpperCase() + selected.kind.slice(1) + ' settings'}</strong></div><div class="page-object-tabs" role="tablist" aria-label="Block settings"><button type="button" class="${inspectorTab === 'content' ? 'is-active' : ''}" aria-selected="${inspectorTab === 'content'}" data-inspector-tab="content">Content</button><button type="button" class="${inspectorTab === 'style' ? 'is-active' : ''}" aria-selected="${inspectorTab === 'style'}" data-inspector-tab="style">Style</button><button type="button" class="${inspectorTab === 'advanced' ? 'is-active' : ''}" aria-selected="${inspectorTab === 'advanced'}" data-inspector-tab="advanced">Advanced</button></div><section class="page-object-tab-panel" data-inspector-panel="content" ${inspectorTab === 'content' ? '' : 'hidden'}><div class="page-object-control-grid">${content}</div>${moveElementControl()}${objectAiControls()}</section><section class="page-object-tab-panel" data-inspector-panel="style" ${inspectorTab === 'style' ? '' : 'hidden'}>${appearanceControls()}</section><section class="page-object-tab-panel" data-inspector-panel="advanced" ${inspectorTab === 'advanced' ? '' : 'hidden'}>${responsiveControls(object)}${elementCustomControls()}${customCodeControls()}</section>`;
         window.initializeEnhancedSelects?.(inspector);
     };
-    const render = () => { renderNavigator(); liveCanvasStyles(); renderInspector(); syncHistory(); };
+    const render = () => { renderNavigator(); renderFloatingNavigator(); liveCanvasStyles(); renderInspector(); syncHistory(); };
     const mutate = (callback) => { snapshot(); callback(); save(); render(); };
     const selectedObject = () => selected.kind === 'section' ? currentSection() : selected.kind === 'column' ? currentColumn() : currentElement();
-    const applyObjectAiEdits = (edits) => mutate(() => Object.entries(edits || {}).forEach(([target, fields]) => {
-        const match = /^c(\d+)e(\d+)$/.exec(target);
-        if (!match || !fields || typeof fields !== 'object') return;
-        const item = documentState.sections[selected.section]?.columns[Number(match[1])]?.elements[Number(match[2])];
-        if (!item) return;
-        Object.entries(fields).forEach(([field, value]) => { if (typeof value === 'string' && Object.hasOwn(item.content || {}, field)) item.content[field] = value; });
-    }));
+    const applyObjectAiProposal = (proposal, target) => mutate(() => {
+        const replacement = clone(proposal);
+        if (target.kind === 'section') documentState.sections[target.section] = replacement;
+        else if (target.kind === 'column') documentState.sections[target.section].columns[target.column] = replacement;
+        else documentState.sections[target.section].columns[target.column].elements[target.element] = replacement;
+        selected = {...target};
+        selectionActive = true;
+    });
+    const reviewValue = (value, key = '') => {
+        const text = typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value ?? '');
+        if (['html','css','javascript','custom_css'].includes(key)) return text ? `Custom code changed (${text.length} characters)` : 'Removed';
+        return text.length > 180 ? `${text.slice(0, 177)}…` : (text || 'Empty');
+    };
+    const objectTree = (root, rootKind) => {
+        const items = [];
+        const addElement = (item, path) => items.push({path, kind:'element', object:item});
+        if (rootKind === 'element') addElement(root, names[root.type] || root.type || 'Element');
+        else if (rootKind === 'column') {
+            items.push({path:'Column', kind:'column', object:root});
+            (root.elements || []).forEach((item, index) => addElement(item, `Element ${index + 1} · ${names[item.type] || item.type}`));
+        } else {
+            items.push({path:'Section', kind:'section', object:root});
+            (root.columns || []).forEach((columnItem, columnIndex) => {
+                items.push({path:`Column ${columnIndex + 1}`, kind:'column', object:columnItem});
+                (columnItem.elements || []).forEach((item, elementIndex) => addElement(item, `Column ${columnIndex + 1} · Element ${elementIndex + 1} · ${names[item.type] || item.type}`));
+            });
+        }
+        return items;
+    };
+    const changedEntries = (beforeRoot, afterRoot, rootKind, bucket) => {
+        const before = objectTree(beforeRoot, rootKind);
+        const after = objectTree(afterRoot, rootKind);
+        const entries = [];
+        const total = Math.max(before.length, after.length);
+        for (let index = 0; index < total; index++) {
+            const oldItem = before[index]; const newItem = after[index];
+            if (!oldItem || !newItem) continue;
+            const oldValues = objectValue(oldItem.object?.[bucket]); const newValues = objectValue(newItem.object?.[bucket]);
+            new Set([...Object.keys(oldValues), ...Object.keys(newValues)]).forEach((key) => {
+                if (JSON.stringify(oldValues[key] ?? '') === JSON.stringify(newValues[key] ?? '')) return;
+                entries.push({label:`${newItem.path} · ${key.replaceAll('_',' ')}`, before:reviewValue(oldValues[key], key), after:reviewValue(newValues[key], key)});
+            });
+        }
+        return entries;
+    };
+    const structureEntries = (before, after, kind) => {
+        const entries = [];
+        if (kind === 'element' && before.type !== after.type) entries.push({label:'Element type', before:names[before.type] || before.type, after:names[after.type] || after.type});
+        const oldTree = objectTree(before, kind); const newTree = objectTree(after, kind);
+        const oldElements = oldTree.filter((item) => item.kind === 'element').map((item) => item.object.type);
+        const newElements = newTree.filter((item) => item.kind === 'element').map((item) => item.object.type);
+        if (kind === 'section' && (before.columns || []).length !== (after.columns || []).length) entries.push({label:'Columns', before:String((before.columns || []).length), after:String((after.columns || []).length)});
+        if (oldElements.length !== newElements.length) entries.push({label:'Elements', before:String(oldElements.length), after:String(newElements.length)});
+        const typeDifference = (left, right) => { const remaining = right.reduce((counts, type) => ({...counts, [type]:(counts[type] || 0) + 1}), {}); return left.filter((type) => { if (remaining[type]) { remaining[type]--; return false; } return true; }); };
+        const added = typeDifference(newElements, oldElements); const removed = typeDifference(oldElements, newElements);
+        if (added.length) entries.push({label:'Added elements', before:'None', after:added.map((type) => names[type] || type).join(', ')});
+        if (removed.length) entries.push({label:'Removed elements', before:removed.map((type) => names[type] || type).join(', '), after:'Removed'});
+        if (JSON.stringify(oldElements) !== JSON.stringify(newElements)) entries.push({label:'Element sequence', before:oldElements.map((type) => names[type] || type).join(' → ') || 'None', after:newElements.map((type) => names[type] || type).join(' → ') || 'None'});
+        return entries;
+    };
+    const protectedUrlEntries = (before, after, kind) => {
+        const collect = (root) => objectTree(root, kind).flatMap((item) => Object.entries({...objectValue(item.object.content), ...objectValue(item.object.settings)})
+            .filter(([key, value]) => typeof value === 'string' && value && (key === 'url' || key === 'media_url' || key === 'images' || key === 'background_image' || key.endsWith('_url')))
+            .map(([key, value]) => ({label:`${item.path} · ${key.replaceAll('_',' ')}`, value})));
+        const oldUrls = collect(before); const newUrls = collect(after);
+        return oldUrls.map((item) => {
+            const retained = newUrls.some((candidate) => candidate.value === item.value);
+            return {label:item.label, before:reviewValue(item.value), after:retained ? 'Preserved' : 'Removed'};
+        });
+    };
+    const appendReviewSection = (container, title, entries) => {
+        if (!entries.length) return;
+        const sectionNode = document.createElement('section'); sectionNode.className = 'page-object-ai-review-group';
+        const heading = document.createElement('h4'); heading.textContent = `${title} (${entries.length})`;
+        const list = document.createElement('dl');
+        entries.slice(0, 30).forEach((entry) => { const term = document.createElement('dt'); term.textContent = entry.label; const detail = document.createElement('dd'); const before = document.createElement('span'); before.textContent = entry.before; const arrow = document.createElement('b'); arrow.textContent = '→'; const after = document.createElement('span'); after.textContent = entry.after; detail.append(before, arrow, after); list.append(term, detail); });
+        if (entries.length > 30) { const note = document.createElement('p'); note.textContent = `${entries.length - 30} additional changes are included.`; sectionNode.append(heading, list, note); }
+        else sectionNode.append(heading, list);
+        container.append(sectionNode);
+    };
+    const buildObjectAiReview = (before, after, kind) => {
+        const review = document.createElement('div'); review.className = 'page-object-ai-review';
+        appendReviewSection(review, 'Structure', structureEntries(before, after, kind));
+        appendReviewSection(review, 'Content', changedEntries(before, after, kind, 'content'));
+        appendReviewSection(review, 'Style and advanced settings', changedEntries(before, after, kind, 'settings'));
+        appendReviewSection(review, 'Responsive behavior', changedEntries(before, after, kind, 'responsive'));
+        appendReviewSection(review, 'Protected links and media', protectedUrlEntries(before, after, kind));
+        if (!review.children.length) { const empty = document.createElement('p'); empty.textContent = 'AI returned no visible changes for this selection.'; review.append(empty); }
+        return review;
+    };
     const requestObjectAi = async (button) => {
         const controls = button.closest('[data-object-ai-controls], .page-object-ai');
         const instruction = controls?.querySelector('[data-object-ai-instruction]');
@@ -382,13 +497,15 @@
             if (JSON.stringify(selectedObject()) !== signature || selected.kind !== target.kind || selected.section !== target.section || selected.column !== target.column || selected.element !== target.element) { status.textContent = 'This selection changed while AI was working. Request a fresh suggestion.'; return; }
             controls.querySelector('[data-object-ai-proposal]')?.remove();
             const proposal = document.createElement('div'); proposal.className = 'page-object-ai-proposal'; proposal.dataset.objectAiProposal = '';
-            const title = document.createElement('strong'); title.textContent = 'Suggested copy changes';
-            const list = document.createElement('dl'); Object.values(payload.data.edits || {}).forEach((fields) => Object.entries(fields).forEach(([field, value]) => { const term = document.createElement('dt'); term.textContent = field.replaceAll('_', ' '); const detail = document.createElement('dd'); detail.textContent = value; list.append(term, detail); }));
+            if (!payload?.data?.proposal || typeof payload.data.proposal !== 'object') throw new Error('AI returned an invalid design proposal. Try again.');
+            const title = document.createElement('strong'); title.textContent = `Proposed ${target.kind} design`;
+            const summary = buildObjectAiReview(JSON.parse(signature), payload.data.proposal, target.kind);
             const actions = document.createElement('div'); actions.className = 'ai-page-proposal-actions';
-            const apply = document.createElement('button'); apply.type = 'button'; apply.className = 'button'; apply.textContent = 'Apply suggestion'; apply.addEventListener('click', () => { applyObjectAiEdits(payload.data.edits); });
+            const apply = document.createElement('button'); apply.type = 'button'; apply.className = 'button'; apply.textContent = 'Apply design'; apply.addEventListener('click', () => { applyObjectAiProposal(payload.data.proposal, target); });
             const discard = document.createElement('button'); discard.type = 'button'; discard.className = 'button button-secondary'; discard.textContent = 'Discard'; discard.addEventListener('click', () => { proposal.remove(); status.textContent = 'Suggestion discarded. The selection is unchanged.'; });
-            actions.append(apply, discard); proposal.append(title, list, actions); controls.append(proposal);
-            status.textContent = `Suggestion ready from ${payload.data.provider} · ${payload.data.model}${payload.data.fallback_used ? ' (fallback model)' : ''}. Review it before applying.`;
+            const another = document.createElement('button'); another.type = 'button'; another.className = 'button button-secondary'; another.textContent = 'Request another version'; another.addEventListener('click', () => { proposal.remove(); requestObjectAi(button); });
+            actions.append(apply, another, discard); proposal.append(title, summary, actions); controls.append(proposal);
+            status.textContent = `Design ready from ${payload.data.provider} · ${payload.data.model}${payload.data.fallback_used ? ' (fallback model)' : ''}. Review the complete replacement before applying.`;
         } catch (error) { status.textContent = error.message || 'This selection could not be revised. Try again.'; } finally { button.disabled = false; }
     };
     const deleteSelected = () => {
@@ -431,9 +548,34 @@
     });
     form.addEventListener('click', (event) => { if (event.target.closest('[data-inspector-close]')) { event.preventDefault(); event.stopPropagation(); closeInspector(); } });
     navigator?.addEventListener('click', (event) => { const target = event.target.closest('[data-navigator-kind]'); if (!target) return; select(target.dataset.navigatorKind, Number(target.dataset.section), Number(target.dataset.column || 0), Number(target.dataset.element || 0)); openInspector(); });
+    floatingNavigatorTrigger?.addEventListener('click', () => {
+        const open = !floatingNavigator?.classList.contains('is-open');
+        if (!open) return closeFloatingNavigator();
+        floatingNavigator?.classList.add('is-open');
+        floatingNavigator?.setAttribute('aria-hidden', 'false');
+        floatingNavigatorTrigger.setAttribute('aria-expanded', 'true');
+    });
+    form.querySelector('[data-floating-navigator-close]')?.addEventListener('click', closeFloatingNavigator);
+    floatingNavigatorTree?.addEventListener('click', (event) => {
+        const target = event.target.closest('[data-floating-navigator-kind]');
+        if (!target) return;
+        const toggle = event.target.closest('.page-editor-floating-navigator-chevron.is-toggle');
+        if (toggle) {
+            const key = target.dataset.floatingNavigatorToggle;
+            if (key) {
+                collapsedNavigatorNodes.has(key) ? collapsedNavigatorNodes.delete(key) : collapsedNavigatorNodes.add(key);
+                renderFloatingNavigator();
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+        }
+        select(target.dataset.floatingNavigatorKind, Number(target.dataset.section), Number(target.dataset.column || 0), Number(target.dataset.element || 0));
+        openInspector();
+    });
     libraryTrigger?.addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); openLibrary(); });
     libraryBackdrop?.addEventListener('click', (event) => { event.preventDefault(); closeLibrary(); });
-    document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeInspector(); });
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape') { closeFloatingNavigator(); closeInspector(); } });
     form.querySelectorAll('[data-add]').forEach((button) => button.addEventListener('click', () => { const type = button.dataset.add; if (type === 'section') return mutate(() => { documentState.sections.push(section()); selectionActive = true; selected = {kind:'section',section:documentState.sections.length - 1,column:0,element:0}; }); if (type === 'grid') return mutate(() => { documentState.sections.push(gridSection(Number(button.dataset.gridCount || 3))); selectionActive = true; selected = {kind:'section',section:documentState.sections.length - 1,column:0,element:0}; }); const target = currentColumn() || documentState.sections[0].columns[0]; mutate(() => { target.elements.push(element(type)); selectionActive = true; selected = {kind:'element',section:selected.section,column:selected.column,element:target.elements.length - 1}; }); }));
     form.querySelectorAll('[data-add]').forEach((button) => button.addEventListener('click', openInspector));
     inspector.addEventListener('change', (event) => {
@@ -473,7 +615,7 @@
     inspector.addEventListener('change', (event) => { const unit = event.target.dataset.spacingUnit; if (!unit) return; const fieldset = event.target.closest('fieldset'); const object = selected.kind === 'section' ? currentSection() : selected.kind === 'column' ? currentColumn() : currentElement(); const radius = fieldset?.classList.contains('page-radius-field'); if (radius) { object.settings ||= {}; fieldset.querySelectorAll('[data-radius-field]').forEach((input) => { const value = numericOf(input.value).trim(); if (value === '') delete object.settings[input.dataset.radiusField]; else object.settings[input.dataset.radiusField] = `${value}${unit}`; }); } else { const key = fieldset?.querySelector('[data-spacing-field]')?.dataset.spacingField; object.responsive ||= {}; object.responsive[breakpoint] ||= {}; const box = object.responsive[breakpoint][key] && typeof object.responsive[breakpoint][key] === 'object' ? object.responsive[breakpoint][key] : {}; fieldset.querySelectorAll('[data-spacing-field]').forEach((input) => { const value = numericOf(input.value).trim(); if (value === '') delete box[input.dataset.spacingSide]; else box[input.dataset.spacingSide] = `${value}${unit}`; }); if (Object.keys(box).length) object.responsive[breakpoint][key] = box; else delete object.responsive[breakpoint][key]; if (!Object.keys(object.responsive[breakpoint]).length) delete object.responsive[breakpoint]; } save(); });
     undo.addEventListener('click', () => { if (!history.length) return; future.push(JSON.stringify(documentState)); documentState = JSON.parse(history.pop()); render(); });
     redo.addEventListener('click', () => { if (!future.length) return; history.push(JSON.stringify(documentState)); documentState = JSON.parse(future.pop()); render(); });
-    form.addEventListener('ai-page-draft', (event) => { const proposal = event.detail; const plannedDocument = proposal?.document; if (plannedDocument?.version !== 2 || !Array.isArray(plannedDocument.sections) || !plannedDocument.sections.length) return; mutate(() => { documentState = clone(plannedDocument); selectionActive = true; selected = {kind:'section',section:0,column:0,element:0}; }); });
+    form.addEventListener('ai-page-draft', (event) => { const proposal = event.detail; const plannedDocument = proposal?.document; if (plannedDocument?.version !== 2 || !Array.isArray(plannedDocument.sections) || !plannedDocument.sections.length) return; mutate(() => { documentState = clone(plannedDocument); selectionActive = true; selected = {kind:'section',section:0,column:0,element:0}; const title=form.querySelector('[name="title"]'); const seoTitle=form.querySelector('[name="seo_title"]'); const seoDescription=form.querySelector('[name="seo_description"]'); if(title&&proposal.title) title.value=proposal.title; if(seoTitle&&proposal.seo_title) seoTitle.value=proposal.seo_title; if(seoDescription&&proposal.seo_description) seoDescription.value=proposal.seo_description; }); });
     form.addEventListener('submit', () => {
         save();
         submittedDocument = output.value;
@@ -505,7 +647,7 @@
     window.oneMinistryPageEditor = {
         get document(){ return documentState; },
         get selected(){ return selected; },
-        select(kind, sectionIndex, columnIndex = 0, elementIndex = 0){ select(kind, sectionIndex, columnIndex, elementIndex); openInspector(); },
+        select(kind, sectionIndex, columnIndex = 0, elementIndex = 0){ select(kind, sectionIndex, columnIndex, elementIndex); },
         action(name){ performEditorAction(name); },
         updateInline(sectionIndex, columnIndex, elementIndex, field, value){
             const item = documentState.sections[sectionIndex]?.columns[columnIndex]?.elements[elementIndex];

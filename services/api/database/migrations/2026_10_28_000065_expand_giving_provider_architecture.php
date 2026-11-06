@@ -36,7 +36,7 @@ return new class extends Migration
             $t->foreignUuid('updated_by')->nullable()->constrained('users')->nullOnDelete();
             $t->timestamps();
             $t->unique(['provider', 'country', 'currency']);
-            $t->index(['enabled', 'country', 'currency', 'priority']);
+            $t->index(['enabled', 'country', 'currency', 'priority'], 'pay_proc_cfg_enabled_idx');
         });
 
         Schema::create('offline_giving_methods', function (Blueprint $t): void {
@@ -79,7 +79,7 @@ return new class extends Migration
             $t->uuid('id')->primary();
             $t->foreignUuid('donation_id')->constrained('donations')->restrictOnDelete();
             $t->string('provider', 40);
-            $t->string('provider_reference', 255)->nullable();
+            $t->string('provider_reference', 191)->nullable();
             $t->string('status', 24)->default('initialized');
             $t->json('response_metadata')->nullable();
             $t->text('failure_reason')->nullable();

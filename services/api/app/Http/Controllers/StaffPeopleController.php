@@ -11,13 +11,13 @@ use Illuminate\Support\Str;
 
 class StaffPeopleController extends Controller
 {
-    public function visitor(Request $r): JsonResponse|RedirectResponse
+    public function contact(Request $r): JsonResponse|RedirectResponse
     {
         $d = $r->validate(['first_name' => ['required', 'string', 'max:100'], 'last_name' => ['nullable', 'string', 'max:100'], 'email' => ['nullable', 'email', 'max:254'], 'phone' => ['nullable', 'string', 'max:40'], 'consent_to_contact' => ['accepted']]);
         $id = (string) Str::uuid();
-        DB::table('people')->insert(array_merge($d, ['id' => $id, 'status' => 'visitor', 'consent_to_contact' => true, 'created_at' => now(), 'updated_at' => now()]));
+        DB::table('people')->insert(array_merge($d, ['id' => $id, 'status' => 'member', 'consent_to_contact' => true, 'created_at' => now(), 'updated_at' => now()]));
         $task = (string) Str::uuid();
-        DB::table('follow_up_tasks')->insert(['id' => $task, 'person_id' => $id, 'kind' => 'visitor_follow_up', 'summary' => 'Follow up with new visitor', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('follow_up_tasks')->insert(['id' => $task, 'person_id' => $id, 'kind' => 'contact_follow_up', 'summary' => 'Follow up with new contact', 'created_at' => now(), 'updated_at' => now()]);
 
         if (! $r->expectsJson()) {
             $previous = url()->previous() ?: url('/');
@@ -45,12 +45,12 @@ class StaffPeopleController extends Controller
         $record = DB::table('people')->where('id', $person)->first();
         abort_unless($record, 404);
 
-        return response()->json(['data' => ['person' => $record, 'groups' => DB::table('group_memberships')->join('groups', 'groups.id', '=', 'group_memberships.group_id')->where('group_memberships.person_id', $person)->get(['groups.id', 'groups.name', 'group_memberships.role']), 'attendance' => DB::table('attendance_records')->join('service_occurrences', 'service_occurrences.id', '=', 'attendance_records.service_occurrence_id')->where('attendance_records.person_id', $person)->latest('attendance_records.observed_at')->limit(25)->get(['attendance_records.id', 'attendance_records.source', 'attendance_records.status', 'attendance_records.observed_at', 'service_occurrences.title']), 'follow_up' => DB::table('follow_up_tasks')->where('person_id', $person)->latest()->limit(25)->get(['id', 'kind', 'status', 'summary', 'due_at', 'completed_at', 'created_at'])]]);
+        return response()->json(['data' => ['person' => $record, 'departments' => DB::table('department_memberships')->join('departments', 'departments.id', '=', 'department_memberships.department_id')->where('department_memberships.person_id', $person)->where('department_memberships.status', 'active')->get(['departments.id', 'departments.name', 'department_memberships.role']), 'attendance' => DB::table('attendance_records')->join('service_occurrences', 'service_occurrences.id', '=', 'attendance_records.service_occurrence_id')->where('attendance_records.person_id', $person)->latest('attendance_records.observed_at')->limit(25)->get(['attendance_records.id', 'attendance_records.source', 'attendance_records.status', 'attendance_records.observed_at', 'service_occurrences.title']), 'follow_up' => DB::table('follow_up_tasks')->where('person_id', $person)->latest()->limit(25)->get(['id', 'kind', 'status', 'summary', 'due_at', 'completed_at', 'created_at'])]]);
     }
 
     public function updatePerson(Request $r, string $person): JsonResponse
     {
-        $data = $r->validate(['first_name' => ['sometimes', 'string', 'max:100'], 'last_name' => ['nullable', 'string', 'max:100'], 'email' => ['nullable', 'email', 'max:254'], 'phone' => ['nullable', 'string', 'max:40'], 'status' => ['sometimes', 'in:visitor,member,volunteer'], 'birthday' => ['nullable', 'date']]);
+        $data = $r->validate(['first_name' => ['sometimes', 'string', 'max:100'], 'last_name' => ['nullable', 'string', 'max:100'], 'email' => ['nullable', 'email', 'max:254'], 'phone' => ['nullable', 'string', 'max:40'], 'birthday' => ['nullable', 'date']]);
         $query = DB::table('people')->where('id', $person);
         $before = $query->first();
         abort_unless($before, 404);
@@ -69,9 +69,9 @@ class StaffPeopleController extends Controller
 
     public function createPerson(Request $r): JsonResponse
     {
-        $d = $r->validate(['first_name' => ['required', 'string', 'max:100'], 'last_name' => ['nullable', 'string', 'max:100'], 'email' => ['nullable', 'email', 'max:254'], 'phone' => ['nullable', 'string', 'max:40'], 'status' => ['sometimes', 'in:visitor,member,volunteer'], 'consent_to_contact' => ['boolean']]);
+        $d = $r->validate(['first_name' => ['required', 'string', 'max:100'], 'last_name' => ['nullable', 'string', 'max:100'], 'email' => ['nullable', 'email', 'max:254'], 'phone' => ['nullable', 'string', 'max:40'], 'consent_to_contact' => ['boolean']]);
         $id = (string) Str::uuid();
-        DB::table('people')->insert(array_merge($d, ['id' => $id, 'created_at' => now(), 'updated_at' => now()]));
+        DB::table('people')->insert(array_merge($d, ['id' => $id, 'status' => 'member', 'created_at' => now(), 'updated_at' => now()]));
 
         return response()->json(['data' => DB::table('people')->where('id', $id)->first()], 201);
     }

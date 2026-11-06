@@ -68,6 +68,20 @@ class AdministrationService
         });
     }
 
+    public function deleteLocation(Location $location, User $actor, ?string $ip): void
+    {
+        DB::transaction(function () use ($location, $actor, $ip): void {
+            $this->lockInstallation();
+            $location->refresh();
+            if ($location->is_primary) {
+                throw new ConflictHttpException('Choose another primary location before deleting this one.');
+            }
+            $before = $location->toArray();
+            $location->delete();
+            $this->audit($actor, 'location.deleted', 'locations', $location->id, ['before' => $before], $ip);
+        });
+    }
+
     public function changeFeature(FeatureSetting $feature, string $state, User $actor, ?string $ip): FeatureSetting
     {
         return DB::transaction(function () use ($feature, $state, $actor, $ip): FeatureSetting {
@@ -81,6 +95,33 @@ class AdministrationService
             }
 
             return $feature;
+        });
+    }
+
+    /**
+     * @param  array<int, string>  $keys
+     */
+    public function changeFeatures(array $keys, string $state, User $actor, ?string $ip): int
+    {
+        return DB::transaction(function () use ($keys, $state, $actor, $ip): int {
+            $this->lockInstallation();
+            $features = FeatureSetting::query()->whereIn('key', $keys)->lockForUpdate()->get();
+            $changed = 0;
+
+            foreach ($features as $feature) {
+                if ($feature->state === $state) {
+                    continue;
+                }
+
+                $before = $feature->state;
+                $feature->update(['state' => $state, 'changed_by' => $actor->id]);
+                $this->audit($actor, 'feature.state_changed', 'feature_settings', MinistrySetting::SINGLETON_ID, [
+                    'key' => $feature->key, 'before' => $before, 'after' => $state, 'bulk' => true,
+                ], $ip);
+                $changed++;
+            }
+
+            return $changed;
         });
     }
 

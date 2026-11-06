@@ -19,6 +19,15 @@ class AiPageDraftController extends Controller
             'brief' => ['required', 'string', 'min:20', 'max:3000'],
             'title' => ['nullable', 'string', 'max:200'],
             'public_details' => ['nullable', 'string', 'max:5000'],
+            'page_goal' => ['nullable', 'string', 'max:1000'],
+            'audience' => ['nullable', 'string', 'max:500'],
+            'tone' => ['nullable', 'string', 'max:300'],
+            'visual_direction' => ['nullable', 'string', 'max:1000'],
+            'content_density' => ['nullable', 'in:concise,balanced,detailed'],
+            'primary_action' => ['nullable', 'string', 'max:500'],
+            'required_sections' => ['nullable', 'string', 'max:1500'],
+            'forbidden_patterns' => ['nullable', 'string', 'max:1500'],
+            'brand_constraints' => ['nullable', 'string', 'max:1500'],
         ]);
 
         try {
@@ -26,6 +35,15 @@ class AiPageDraftController extends Controller
                 'brief' => trim($input['brief']),
                 'title' => isset($input['title']) ? trim($input['title']) : null,
                 'public_details' => isset($input['public_details']) ? trim($input['public_details']) : null,
+                'page_goal' => trim($input['page_goal'] ?? ''),
+                'audience' => trim($input['audience'] ?? ''),
+                'tone' => trim($input['tone'] ?? ''),
+                'visual_direction' => trim($input['visual_direction'] ?? ''),
+                'content_density' => $input['content_density'] ?? 'balanced',
+                'primary_action' => trim($input['primary_action'] ?? ''),
+                'required_sections' => trim($input['required_sections'] ?? ''),
+                'forbidden_patterns' => trim($input['forbidden_patterns'] ?? ''),
+                'brand_constraints' => trim($input['brand_constraints'] ?? ''),
             ], $request->user(), $request->ip());
             $draft['slug'] = Str::slug($draft['title']) ?: 'page-'.Str::lower(Str::random(6));
 
@@ -34,33 +52,6 @@ class AiPageDraftController extends Controller
             throw $exception;
         } catch (RuntimeException $exception) {
             return response()->json(['error' => ['code' => 'ai_page_draft_unavailable', 'message' => $exception->getMessage()]], 503);
-        }
-    }
-
-    public function reviseSection(Request $request, AiPageDraftService $drafts): JsonResponse
-    {
-        $input = $request->validate([
-            'title' => ['required', 'string', 'max:200'],
-            'instruction' => ['required', 'string', 'min:10', 'max:1500'],
-            'page_purpose' => ['nullable', 'string', 'max:3000'],
-            'selected_index' => ['required', 'integer', 'min:0', 'max:59'],
-            'blocks' => ['required', 'string', 'max:100000'],
-        ]);
-        $blocks = json_decode($input['blocks'], true);
-        if (! is_array($blocks) || count($blocks) > 60 || ! array_is_list($blocks) || ! array_key_exists((int) $input['selected_index'], $blocks)) {
-            throw ValidationException::withMessages(['blocks' => 'The page sections could not be read. Refresh the editor and try again.']);
-        }
-
-        try {
-            return response()->json(['data' => $drafts->reviseSection([
-                'title' => trim($input['title']), 'instruction' => trim($input['instruction']),
-                'page_purpose' => trim($input['page_purpose'] ?? ''),
-                'blocks' => $blocks, 'selected_index' => (int) $input['selected_index'],
-            ], $request->user(), $request->ip())]);
-        } catch (ValidationException $exception) {
-            throw $exception;
-        } catch (RuntimeException $exception) {
-            return response()->json(['error' => ['code' => 'ai_page_section_revision_unavailable', 'message' => $exception->getMessage()]], 503);
         }
     }
 

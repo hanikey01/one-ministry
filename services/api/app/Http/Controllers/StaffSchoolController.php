@@ -46,7 +46,7 @@ class StaffSchoolController extends Controller
         $classes = DB::table('school_live_classes')->where('course_id', $course)->orderBy('starts_at')->get();
         $enrollments = DB::table('school_enrollments')->join('people', 'people.id', '=', 'school_enrollments.person_id')
             ->where('course_id', $course)->orderByDesc('enrolled_at')->get(['school_enrollments.*', 'people.first_name', 'people.last_name', 'people.email']);
-        $people = DB::table('people')->whereNotIn('id', $enrollments->pluck('person_id'))->whereIn('status', ['member', 'visitor'])
+          $people = DB::table('people')->whereNotIn('id', $enrollments->pluck('person_id'))->where('status', 'member')
             ->orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name', 'email']);
         $certificates = DB::table('school_certificates')
             ->join('school_enrollments', 'school_enrollments.id', '=', 'school_certificates.enrollment_id')

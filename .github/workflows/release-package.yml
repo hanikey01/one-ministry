@@ -24,8 +24,8 @@ jobs:
           git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
-          extensions: intl, pcntl, posix, pdo_pgsql, zip
+          php-version: '8.4'
+          extensions: intl, pcntl, posix, pdo_mysql, pdo_pgsql, zip
           tools: composer:v2
           coverage: none
       - uses: actions/setup-node@v4

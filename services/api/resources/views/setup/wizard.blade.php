@@ -1,18 +1,22 @@
 <x-layouts.app title="Launch your ministry">
     <main class="setup-shell" data-setup-wizard>
+        <style>
+            .setup-brand { color: var(--brand-foreground, #fff) !important; }
+            .setup-brand > span { color: var(--brand-foreground, #fff) !important; }
+        </style>
         <aside class="setup-aside">
             <a class="setup-brand" href="{{ route('setup.create') }}"><span>✦</span><strong>Ministry Platform</strong></a>
             <div class="setup-aside-copy"><p>WELCOME</p><h1>Build a home for your ministry.</h1><span>A guided start for your public presence, people, and everyday ministry work.</span></div>
             <ol class="setup-progress" aria-label="Setup progress">
-                <li class="is-active" data-setup-progress="0"><span>01</span><div><strong>Ministry</strong><small>Your identity</small></div></li>
-                <li data-setup-progress="1"><span>02</span><div><strong>Home base</strong><small>Time and location</small></div></li>
-                <li data-setup-progress="2"><span>03</span><div><strong>Theme</strong><small>Starting preset</small></div></li>
-                <li data-setup-progress="3"><span>04</span><div><strong>Administrator</strong><small>Secure access</small></div></li>
+                <li class="is-active" data-setup-progress="0"><span>02</span><div><strong>Ministry</strong><small>Your identity</small></div></li>
+                <li data-setup-progress="1"><span>03</span><div><strong>Home base</strong><small>Time and location</small></div></li>
+                <li data-setup-progress="2"><span>04</span><div><strong>Theme</strong><small>Starting preset</small></div></li>
+                <li data-setup-progress="3"><span>05</span><div><strong>Administrator</strong><small>Secure access</small></div></li>
             </ol>
             <p class="setup-aside-foot">Your choices remain editable after launch.</p>
         </aside>
         <section class="setup-workspace">
-            <header class="setup-topbar"><span data-setup-count>Step 1 of 4</span><span class="setup-save-note"><i></i> Setup takes about 3 minutes</span></header>
+            <header class="setup-topbar"><span data-setup-count>Step 2 of 5</span><span class="setup-save-note"><i></i> Setup takes about 3 minutes</span></header>
             <form method="POST" action="{{ route('setup.store') }}" class="setup-form" data-setup-form novalidate>
                 @csrf
                 @if($errors->any())<div class="setup-error" role="alert"><strong>Review the highlighted details</strong><span>{{ $errors->first() }}</span></div>@endif
@@ -22,12 +26,12 @@
                 </section>
                 <section class="setup-step" data-setup-step="1" aria-labelledby="setup-location-title" hidden>
                     <p class="setup-eyebrow">YOUR HOME BASE</p><h2 id="setup-location-title">Where does your ministry gather?</h2><span class="setup-intro">Choose the time zone for service times, events, reminders, and birthdays.</span>
-                    <div class="setup-fields"><label class="setup-field-wide">Primary location or online campus<input name="location" value="{{ old('location') }}" maxlength="160" required placeholder="e.g. Main Campus or Online Church"></label><label class="setup-field-wide">Time zone<div class="setup-timezone-picker" data-setup-timezone-picker><input type="hidden" name="timezone" value="{{ old('timezone', config('app.timezone')) }}"><button class="setup-timezone-trigger" type="button" aria-expanded="false" aria-controls="setup-timezone-options"><span data-setup-timezone-label>{{ old('timezone', config('app.timezone')) }}</span><x-ui.icon name="chevron-down" :size="17"/></button><div class="setup-timezone-options" id="setup-timezone-options" hidden><div class="setup-timezone-search"><x-ui.icon name="search" :size="16"/><input type="search" data-setup-timezone-search placeholder="Search city or time zone" autocomplete="off"></div><div class="setup-timezone-list" role="listbox" aria-label="Time zones" data-setup-timezone-list>@foreach($timezones as $timezone)<button type="button" role="option" data-timezone-option data-value="{{ $timezone }}" aria-selected="{{ old('timezone', config('app.timezone')) === $timezone ? 'true' : 'false' }}">{{ $timezone }}</button>@endforeach</div></div></div></label></div>
+                    <div class="setup-fields"><label class="setup-field-wide">Primary location or online campus<input name="location" value="{{ old('location') }}" maxlength="160" required placeholder="e.g. Main Campus or Online Church"></label><label class="setup-field-wide">Time zone<select name="timezone" required aria-label="Time zone">@foreach($timezones as $timezone)<option value="{{ $timezone }}" @selected(old('timezone', config('app.timezone')) === $timezone)>{{ $timezone }}</option>@endforeach</select></label></div>
                     <aside class="setup-tip"><span>✦</span><div><strong>You can add campuses later.</strong><p>Start with one primary location. Additional campuses, service schedules, and online locations are managed in the workspace.</p></div></aside>
                 </section>
                 <section class="setup-step" data-setup-step="2" aria-labelledby="setup-brand-title" hidden>
                     <p class="setup-eyebrow">YOUR APPLICATION THEME</p><h2 id="setup-brand-title">Choose a platform theme.</h2><span class="setup-intro">Every workspace uses the same responsive light and dark system. You can later choose one ministry chrome colour for the header, sidebar, and mobile footer.</span>
-                    <div class="setup-colours"><label><span>Neutral</span><input type="radio" name="theme_preset" value="neutral" @checked(old('theme_preset', 'neutral') === 'neutral')><b>White, charcoal, and balanced gray.</b></label><label><span>Slate</span><input type="radio" name="theme_preset" value="slate" @checked(old('theme_preset') === 'slate')><b>Cool gray with restrained blue actions.</b></label><label><span>Warm</span><input type="radio" name="theme_preset" value="warm" @checked(old('theme_preset') === 'warm')><b>Soft stone with grounded contrast.</b></label></div>
+                    <div class="setup-colours"><label><span>Tech Blue</span><input type="radio" name="theme_preset" value="tech_blue" @checked(old('theme_preset', 'tech_blue') === 'tech_blue')><b>Clean blue, bright actions, and deep navy navigation.</b></label><label><span>Neutral</span><input type="radio" name="theme_preset" value="neutral" @checked(old('theme_preset') === 'neutral')><b>White, charcoal, and balanced gray.</b></label><label><span>Warm</span><input type="radio" name="theme_preset" value="warm" @checked(old('theme_preset') === 'warm')><b>Soft stone with grounded contrast.</b></label></div>
                 </section>
                 <section class="setup-step" data-setup-step="3" aria-labelledby="setup-admin-title" hidden>
                     <p class="setup-eyebrow">YOUR SECURE WORKSPACE</p><h2 id="setup-admin-title">Create the first administrator account.</h2><span class="setup-intro">This account manages ministry settings, staff access, and launch configuration.</span>
@@ -38,6 +42,27 @@
             </form>
         </section>
     </main>
+<script>
+(() => {
+    const wizard = document.querySelector('[data-setup-wizard]');
+    if (!wizard) return;
+    const sync = () => {
+        const steps = [...wizard.querySelectorAll('[data-setup-step]')];
+        const next = wizard.querySelector('[data-setup-next]');
+        const finish = wizard.querySelector('[data-setup-finish]');
+        const count = wizard.querySelector('[data-setup-count]');
+        let active = steps.findIndex((step) => !step.hidden);
+        if (active < 0) { active = steps.length - 1; steps[active].hidden = false; }
+        const last = active === steps.length - 1;
+        if (count) count.textContent = `Step ${active + 2} of ${steps.length + 1}`;
+        if (next) { next.hidden = last; next.style.display = last ? 'none' : ''; }
+        if (finish) { finish.hidden = !last; finish.style.display = last ? '' : 'none'; }
+    };
+    wizard.addEventListener('click', () => window.setTimeout(sync, 0));
+
+    sync();
+})();
+</script>
 </x-layouts.app>
 
 

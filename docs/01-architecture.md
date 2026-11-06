@@ -22,7 +22,7 @@ The distributable package contains application code, database migrations, seed d
 | Media storage | Protected local storage where safe, or S3-compatible object storage | Images, audio, recordings, exports, restricted documents |
 | Reverse proxy | TLS-capable proxy | Routing, headers, rate limiting, upload limits |
 
-Do not insert a general-purpose AI service into the first release. The bounded AI page-editor exception in `09-decisions.md` permits staff to draft public pages through installation-configured Gemini or OpenRouter adapters. Laravel owns the provider boundary, encrypted per-installation credentials, validation, routing, and audit; no separate AI service or central vendor-controlled account is required. Full-page planning receives the staff brief and optional public details. A selected-section revision receives the current public page draft for context and can return copy only for the selected block. The assistant cannot query pastoral-care, giving, attendance, or children's records. It can create drafts only; the existing publisher review remains mandatory. This exception does not authorize other AI features.
+Do not insert a general-purpose AI service into the first release. The bounded AI page-editor exception in `09-decisions.md` permits staff to draft public pages through installation-configured Gemini or OpenRouter adapters. Laravel owns the provider boundary, encrypted per-installation credentials, validation, routing, and audit; no separate AI service or central vendor-controlled account is required. Full-page planning receives the staff brief and optional public details. A scoped revision receives the current public draft for context and returns a complete replacement for only the selected section, column, or element; Laravel inserts it into a copy of the document and validates the entire result before review. The assistant cannot query pastoral-care, giving, attendance, or children's records. It can create drafts only; the existing publisher review remains mandatory. This exception does not authorize other AI features.
 
 ## 3. Media architecture
 
@@ -61,7 +61,7 @@ Service state has one authoritative record in PostgreSQL. Redis may cache and br
 | --- | --- |
 | Public → API | Rate limits, validation, spam controls, request size limits |
 | Member → own data | Session authentication and object-level authorization |
-| Staff → ministry data | Permission plus assigned location/group/case scope; audit sensitive access |
+| Staff → ministry data | Permission plus assigned location/department/case scope; audit sensitive access |
 | API → media | Short-lived signed room/stream grants, verified callbacks |
 | API → providers | Per-installation credentials, restricted scopes, secret rotation |
 | Database/storage | Encryption in transit, private network access, encrypted backups, restricted buckets |

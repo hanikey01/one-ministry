@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\UpdateMinistrySettings;
 use App\Models\FeatureSetting;
 use App\Models\MinistrySetting;
+use App\Models\Location;
 use App\Models\ServiceOccurrence;
 use App\Services\AdministrationService;
 use App\Services\EmailDeliverySettingsService;
@@ -36,7 +37,6 @@ class StaffWorkspaceController extends Controller
         $visibleModules = [
             'people' => $modules->visibleToStaff('people', $request->user()),
             'digital_church' => $modules->visibleToStaff('digital_church', $request->user()),
-            'groups' => $modules->visibleToStaff('groups', $request->user()),
         ];
 
         return view('staff.overview', [
@@ -45,7 +45,7 @@ class StaffWorkspaceController extends Controller
             'visibleModules' => $visibleModules,
             'metrics' => [
                 'people' => $visibleModules['people'] ? DB::table('people')->count() : null,
-                'activeGroups' => $visibleModules['groups'] ? DB::table('groups')->where('status', 'active')->count() : null,
+                'activeDepartments' => DB::table('departments')->where('status', 'active')->count(),
                 'openFollowUps' => $visibleModules['people'] ? DB::table('follow_up_tasks')->where('status', 'open')->count() : null,
                 'upcomingServices' => $visibleModules['digital_church'] ? DB::table('service_occurrences')->whereIn('state', ['scheduled', 'rehearsing', 'live'])->count() : null,
             ],
@@ -60,30 +60,30 @@ class StaffWorkspaceController extends Controller
         return view('staff.settings', ['settings' => MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID), 'homepagePages' => $homepagePages, 'user' => $request->user(), 'timezones' => timezone_identifiers_list(), 'zoomVideoSdk' => $zoom]);
     }
 
-    public function storeJourneyOption(Request $request): RedirectResponse
+    public function storeNextStepOption(Request $request): RedirectResponse
     {
         $data = $request->validate(['label' => ['required', 'string', 'max:120'], 'description' => ['nullable', 'string', 'max:500']]);
         $key = Str::slug($data['label'], '_');
         $key = substr($key, 0, 40);
-        if ($key === '' || DB::table('member_journey_options')->where('key', $key)->exists()) {
+        if ($key === '' || DB::table('next_step_options')->where('key', $key)->exists()) {
             return to_route('staff.follow-up')->withErrors(['label' => 'Use a unique next-step name.']);
         }
-        DB::table('member_journey_options')->insert(['id' => (string) Str::uuid(), 'key' => $key, 'label' => trim($data['label']), 'description' => filled($data['description'] ?? null) ? trim($data['description']) : null, 'active' => true, 'display_order' => (int) DB::table('member_journey_options')->max('display_order') + 1, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('next_step_options')->insert(['id' => (string) Str::uuid(), 'key' => $key, 'label' => trim($data['label']), 'description' => filled($data['description'] ?? null) ? trim($data['description']) : null, 'active' => true, 'display_order' => (int) DB::table('next_step_options')->max('display_order') + 1, 'created_at' => now(), 'updated_at' => now()]);
 
         return to_route('staff.follow-up')->with('status', 'Next-step option added.');
     }
 
-    public function updateJourneyOption(Request $request, string $option): RedirectResponse
+    public function updateNextStepOption(Request $request, string $option): RedirectResponse
     {
         $data = $request->validate(['label' => ['required', 'string', 'max:120'], 'description' => ['nullable', 'string', 'max:500'], 'active' => ['nullable', 'boolean'], 'display_order' => ['required', 'integer', 'min:0', 'max:9999']]);
-        DB::table('member_journey_options')->where('id', $option)->update(['label' => trim($data['label']), 'description' => filled($data['description'] ?? null) ? trim($data['description']) : null, 'active' => $request->boolean('active'), 'display_order' => $data['display_order'], 'updated_at' => now()]);
+        DB::table('next_step_options')->where('id', $option)->update(['label' => trim($data['label']), 'description' => filled($data['description'] ?? null) ? trim($data['description']) : null, 'active' => $request->boolean('active'), 'display_order' => $data['display_order'], 'updated_at' => now()]);
 
         return to_route('staff.follow-up')->with('status', 'Next-step option updated.');
     }
 
-    public function destroyJourneyOption(string $option): RedirectResponse
+    public function destroyNextStepOption(string $option): RedirectResponse
     {
-        DB::table('member_journey_options')->where('id', $option)->update(['active' => false, 'updated_at' => now()]);
+        DB::table('next_step_options')->where('id', $option)->update(['active' => false, 'updated_at' => now()]);
 
         return to_route('staff.follow-up')->with('status', 'Next-step option hidden from members.');
     }
@@ -113,6 +113,25 @@ class StaffWorkspaceController extends Controller
             ->withQueryString();
 
         return view('staff.people', compact('settings', 'people', 'search') + ['user' => $request->user()]);
+    }
+
+    public function person(Request $request, string $person): View
+    {
+        $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
+        $record = DB::table('people')->where('id', $person)->first();
+        abort_unless($record, 404);
+        $departments = DB::table('department_memberships')->join('departments', 'departments.id', '=', 'department_memberships.department_id')->where('department_memberships.person_id', $person)->where('department_memberships.status', 'active')->get(['departments.name', 'department_memberships.role']);
+        $followUp = DB::table('follow_up_tasks')->where('person_id', $person)->latest()->limit(25)->get();
+        return view('staff.person', compact('settings', 'record', 'departments', 'followUp') + ['user' => $request->user()]);
+    }
+
+    public function updatePersonPage(Request $request, string $person): RedirectResponse
+    {
+        $data = $request->validate(['first_name' => ['required', 'string', 'max:100'], 'last_name' => ['nullable', 'string', 'max:100'], 'email' => ['nullable', 'email', 'max:254'], 'phone' => ['nullable', 'string', 'max:40']]);
+        $query = DB::table('people')->where('id', $person);
+        abort_unless($query->exists(), 404);
+        $query->update([...$data, 'status' => 'member', 'updated_at' => now()]);
+        return to_route('staff.people.person', $person)->with('status', 'Person updated.');
     }
 
     public function services(Request $request): View
@@ -295,21 +314,6 @@ class StaffWorkspaceController extends Controller
         return to_route('staff.settings')->with('status', 'Zoom Video SDK settings saved.');
     }
 
-    public function groups(Request $request): View
-    {
-        $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
-        $membershipCounts = DB::table('group_memberships')
-            ->select('group_id', DB::raw('count(*) as member_count'))
-            ->groupBy('group_id');
-        $groups = DB::table('groups')
-            ->leftJoinSub($membershipCounts, 'membership_counts', fn ($join) => $join->on('membership_counts.group_id', '=', 'groups.id'))
-            ->select('groups.*', DB::raw('coalesce(membership_counts.member_count, 0) as member_count'))
-            ->orderBy('groups.name')
-            ->paginate(15);
-
-        return view('staff.groups', compact('settings', 'groups') + ['user' => $request->user()]);
-    }
-
     public function events(Request $request): View
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
@@ -319,6 +323,7 @@ class StaffWorkspaceController extends Controller
         $events = DB::table('events')
             ->leftJoinSub($registrationCounts, 'registration_counts', fn ($join) => $join->on('registration_counts.event_id', '=', 'events.id'))
             ->select('events.*', DB::raw('coalesce(registration_counts.registration_count, 0) as registration_count'))
+            ->orderByRaw("case when events.status = 'published' then 0 else 1 end")
             ->orderBy('events.starts_at')
             ->paginate(15);
 
@@ -331,21 +336,32 @@ class StaffWorkspaceController extends Controller
     {
         $data = $request->validate([
             'title' => ['required', 'string', 'max:200'], 'description' => ['nullable', 'string', 'max:5000'],
+            'image_url' => ['nullable', 'string', 'max:1000'], 'image_alt' => ['nullable', 'string', 'max:255'],
+            'category' => ['nullable', 'string', 'max:80'], 'status' => ['required', Rule::in(['draft','published'])],
             'starts_at' => ['required', 'date'], 'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
-            'location' => ['nullable', 'string', 'max:200'], 'capacity' => ['nullable', 'integer', 'min:1'],
+            'location' => ['nullable', 'string', 'max:200'], 'online_url' => ['nullable', 'url', 'max:1000'], 'capacity' => ['nullable', 'integer', 'min:1'],
+            'registration_deadline' => ['nullable', 'date', 'before_or_equal:starts_at'],
             'waitlist_enabled' => ['nullable', 'boolean'], 'registration_open' => ['nullable', 'boolean'],
         ]);
-        DB::table('events')->insert([...$data, 'id' => (string) Str::uuid(), 'waitlist_enabled' => $request->boolean('waitlist_enabled'), 'registration_open' => $request->boolean('registration_open'), 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('events')->insert([...$data, 'id' => (string) Str::uuid(), 'slug' => Str::slug($data['title']).'-'.Str::lower(Str::random(6)), 'featured' => $request->boolean('featured'), 'waitlist_enabled' => $request->boolean('waitlist_enabled'), 'registration_open' => $request->boolean('registration_open'), 'created_at' => now(), 'updated_at' => now()]);
 
         return to_route('staff.events')->with('status', 'Event created.');
     }
 
-    public function storeGroup(Request $request): RedirectResponse
+    public function updateEvent(Request $request, string $event): RedirectResponse
     {
-        $data = $request->validate(['name' => ['required', 'string', 'max:160'], 'description' => ['nullable', 'string', 'max:5000']]);
-        DB::table('groups')->insert([...$data, 'id' => (string) Str::uuid(), 'status' => 'active', 'created_at' => now(), 'updated_at' => now()]);
-
-        return to_route('staff.groups')->with('status', 'Group created.');
+        $record = DB::table('events')->where('id', $event)->first();
+        abort_unless($record, 404);
+        $data = $request->validate([
+            'title' => ['required','string','max:200'], 'description' => ['nullable','string','max:5000'],
+            'image_url' => ['nullable','string','max:1000'], 'image_alt' => ['nullable','string','max:255'],
+            'category' => ['nullable','string','max:80'], 'status' => ['required',Rule::in(['draft','published'])],
+            'starts_at' => ['required','date'], 'ends_at' => ['nullable','date','after_or_equal:starts_at'],
+            'location' => ['nullable','string','max:200'], 'online_url' => ['nullable','url','max:1000'],
+            'capacity' => ['nullable','integer','min:1'], 'registration_deadline' => ['nullable','date','before_or_equal:starts_at'],
+        ]);
+        DB::table('events')->where('id', $event)->update([...$data, 'featured'=>$request->boolean('featured'), 'registration_open'=>$request->boolean('registration_open'), 'waitlist_enabled'=>$request->boolean('waitlist_enabled'), 'updated_at'=>now()]);
+        return to_route('staff.events')->with('status', 'Event updated.');
     }
 
     public function storePerson(Request $request): RedirectResponse
@@ -353,9 +369,15 @@ class StaffWorkspaceController extends Controller
         $data = $request->validate([
             'first_name' => ['required', 'string', 'max:100'], 'last_name' => ['nullable', 'string', 'max:100'],
             'email' => ['nullable', 'email', 'max:254'], 'phone' => ['nullable', 'string', 'max:40'],
-            'status' => ['required', Rule::in(['visitor', 'member', 'volunteer'])], 'consent_to_contact' => ['nullable', 'boolean'],
+            'consent_to_contact' => ['nullable', 'boolean'],
         ]);
-        DB::table('people')->insert([...$data, 'id' => (string) Str::uuid(), 'consent_to_contact' => $request->boolean('consent_to_contact'), 'created_at' => now(), 'updated_at' => now()]);
+        if (($data['email'] ?? null) && DB::table('people')->where('email', $data['email'])->exists()) {
+            return back()->withInput()->withErrors(['email' => 'A person with this email already exists.']);
+        }
+        if (($data['phone'] ?? null) && DB::table('people')->where('phone', $data['phone'])->exists()) {
+            return back()->withInput()->withErrors(['phone' => 'A person with this phone number already exists.']);
+        }
+        DB::table('people')->insert([...$data, 'id' => (string) Str::uuid(), 'status' => 'member', 'consent_to_contact' => $request->boolean('consent_to_contact'), 'created_at' => now(), 'updated_at' => now()]);
 
         return to_route('staff.people')->with('status', 'Person added.');
     }
@@ -557,11 +579,26 @@ class StaffWorkspaceController extends Controller
     public function followUp(Request $request): View
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
-        $journeyOptions = DB::table('member_journey_options')->orderBy('display_order')->orderBy('label')->get();
+        $journeyOptions = DB::table('next_step_options')->orderBy('display_order')->orderBy('label')->get();
+        $staff = DB::table('users')->orderBy('name')->get(['id', 'name']);
         $tasks = DB::table('follow_up_tasks')->leftJoin('people', 'people.id', '=', 'follow_up_tasks.person_id')
-            ->select('follow_up_tasks.*', 'people.first_name', 'people.last_name')->where('follow_up_tasks.status', '!=', 'completed')->orderByRaw('follow_up_tasks.due_at is null')->orderBy('follow_up_tasks.due_at')->paginate(20);
+            ->select('follow_up_tasks.*', 'people.first_name', 'people.last_name')->whereIn('follow_up_tasks.status', ['open', 'in_progress'])->orderByRaw('follow_up_tasks.due_at is null')->orderBy('follow_up_tasks.due_at')->paginate(20);
 
-        return view('staff.follow-up', compact('settings', 'tasks', 'journeyOptions') + ['user' => $request->user()]);
+        return view('staff.follow-up', compact('settings', 'tasks', 'journeyOptions', 'staff') + ['user' => $request->user()]);
+    }
+
+    public function updateFollowUp(Request $request, string $task): RedirectResponse
+    {
+        $data = $request->validate([
+            'assigned_to' => ['nullable', 'uuid', 'exists:users,id'],
+            'status' => ['required', Rule::in(['open', 'in_progress', 'completed', 'closed_no_contact'])],
+            'due_at' => ['nullable', 'date'],
+        ]);
+        $query = DB::table('follow_up_tasks')->where('id', $task);
+        abort_unless($query->exists(), 404);
+        $query->update([...$data, 'completed_at' => in_array($data['status'], ['completed', 'closed_no_contact'], true) ? now() : null, 'updated_at' => now()]);
+
+        return to_route('staff.follow-up')->with('status', 'Follow-up request updated.');
     }
 
     public function care(Request $request): View
@@ -588,19 +625,9 @@ class StaffWorkspaceController extends Controller
                 ['label' => 'Anonymous viewer buckets', 'value' => DB::table('anonymous_viewer_aggregates')->sum('viewer_count'), 'detail' => 'Kept separate from attendance']
             );
         }
-        if ($modules->visibleToStaff('groups', $request->user())) {
-            $metrics[] = ['label' => 'Active groups', 'value' => DB::table('groups')->where('status', 'active')->count(), 'detail' => 'Current community groups'];
-        }
+        $metrics[] = ['label' => 'Active departments', 'value' => DB::table('departments')->where('status', 'active')->count(), 'detail' => 'Current ministry departments'];
 
         return view('staff.reports', compact('settings', 'metrics') + ['user' => $request->user()]);
-    }
-
-    public function volunteers(Request $request): View
-    {
-        $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
-        $assignments = DB::table('volunteer_assignments')->join('volunteer_teams', 'volunteer_teams.id', '=', 'volunteer_assignments.team_id')->join('people', 'people.id', '=', 'volunteer_assignments.person_id')->select('volunteer_assignments.*', 'volunteer_teams.name as team_name', 'people.first_name', 'people.last_name')->orderBy('volunteer_assignments.starts_at')->paginate(20);
-
-        return view('staff.volunteers', compact('settings', 'assignments') + ['user' => $request->user()]);
     }
 
     public function communications(Request $request): View
@@ -630,7 +657,11 @@ class StaffWorkspaceController extends Controller
     public function locations(Request $request): View
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
-        $locations = DB::table('locations')->orderByDesc('is_primary')->orderBy('name')->get();
+        $locations = Location::query()->orderByDesc('is_primary')->orderBy('name')->get();
+        $locations->each(function (object $location): void {
+            $location->latitude ??= null;
+            $location->longitude ??= null;
+        });
 
         return view('staff.locations', compact('settings', 'locations') + ['user' => $request->user()]);
     }
@@ -643,13 +674,36 @@ class StaffWorkspaceController extends Controller
         return view('staff.modules', compact('settings', 'features') + ['user' => $request->user(), 'canManageFeatures' => $permissions->allows($request->user(), 'features.manage')]);
     }
 
-    public function updateModule(Request $request, string $key, AdministrationService $administration): RedirectResponse
+    public function updateModule(Request $request, string $key, AdministrationService $administration): JsonResponse|RedirectResponse
     {
         $data = $request->validate(['state' => ['required', Rule::in(['disabled', 'staff_preview', 'enabled'])]]);
         $feature = FeatureSetting::query()->findOrFail($key);
-        $administration->changeFeature($feature, $data['state'], $request->user(), $request->ip());
+        $feature = $administration->changeFeature($feature, $data['state'], $request->user(), $request->ip());
+
+        if ($request->expectsJson()) {
+            return response()->json(['data' => $feature->only(['key', 'state', 'updated_at'])]);
+        }
 
         return to_route('staff.modules')->with('status', 'Module state updated.');
+    }
+
+    public function bulkUpdateModules(Request $request, AdministrationService $administration): JsonResponse|RedirectResponse
+    {
+        $data = $request->validate([
+            'state' => ['required', Rule::in(['disabled', 'enabled'])],
+            'keys' => ['required', 'array', 'min:1'],
+            'keys.*' => ['required', 'string', Rule::exists('feature_settings', 'key')],
+        ]);
+        $changed = $administration->changeFeatures(array_values(array_unique($data['keys'])), $data['state'], $request->user(), $request->ip());
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'data' => FeatureSetting::query()->whereIn('key', $data['keys'])->orderBy('key')->get(['key', 'state', 'updated_at']),
+                'meta' => ['changed' => $changed],
+            ]);
+        }
+
+        return to_route('staff.modules')->with('status', "{$changed} module states updated.");
     }
 
     public function staffAccess(Request $request): View
@@ -669,13 +723,13 @@ class StaffWorkspaceController extends Controller
         return to_route('staff.access')->with('status', "Invitation created for {$invite['email']} as ".str($invite['role_key'])->headline().'.');
     }
 
-    public function security(Request $request, EmailDeliverySettingsService $delivery): View
+    public function security(Request $request, EmailDeliverySettingsService $delivery, PermissionChecker $permissions): View
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
         $mfaEnabled = DB::table('mfa_credentials')->where('user_id', $request->user()->id)->whereNotNull('enabled_at')->exists();
         $sessions = DB::table('sessions')->where('user_id', $request->user()->id)->orderByDesc('last_activity')->limit(10)->get();
 
-        return view('staff.security', compact('settings', 'mfaEnabled', 'sessions') + ['user' => $request->user(), 'emailVerified' => $request->user()->email_verified_at !== null, 'emailDeliveryActive' => $delivery->active(), 'mfaSetup' => $request->session()->get('mfa_setup'), 'recoveryCodes' => $request->session()->get('mfa_recovery_codes', [])]);
+        return view('staff.security', compact('settings', 'mfaEnabled', 'sessions') + ['user' => $request->user(), 'emailVerified' => $request->user()->email_verified_at !== null, 'emailDeliveryActive' => $delivery->active(), 'canManageEmail' => $permissions->allows($request->user(), 'settings.read'), 'mfaSetup' => $request->session()->get('mfa_setup'), 'recoveryCodes' => $request->session()->get('mfa_recovery_codes', [])]);
     }
 
     public function beginMfa(Request $request, MfaService $mfa): RedirectResponse
@@ -699,13 +753,17 @@ class StaffWorkspaceController extends Controller
         return to_route('staff.security')->with(['status' => 'Two-factor authentication is enabled for this session.', 'mfa_recovery_codes' => $codes]);
     }
 
-    public function requestEmailVerification(Request $request, EmailVerificationService $verification, EmailDeliverySettingsService $delivery): RedirectResponse
+    public function requestEmailVerification(Request $request, EmailVerificationService $verification, EmailDeliverySettingsService $delivery, PermissionChecker $permissions): RedirectResponse
     {
         if ($request->user()->email_verified_at !== null) {
             return to_route('staff.security')->with('status', 'Your email address is already verified.');
         }
         if (! $delivery->active()) {
-            return to_route('staff.settings')->with('status', 'Set up and activate email delivery before sending a verification email.');
+            if ($permissions->allows($request->user(), 'settings.read')) {
+                return to_route('staff.email')->with('status', 'Set up and activate email delivery before sending a verification email.');
+            }
+
+            return to_route('staff.security')->with('security_notice', 'Email delivery is not active. Ask a ministry administrator to configure it before requesting verification.');
         }
 
         $verification->request($request->user());
@@ -730,7 +788,7 @@ class StaffWorkspaceController extends Controller
             'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048', 'dimensions:max_width=2400,max_height=2400'],
             'dark_logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048', 'dimensions:max_width=2400,max_height=2400'],
             'favicon' => ['nullable', 'file', 'mimes:ico,png', 'max:512'],
-            'theme_preset' => ['required', Rule::in(['neutral', 'slate', 'warm'])],
+            'theme_preset' => ['required', Rule::in(['neutral', 'tech_blue', 'warm'])],
             'chrome_mode' => ['required', Rule::in(['preset', 'custom'])],
             'chrome_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'staff_font' => ['required', Rule::in(['modern', 'editorial', 'humanist'])],

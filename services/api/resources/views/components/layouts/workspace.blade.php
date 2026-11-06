@@ -1,8 +1,5 @@
 <x-layouts.app :title="$title ?? null" :ministry-name="$ministryName ?? null">
     @php($staffAppearance = \App\Models\MinistrySetting::find(\App\Models\MinistrySetting::SINGLETON_ID))
-    @php($staffPermissions = auth()->check() ? app(\App\Services\PermissionChecker::class) : null)
-    @php($canManagePeople = auth()->check() && $staffPermissions?->allows(auth()->user(), 'services.manage'))
-    @php($canManageCommunity = auth()->check() && $staffPermissions?->allows(auth()->user(), 'community.manage'))
     @php($surface = $surface ?? 'staff')
     @php($surfaceFeatures = $features ?? [])
     <div class="workspace-shell staff-font-{{ $staffAppearance?->staff_font ?? 'modern' }} staff-density-{{ $staffAppearance?->staff_density ?? 'comfortable' }}" data-workspace-shell data-workspace-surface="{{ $surface }}">
@@ -38,7 +35,7 @@
                 <button class="workspace-menu" type="button" data-workspace-toggle aria-expanded="false" aria-label="Open navigation"><x-ui.icon name="menu" :size="20"/><x-ui.icon name="close" :size="19"/></button>
                 <span class="mobile-header-brand" aria-label="{{ $ministryName ?? config('app.name') }}">@if($staffAppearance?->logo_path)<img src="{{ asset('storage/'.$staffAppearance->logo_path) }}" alt="">@else{{ mb_strtoupper(mb_substr($ministryName ?? 'M', 0, 1)) }}@endif</span>
                 <div class="workspace-context"><span>{{ $surface === 'member' ? 'Member portal' : now()->timezone(config('app.timezone'))->format('l, F j') }}</span><strong>{{ $title ?? ($surface === 'member' ? 'My ministry' : 'Workspace') }}</strong></div>
-                <div class="workspace-top-actions">@if($surface === 'member')<span class="member-top-avatar" aria-label="Signed in as {{ auth()->user()?->name }}">{{ mb_strtoupper(mb_substr(auth()->user()?->name ?? 'M', 0, 1)) }}</span>@else @if($canManagePeople && app(\App\Services\ModuleAvailability::class)->visibleToStaff('people', auth()->user()))<a class="workspace-quick-action" href="{{ route('staff.people') }}" wire:navigate.hover title="Open people directory to add a person"><x-ui.icon name="people" :size="16"/><span>Add person</span></a>@endif<a href="{{ route('public.home') }}" target="_blank" aria-label="Open public site"><x-ui.icon name="external" :size="17"/></a>@endif<button class="workspace-theme-toggle" type="button" data-workspace-theme-toggle aria-pressed="false" aria-label="Switch to dark mode"><span class="workspace-theme-track" aria-hidden="true"></span><span class="workspace-theme-label">Light</span></button></div>
+                <div class="workspace-top-actions">@if($surface === 'member')<span class="member-top-avatar" aria-label="Signed in as {{ auth()->user()?->name }}">{{ mb_strtoupper(mb_substr(auth()->user()?->name ?? 'M', 0, 1)) }}</span>@endif<button class="workspace-theme-toggle" type="button" data-workspace-theme-toggle aria-pressed="false" aria-label="Switch to dark mode"><span class="workspace-theme-track" aria-hidden="true"></span><span class="workspace-theme-label">Light</span></button></div>
             </header>
             <section @class(['workspace-content', 'member-content' => $surface === 'member'])>
                 {{ $slot }}

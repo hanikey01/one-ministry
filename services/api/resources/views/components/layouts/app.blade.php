@@ -103,7 +103,8 @@
                         if (!sidebar?.contains(event.target) && !toggles.some((toggle) => toggle.contains(event.target))) closeMember(shell);
                     });
                     document.querySelectorAll('details[open][data-dismiss-on-outside]').forEach((popup) => {
-                        if (!popup.contains(event.target)) popup.removeAttribute('open');
+                        if (event.target.closest('.enhanced-select-options.is-portaled')) return;
+                        if (!popup.contains(event.target) && !popup.contains(document.activeElement)) popup.removeAttribute('open');
                     });
                 });
             })();

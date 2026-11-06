@@ -5,6 +5,13 @@
 
     RewriteEngine On
 
+    # A primary-domain package may be extracted directly into public_html.
+    # Keep application internals, credentials, and build metadata out of the web root.
+    RewriteRule ^(?:app|bootstrap|config|database|resources|routes|tests|vendor|node_modules)(?:/|$) - [F,L]
+    RewriteRule ^(?:\.env(?:\..*)?|artisan|composer\.(?:json|lock)|package(?:-lock)?\.json|vite\.config\.js)$ - [F,L]
+
+    RewriteRule ^install/?$ install.php [L]
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]

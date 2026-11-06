@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type AdminIconName = "home"|"people"|"heart"|"calendar"|"groups"|"event"|"volunteer"|"library"|"pages"|"message"|"giving"|"chart"|"staff"|"location"|"modules"|"settings"|"security";
+export type AdminIconName = "home"|"people"|"heart"|"calendar"|"event"|"library"|"pages"|"message"|"giving"|"chart"|"staff"|"location"|"modules"|"settings"|"security";
 
 export default function AdminIcon({ name }: { name: AdminIconName }) {
   const paths: Record<AdminIconName, ReactNode> = {
@@ -8,9 +8,7 @@ export default function AdminIcon({ name }: { name: AdminIconName }) {
     people:<><circle cx="9" cy="8" r="3.2"/><path d="M3 20c.5-4 2.5-6 6-6s5.5 2 6 6"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 15c3 0 4.5 1.7 5 5"/></>,
     heart:<path d="M20.8 5.7c-2.3-2.4-6.1-1.7-8.8 1.1C9.3 4 5.5 3.3 3.2 5.7.8 8.1 1 12 3.5 14.5L12 22l8.5-7.5c2.5-2.5 2.7-6.4.3-8.8Z"/>,
     calendar:<><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18M8 14h2M14 14h2M8 18h2"/></>,
-    groups:<><circle cx="8" cy="8" r="3"/><circle cx="17" cy="8" r="3"/><path d="M2 20c.5-4 2.5-6 6-6 2 0 3.5.7 4.5 2M12 20c.5-4 2-6 5-6s4.5 2 5 6"/></>,
     event:<><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="m9 16 2 2 4-5"/></>,
-    volunteer:<><path d="M12 21s-8-4.4-8-11a4 4 0 0 1 7-2.7L12 9l1-1.7A4 4 0 0 1 20 10c0 6.6-8 11-8 11Z"/><path d="M8 12h8"/></>,
     library:<><path d="M4 4h5v16H4zM10 4h5v16h-5zM16 5l4-1 2 15-4 1z"/></>,
     pages:<><path d="M5 3h10l4 4v14H5z"/><path d="M15 3v5h4M8 12h8M8 16h8"/></>,
     message:<><path d="M4 4h16v13H9l-5 4V4Z"/><path d="M8 9h8M8 13h5"/></>,

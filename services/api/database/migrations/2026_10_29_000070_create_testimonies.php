@@ -16,7 +16,7 @@ return new class extends Migration {
             $table->foreignUuid('reviewed_by_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('author_name',160);
             $table->string('title',180);
-            $table->string('slug',200)->unique();
+            $table->string('slug',191)->unique();
             $table->string('category',60)->default('general');
             $table->text('summary')->nullable();
             $table->text('body');

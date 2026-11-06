@@ -7,13 +7,18 @@ use App\Models\MinistrySetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class SetupWizardController extends Controller
 {
     public function create(): View|RedirectResponse
     {
-        if (MinistrySetting::query()->exists()) {
+        if (blank(config('app.key'))) {
+            return redirect('/install');
+        }
+
+        if (Schema::hasTable('ministry_settings') && MinistrySetting::query()->exists()) {
             return to_route('public.home');
         }
 
@@ -22,6 +27,10 @@ class SetupWizardController extends Controller
 
     public function store(Request $request, InstallMinistry $installer): RedirectResponse
     {
+        if (! Schema::hasTable('ministry_settings')) {
+            return redirect('/install.php');
+        }
+
         if (MinistrySetting::query()->exists()) {
             return to_route('login')->withErrors(['installation' => 'This installation is already configured.']);
         }

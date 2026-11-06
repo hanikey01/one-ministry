@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use RuntimeException;
@@ -30,7 +31,20 @@ class StaffAiSettingsController extends Controller
     public function searchModels(Request $request, AiModelSettingsService $ai): JsonResponse
     {
         $validated = Validator::make($request->query(), ['q' => ['nullable', 'string', 'max:120']])->validate();
-        return response()->json(['data' => $ai->searchModelChoices((string) ($validated['q'] ?? ''))]);
+        try {
+            return response()->json(['data' => $ai->searchModelChoices((string) ($validated['q'] ?? ''))])
+                ->header('Cache-Control', 'private, no-store');
+        } catch (Throwable $exception) {
+            Log::error('Saved AI model catalog could not be searched.', [
+                'actor_user_id' => $request->user()?->id,
+                'exception' => $exception,
+            ]);
+
+            return response()->json([
+                'message' => 'The saved model catalog could not be loaded. Refresh the provider catalog and try again.',
+                'data' => ['models' => [], 'has_more' => false],
+            ], 503);
+        }
     }
 
     public function updateProvider(Request $request, string $provider, AiModelSettingsService $ai): RedirectResponse|JsonResponse
@@ -42,13 +56,30 @@ class StaffAiSettingsController extends Controller
         } catch (ValidationException $exception) {
             return $this->failure($request, 'Check the provider settings and try again.', $exception->errors());
         } catch (Throwable $exception) {
-            return $this->failure($request, 'Provider settings could not be saved.', ['provider' => 'Provider settings could not be saved.'], 500);
+            Log::error('AI provider settings could not be saved.', [
+                'provider' => $provider,
+                'actor_user_id' => $request->user()?->id,
+                'exception' => $exception,
+            ]);
+
+            return $this->failure(
+                $request,
+                'Provider settings could not be saved because of a server configuration problem. Try again or check the application log.',
+                ['_form' => 'The provider connection was not changed.'],
+                500,
+                false,
+            );
         }
 
         $overview = $ai->overview();
-        return $this->success($request, 'AI provider settings saved. Refresh its model catalog to verify the connection.', [
+        $savedProvider = $overview['providers'][$provider] ?? null;
+        $message = ($savedProvider['enabled'] ?? false)
+            ? 'AI provider settings saved. Refresh its model catalog to verify the connection.'
+            : 'AI provider key saved, but the provider is disabled. Enable it and save again before refreshing its model catalog.';
+
+        return $this->success($request, $message, [
             'provider_key' => $provider,
-            'provider' => $overview['providers'][$provider] ?? null,
+            'provider' => $savedProvider,
         ]);
     }
 

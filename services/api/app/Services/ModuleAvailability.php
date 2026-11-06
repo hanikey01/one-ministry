@@ -18,7 +18,6 @@ class ModuleAvailability
             '/staff/people', '/api/v1/staff/people', '/staff/celebrations', '/api/v1/staff/celebrations',
             '/staff/follow-up', '/staff/follow-up-tasks', '/api/v1/staff/follow-up-tasks',
         ],
-        'groups' => ['/staff/groups', '/api/v1/staff/groups', '/member/groups', '/api/v1/public/groups', '/public/groups', '/groups'],
         'giving' => ['/staff/giving', '/api/v1/staff/giving', '/member/giving', '/give', '/api/v1/me/donations', '/api/v1/public/giving', '/api/v1/webhooks/giving'],
         'testimonies' => ['/staff/testimonies','/member/testimonies','/testimonies'],
         'digital_church' => [

@@ -10,7 +10,7 @@ final class NavigationLayout
 {
     public const SURFACES = ['staff', 'member'];
 
-    public const ICONS = ['home', 'worship', 'calendar', 'groups', 'people', 'services', 'content', 'giving', 'location', 'message', 'volunteer', 'school', 'followup', 'care', 'reports', 'modules', 'access', 'security', 'settings', 'homepage', 'menu', 'external', 'about', 'activity', 'announcement', 'archive', 'arrow-right', 'audio', 'book', 'book-open', 'briefcase', 'building', 'camera', 'chat', 'check', 'clock', 'coffee', 'compass', 'download', 'email', 'file', 'flag', 'globe', 'hand-heart', 'heart', 'help', 'image', 'info', 'link', 'list', 'lock', 'map', 'music', 'news', 'phone', 'pin', 'play', 'podcast', 'prayer', 'search', 'send', 'share', 'sparkles', 'star', 'support', 'video', 'wifi'];
+    public const ICONS = ['home', 'worship', 'calendar', 'departments', 'people', 'services', 'content', 'giving', 'location', 'message', 'school', 'followup', 'care', 'reports', 'modules', 'access', 'security', 'settings', 'homepage', 'menu', 'external', 'about', 'activity', 'announcement', 'archive', 'arrow-right', 'audio', 'book', 'book-open', 'briefcase', 'building', 'camera', 'chat', 'check', 'clock', 'coffee', 'compass', 'download', 'email', 'file', 'flag', 'globe', 'hand-heart', 'heart', 'help', 'image', 'info', 'link', 'list', 'lock', 'map', 'music', 'news', 'phone', 'pin', 'play', 'podcast', 'prayer', 'search', 'send', 'share', 'sparkles', 'star', 'support', 'video', 'wifi'];
 
     /** @return array<string, array{label:string, icon:string, route:string, match:string, group:string, permission:?string, module:?string, feature:?string}> */
     public function options(string $surface): array
@@ -86,11 +86,9 @@ final class NavigationLayout
 
             $label = match ($key) {
                 'staff.services' => $terminology->label('service', 'plural'),
-                'staff.groups' => $terminology->label('group', 'plural'),
-                'staff.volunteers' => $terminology->label('volunteer', 'plural'),
                 'staff.locations' => $terminology->label('location', 'plural'),
                 'staff.departments' => $terminology->label('department', 'plural'),
-                'member.groups' => 'My '.mb_strtolower($terminology->label('group', 'plural')),
+                'member.departments' => 'My '.mb_strtolower($terminology->label('department', 'plural')),
                 default => $definition['label'],
             };
             $parameter = $definition['parameter'] ?? null;
@@ -122,10 +120,8 @@ final class NavigationLayout
             'staff.services' => $this->item('Services', 'services', 'staff.services', 'Workspace', 'services.manage', 'digital_church'),
             'staff.follow-up' => $this->item('Follow-up', 'followup', 'staff.follow-up', 'Workspace', 'services.manage', null, 'people'),
             'staff.care' => $this->item('Care', 'care', 'staff.care', 'Workspace', 'care.manage', null, 'care'),
-            'staff.groups' => $this->item('Groups', 'groups', 'staff.groups', 'Ministry', 'community.manage', 'groups'),
             'staff.events' => $this->item('Events', 'calendar', 'staff.events', 'Ministry', 'community.manage'),
-            'staff.volunteers' => $this->item('Volunteers', 'volunteer', 'staff.volunteers', 'Ministry', 'community.manage'),
-            'staff.departments' => $this->item('Departments', 'groups', 'staff.departments', 'Ministry'),
+            'staff.departments' => $this->item('Departments', 'departments', 'staff.departments', 'Ministry'),
             'staff.school.index' => $this->item('Digital school', 'school', 'staff.school.index', 'Ministry', 'school.manage', 'digital_school'),
             'staff.communications' => $this->item('Communications', 'message', 'staff.communications', 'Ministry', 'communications.manage'),
             'staff.giving' => $this->item('Giving', 'giving', 'staff.giving', 'Ministry', 'giving.manage', null, 'giving'),
@@ -151,9 +147,8 @@ final class NavigationLayout
     {
         return [
             'member.home' => $this->item('Overview', 'home', 'member.home', 'My ministry'),
-            'member.groups' => $this->item('Groups', 'groups', 'member.groups', 'My ministry', null, null, 'groups'),
+            'member.departments' => $this->item('Departments', 'departments', 'member.departments', 'My ministry'),
             'member.events' => $this->item('Events', 'calendar', 'member.events', 'My ministry'),
-            'member.serving' => $this->item('Serving', 'volunteer', 'member.serving', 'My ministry'),
             'member.school.index' => $this->item('Digital school', 'school', 'member.school.index', 'My ministry', null, null, 'digital_school'),
             'member.activity' => $this->item('Participation', 'services', 'member.activity', 'My ministry'),
             'member.next-steps' => $this->item('Next steps', 'followup', 'member.next-steps', 'My ministry'),
@@ -176,7 +171,7 @@ final class NavigationLayout
             ['staff', 'sidebar'] => array_keys($options),
             ['staff', 'mobile'] => ['staff.overview', 'staff.people', 'staff.services', 'staff.events'],
             ['member', 'sidebar'] => array_keys($options),
-            ['member', 'mobile'] => ['member.home', 'member.events', 'member.groups', 'member.giving'],
+            ['member', 'mobile'] => ['member.home', 'member.events', 'member.departments', 'member.giving'],
             default => [],
         };
 

@@ -25,10 +25,11 @@ class PagePublishingTest extends TestCase
             'recovery_code_hashes' => '[]', 'enabled_at' => now(), 'created_at' => now(), 'updated_at' => now(),
         ]);
         $this->actingAs($admin)->withSession(['mfa_verified_at' => now()->timestamp]);
+        $aboutDocument = $this->document("Welcome.\n\nWe serve our city.");
 
         $this->postJson('/api/v1/staff/pages', ['title' => 'Admin', 'slug' => 'admin'])->assertUnprocessable();
         $created = $this->postJson('/api/v1/staff/pages', [
-            'title' => 'About us', 'slug' => 'About Us', 'body' => "Welcome.\n\nWe serve our city.",
+            'title' => 'About us', 'slug' => 'About Us', 'blocks' => $aboutDocument,
             'seo_title' => 'About Hope Community', 'seo_description' => 'Learn about our ministry.',
         ])->assertCreated()->assertJsonPath('data.slug', 'about-us')->assertJsonPath('data.status', 'draft');
         $id = $created->json('data.id');
@@ -45,7 +46,7 @@ class PagePublishingTest extends TestCase
         }
 
         $this->patchJson("/api/v1/staff/pages/{$id}", [
-            'title' => 'Our story', 'slug' => 'about-us', 'body' => 'An updated story.',
+            'title' => 'Our story', 'slug' => 'about-us', 'blocks' => $this->document('An updated story.'),
         ])->assertOk()->assertJsonPath('data.status', 'draft');
         $this->getJson('/api/v1/public/pages/about-us')->assertNotFound();
         $this->getJson("/api/v1/staff/pages/{$id}/revisions")
@@ -71,7 +72,7 @@ class PagePublishingTest extends TestCase
         $admin->forceFill(['email_verified_at' => now()])->save();
         $this->actingAs($admin);
 
-        $id = $this->postJson('/api/v1/staff/pages', ['title' => 'About us', 'slug' => 'about-us', 'body' => 'Old copy.'])
+        $id = $this->postJson('/api/v1/staff/pages', ['title' => 'About us', 'slug' => 'about-us', 'blocks' => $this->document('Old copy.')])
             ->assertCreated()->json('data.id');
         $document = [
             'version' => 2,
@@ -102,6 +103,7 @@ class PagePublishingTest extends TestCase
 
         $response = $this->putJson("/staff/pages/{$id}", [
             'title' => 'About us', 'slug' => 'about-us', 'blocks' => json_encode($document), 'publish' => '1',
+            'document_version' => (string) DB::table('pages')->where('id', $id)->value('updated_at'),
         ])->assertOk()
             ->assertJsonPath('data.status', 'published')
             ->assertJsonPath('data.document.sections.0.settings.content_width', 'custom')
@@ -136,7 +138,7 @@ class PagePublishingTest extends TestCase
         ]);
         $this->actingAs($admin)->withSession(['mfa_verified_at' => now()->timestamp]);
 
-        $id = $this->postJson('/api/v1/staff/pages', ['title' => 'About us', 'slug' => 'about-us', 'body' => 'Welcome.'])
+        $id = $this->postJson('/api/v1/staff/pages', ['title' => 'About us', 'slug' => 'about-us', 'blocks' => $this->document('Welcome.')])
             ->assertCreated()->json('data.id');
         DB::table('pages')->where('id', $id)->update(['blocks' => json_encode([
             'version' => 2,
@@ -203,5 +205,22 @@ class PagePublishingTest extends TestCase
         $this->post('/staff/pages', ['title' => 'Published page', 'slug' => 'published-page', 'blocks' => $document, 'publish' => '1'])
             ->assertRedirect();
         $this->assertDatabaseHas('pages', ['slug' => 'published-page', 'status' => 'published']);
+    }
+
+    /** @return array<string,mixed> */
+    private function document(string $text): array
+    {
+        return [
+            'version' => 2,
+            'sections' => [[
+                'id' => 'section-'.md5($text), 'type' => 'section', 'settings' => [], 'responsive' => [],
+                'columns' => [[
+                    'id' => 'column-'.md5($text), 'settings' => [], 'responsive' => [],
+                    'elements' => [[
+                        'id' => 'element-'.md5($text), 'type' => 'paragraph', 'content' => ['text' => $text], 'settings' => [], 'responsive' => [],
+                    ]],
+                ]],
+            ]],
+        ];
     }
 }

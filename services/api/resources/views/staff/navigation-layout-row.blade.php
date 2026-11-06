@@ -15,8 +15,7 @@
         </div>
         @if($menuSlot === 'sidebar')
             <div class="navigation-section-control" data-navigation-section-control @if(!$selected) hidden @endif>
-                <label class="sr-only" for="navigation-section-{{ $surface }}-{{ $fieldKey }}">Section for {{ $option['label'] }}</label>
-                <select id="navigation-section-{{ $surface }}-{{ $fieldKey }}" name="groups[{{ $surface }}][sidebar][{{ $fieldKey }}]" aria-label="Section for {{ $option['label'] }}" title="{{ $configuredGroup }}" data-navigation-group @disabled(!$selected)>
+                <select id="navigation-section-{{ $surface }}-{{ $fieldKey }}" name="sections[{{ $surface }}][sidebar][{{ $fieldKey }}]" aria-label="Section for {{ $option['label'] }}" title="{{ $configuredGroup }}" data-navigation-group @disabled(!$selected)>
                     @foreach($sidebarSections as $section)
                         <option value="{{ $section }}" @selected($configuredGroup === $section)>{{ $section }}</option>
                     @endforeach

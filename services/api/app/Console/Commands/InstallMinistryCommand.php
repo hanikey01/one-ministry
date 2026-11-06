@@ -52,7 +52,7 @@ class InstallMinistryCommand extends Command
             return self::FAILURE;
         }
 
-        $this->info('Ministry configured. Public modules remain disabled until enabled by staff.');
+        $this->info('Ministry configured. All available modules are enabled.');
 
         return self::SUCCESS;
     }

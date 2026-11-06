@@ -14,7 +14,7 @@ The existing Laravel domain rules, migrations, services, permissions, audits, fe
 
 | Requirement | Baseline shared-hosting profile | Optional enhancement |
 | --- | --- | --- |
-| PHP | PHP 8.3+ with the listed required extensions | Managed VPS/container profile |
+| PHP | PHP 8.4.1+ with the listed required extensions | Managed VPS/container profile |
 | Database | MySQL or MariaDB; PostgreSQL remains supported | Dedicated managed database |
 | Web process | PHP-FPM/Apache/LiteSpeed serving Laravel `public/` | Docker/Caddy or Nginx profile |
 | Scheduling | Host cron executes `php artisan schedule:run` every minute | Persistent scheduler process |
@@ -30,7 +30,7 @@ Video delivery never passes through the shared PHP host. A broadcast remains a p
 
 | Capability | Required baseline | Verification |
 | --- | --- | --- |
-| PHP runtime | PHP 8.3 or later | `php -v`; `php artisan ministry:doctor --profile=shared --json` |
+| PHP runtime | PHP 8.4.1 or later | `php -v`; `php artisan ministry:doctor --profile=shared --json` |
 | PHP extensions | `ctype`, `curl`, `dom`, `fileinfo`, `filter`, `hash`, `mbstring`, `openssl`, `pcre`, `pdo`, `pdo_mysql`, `session`, `tokenizer`, `xml` | `php -m`; shared doctor `runtime` check |
 | Database | MySQL 8.0+ or MariaDB 10.6+; a dedicated database/user with migration privileges | Fresh migration and focused MariaDB test profile |
 | Scheduler | Cron available every minute | Scheduler heartbeat is fresh in the shared doctor profile |
@@ -63,13 +63,13 @@ Port setup, login, recovery, email verification, MFA, sessions, invitations, bra
 
 ### Batch SH-3 — Staff operations
 
-Port people, attendance, follow-up, groups, events, volunteers, care, communications, media review, giving, reports, and service operations to Livewire workspaces. Build reusable search, filtering, pagination, table, and inline-action patterns.
+Port people, attendance, follow-up, departments, events, volunteers, care, communications, media review, giving, reports, and service operations to Livewire workspaces. Build reusable search, filtering, pagination, table, and inline-action patterns.
 
 **Exit:** staff can complete current daily operations through Laravel pages while permission domains remain enforced.
 
 ### Batch SH-4 — Member and public experience
 
-Port member self-service, public content, groups, events, giving, libraries, custom pages, and feature-aware navigation. Preserve direct server enforcement for disabled modules and content publication rules.
+Port member self-service, public content, departments, events, giving, libraries, custom pages, and feature-aware navigation. Preserve direct server enforcement for disabled modules and content publication rules.
 
 **Exit:** current member and public routes work without Next.js and retain ownership, consent, and privacy checks.
 

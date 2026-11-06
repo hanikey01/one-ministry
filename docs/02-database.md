@@ -5,7 +5,7 @@
 ## 1. Conventions
 
 - `uuid` primary keys for externally referenced records; `created_at`, `updated_at` UTC timestamps; explicit `deleted_at` only where recoverable soft deletion is required. Migrations must work on supported MySQL/MariaDB and PostgreSQL versions; database-specific shortcuts require an application-level equivalent and tests on both engines.
-- Every record belongs to its installation implicitly. There is no `tenant_id` or shared database across ministries. Scoped records carry `location_id`, `group_id`, or `case_id` where needed.
+- Every record belongs to its installation implicitly. There is no `tenant_id` or shared database across ministries. Scoped records carry `location_id`, `department_id`, or `case_id` where needed.
 - Store times in UTC with the event's IANA time zone. Store a person's birthday as month/day and optional year; do not derive age when year is absent.
 - Monetary amounts are integer minor units with ISO currency. Never use floating point for money.
 - Foreign keys are enforced. Every relationship specifies `RESTRICT`, `SET NULL`, or `CASCADE` intentionally. Audit, giving, attendance correction, and care history must not be erased by a cascading person delete.
@@ -28,7 +28,7 @@ The first implementation slice uses the following exact fields. Later migrations
 
 | Table | Fields and constraints |
 | --- | --- |
-| `ministry_settings` | `id uuid PK`; `name varchar(160) NOT NULL`; `tagline varchar(240) NULL`; `public_domain varchar(253) NOT NULL UNIQUE`; `contact_email varchar(254) NULL`; `timezone varchar(64) NOT NULL`; `theme_preset varchar(24) NOT NULL DEFAULT 'neutral'` constrained to platform-owned `neutral`, `slate`, or `warm`; `chrome_mode varchar(24) NOT NULL DEFAULT 'preset'` constrained to `preset` or `custom`; `chrome_color char(7) NULL`, accepted only when `chrome_mode=custom`; `staff_font varchar(24) NOT NULL`; `staff_density varchar(24) NOT NULL`; `terminology json NULL` for ministry-owned singular/plural interface-label overrides keyed by stable domain concept; `created_at`, `updated_at`. Exactly one row is allowed by application setup and a fixed singleton key. The application owns all canvas, surface, text, border, input, control, and action colors. A ministry may select one platform preset and optionally one accessible chrome color shared by its sidebar, header, and mobile footer. Arbitrary CSS is not accepted. Terminology affects presentation labels only, never route names, permission keys, stored domain values, or API identifiers. |
+| `ministry_settings` | `id uuid PK`; `name varchar(160) NOT NULL`; `tagline varchar(240) NULL`; `public_domain varchar(253) NOT NULL UNIQUE`; `contact_email varchar(254) NULL`; `timezone varchar(64) NOT NULL`; `theme_preset varchar(24) NOT NULL DEFAULT 'tech_blue'` constrained to platform-owned `tech_blue`, `neutral`, or `warm`; `chrome_mode varchar(24) NOT NULL DEFAULT 'preset'` constrained to `preset` or `custom`; `chrome_color char(7) NULL`, accepted only when `chrome_mode=custom`; `staff_font varchar(24) NOT NULL`; `staff_density varchar(24) NOT NULL`; `terminology json NULL` for ministry-owned singular/plural interface-label overrides keyed by stable domain concept; `created_at`, `updated_at`. Exactly one row is allowed by application setup and a fixed singleton key. The application owns all canvas, surface, text, border, input, control, and action colors. A ministry may select one platform preset and optionally one accessible chrome color shared by its sidebar, header, and mobile footer. Arbitrary CSS is not accepted. Terminology affects presentation labels only, never route names, permission keys, stored domain values, or API identifiers. |
 | `locations` | `id uuid PK`; `name varchar(160) NOT NULL`; `slug varchar(160) NOT NULL UNIQUE`; `timezone varchar(64) NOT NULL`; `address text NULL`; `is_primary boolean NOT NULL DEFAULT false`; `is_public boolean NOT NULL DEFAULT true`; `created_at`, `updated_at`. At most one primary location is enforced by a partial unique index where supported. |
 | `feature_settings` | `key varchar(80) PK`; `state varchar(16) NOT NULL` with check in `disabled`, `staff_preview`, `enabled`; `changed_by uuid NULL FK users.id ON DELETE SET NULL`; `created_at`, `updated_at`. |
 | `users` | `id uuid PK`; `name varchar(160)`; `email varchar(254) UNIQUE`; `email_verified_at timestamp NULL`; password hash; remember token; timestamps. The first administrator is created by the setup command. |
@@ -44,7 +44,7 @@ Staff invitations use `staff_invitations(id uuid PK, email varchar(254), name va
 | Domain | Tables | Essential relationships and constraints |
 | --- | --- | --- |
 | Installation | `ministry_settings`, `locations`, `feature_settings`, `email_delivery_settings`, `provider_connections` | One settings row; locations may have parent; provider credentials stored as encrypted server-side values or secret references, never plaintext. |
-| Identity | `users`, `sessions`, `roles`, `permissions`, `user_role_assignments`, `role_scopes`, `invitations` | User email unique when present; role assignments carry optional location/group scope. Sessions revocable. |
+| Identity | `users`, `sessions`, `roles`, `permissions`, `user_role_assignments`, `role_scopes`, `invitations` | User email unique when present; role assignments carry optional location/department scope. Sessions revocable. |
 | People | `people`, `households`, `household_memberships`, `contact_methods`, `consents`, `person_relationships`, `merge_records` | A person may have no login; one user maps to at most one active person. Household memberships allow dated history. |
 | Public content | `pages`, `content_items`, `content_series`, `media_assets`, `content_revisions`, `homepage_settings`, `homepage_slides`, `homepage_sections`, `navigation_items`, `navigation_layouts` | Publish state and time; revisions immutable; media assets have visibility class. `pages.blocks` stores an ordered JSON document of validated visual blocks; `body` remains a text compatibility summary for legacy readers and exports. `pages.page_type` distinguishes `standard` pages from the future centralized `homepage` document, while `source_key=homepage` provides a stable installation-local identity during migration. |
 | Services | `service_templates`, `service_occurrences`, `service_segments`, `service_staff`, `live_sessions`, `service_prompts` | Occurrence has explicit state and time zone; at most one active primary live session per occurrence. |
@@ -52,7 +52,7 @@ Staff invitations use `staff_invitations(id uuid PK, email varchar(254), name va
 | Interaction | `chat_messages`, `chat_moderation_actions`, `polls`, `poll_options`, `poll_responses`, `connection_responses` | Service/meeting context required; moderation history retained; poll anonymity respected. |
 | Attendance | `attendance_records`, `attendance_corrections`, `anonymous_viewer_aggregates`, `presence_sessions` | Identified attendance unique per person, occurrence, and channel after reconciliation; anonymous aggregates never linked to people. |
 | Care | `prayer_requests`, `care_cases`, `care_notes`, `follow_up_tasks`, `task_activity` | Restricted visibility; assignments and state history; no general profile notes containing pastoral details. |
-| Community | `groups`, `group_memberships`, `events`, `event_registrations`, `volunteer_teams`, `volunteer_assignments` | Dates and location; waitlist order; team role and shift uniqueness. |
+| Community | `departments`, `department_memberships`, `department_join_requests`, `department_gatherings`, `department_attendance_records`, `department_messages`, `events`, `event_registrations` | Scoped membership, moderated discussion, dates and location, waitlist order, and registration integrity. |
 | Communication | `message_templates`, `campaigns`, `message_deliveries`, `notification_preferences` | Delivery outcome; consent snapshot; provider message ID unique where present. |
 | Giving | `funds`, `donations`, `payment_attempts`, `payment_events`, `receipts`, `reconciliation_batches` | Append-only payment events; unique provider transaction ID; donation state derived from verified events. |
 | Testimonies | `testimonies` | Member submissions remain private until reviewed; public rows require explicit consent and published status. Author visibility is separate from authorship. |
@@ -68,7 +68,7 @@ Staff invitations use `staff_invitations(id uuid PK, email varchar(254), name va
 
 ### 3.1 Person and identity
 
-`people` owns a stable person ID, names, optional birth date components, preferred language and location, relationship state, and archival status. `users` owns login credentials. Visitors may create a person record through a consented form without a user account. Staff must see an explicit distinction between verified self-service information and staff-entered information. Merge keeps the surviving ID and a permanent redirect/mapping for historical references. The current member self-service screen records birthday month and day in the existing `people.birthday` field using a leap-year placeholder; it never asks for or displays a birth year. Removing birthday permission clears that field and stops birthday-specific preferences.
+`people` owns a stable person ID, names, optional birth date components, preferred language and location, relationship state, and archival status. `users` owns login credentials. A public contact form may create a person record through consent without creating an account; such records use the normal `member` status. Staff must see an explicit distinction between verified self-service information and staff-entered information. Merge keeps the surviving ID and a permanent redirect/mapping for historical references. The current member self-service screen records birthday month and day in the existing `people.birthday` field using a leap-year placeholder; it never asks for or displays a birth year. Removing birthday permission clears that field and stops birthday-specific preferences.
 
 `consents` records person, purpose, channel, status, source, timestamp, policy version, and actor. A later change creates a new consent event rather than overwriting history. Current effective consent may be materialized for queries.
 
@@ -92,7 +92,7 @@ AI page drafting adds installation-owned `ai_provider_connections` (one row per 
 
 ### 3.3 Attendance
 
-`presence_sessions` capture authenticated join/leave heartbeats for possible attendance computation. A missed disconnect creates a bounded inferred end time. `attendance_records` contain `person_id`, occurrence or event context, channel (`in_person`, `online_identified`, `group`, `event`, `serving`), status (`confirmed`, `self_reported`, `corrected`), source, observed interval, and confidence reason. Anonymous viewing uses time-bucket aggregates only. `attendance_corrections` append before/after, reason, actor, and time. Attendance threshold rules are owned by `05-systems.md` and must be configurable, not hardcoded in migrations.
+`presence_sessions` capture authenticated join/leave heartbeats for possible attendance computation. A missed disconnect creates a bounded inferred end time. `attendance_records` contain `person_id`, occurrence or event context, channel (`in_person`, `online_identified`, `department`, `event`, `serving`), status (`confirmed`, `self_reported`, `corrected`), source, observed interval, and confidence reason. Anonymous viewing uses time-bucket aggregates only. `attendance_corrections` append before/after, reason, actor, and time. Attendance threshold rules are owned by `05-systems.md` and must be configurable, not hardcoded in migrations.
 
 ### 3.4 Care and giving
 
@@ -103,7 +103,7 @@ Care cases and notes carry a visibility class and authorized assignment. Search 
 | Class | Examples | Default access |
 | --- | --- | --- |
 | Public | Published sermon, public event | Everyone |
-| Member | Own profile, group membership | Subject and scoped leaders as permitted |
+| Member | Own profile, department membership | Subject and scoped department coordinators as permitted |
 | Staff operational | Attendance, follow-up status | Authorized staff within scope |
 | Restricted care | Prayer details, pastoral notes | Assigned care staff only |
 | Restricted child | Child profile, guardian and check-in data | Authorized children's team only |
@@ -135,7 +135,7 @@ Recording files may be unpublished independently of their metadata and audit his
 5. Service schedules, live sessions, meetings.
 6. Interaction and attendance.
 7. Care and follow-up.
-8. Groups, events, volunteering, communications.
+8. Departments, events, next-step follow-up, communications.
 9. Giving and reconciliation.
 10. Operational outbox, exports, and reporting projections.
 

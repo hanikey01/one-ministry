@@ -17,7 +17,7 @@ The Laravel server-rendered baseline is mandatory. Enhanced navigation and in-pl
 2. **Ministry-owned presentation.** A ministry controls its name, logo, terminology, navigation selection, selected platform theme preset, and an optional shared navigation chrome colour. The product controls page and component surfaces. Configuration changes presentation only; routes, permission keys, stored values, and server authorization remain stable.
 3. **Neutral by default.** New installations use white/neutral-gray light surfaces and charcoal/near-black dark surfaces. Green or any other brand tint is never a platform default.
 4. **One primary action rule.** A primary action uses the selected platform preset action token. Secondary, quiet, destructive, and status actions use semantic tokens with accessible contrast.
-5. **Direct, scoped editing.** A user edits the item or section they selected. AI assistance receives enough approved page context to make a coherent suggestion, but can change only the selected section unless a staff member explicitly applies a reviewed full-page plan.
+5. **Direct, scoped editing.** A user edits the object they selected. AI assistance receives enough approved page context to make a coherent suggestion, but a scoped proposal can replace only the selected section, column, or element unless a staff member explicitly applies a reviewed full-page design.
 6. **Visible system feedback.** Every save, background request, warning, and failure has a pending, success, error, or recovery state in the current viewport. Field validation stays beside the field; completed notices use the shared notification stack.
 7. **No false affordances.** A visible action must work, explain why it is unavailable, or be absent. Placeholder controls, hidden global click targets, and links that lead to a known module/permission error are defects.
 
@@ -86,12 +86,12 @@ Keep the existing screen visible during a transition whenever possible. Use a lo
 
 ## 7. AI page editor contract
 
-AI is a staff drafting assistant, not a page publisher or free-form code generator.
+AI is a staff design assistant, not a page publisher.
 
 - Staff can ask AI for a reviewed page outline, including a suggested number and sequence of approved sections, then apply or reject it.
 - Staff can add, remove, reorder, duplicate, and edit sections manually.
-- Selecting a section opens a scoped assistant request. The request includes the ordered public draft as context so the result fits neighboring sections, but the response schema limits changes to the selected section's existing approved fields.
-- AI never receives private person, attendance, care, children, or giving data. It cannot provide arbitrary HTML, scripts, media URLs, internal destinations, or publish a page.
+- Selecting a section, column, or element opens a scoped assistant request. The request includes the ordered public draft as context, but the response is a complete replacement for only that selected object and may use all settings and permitted children available to it.
+- AI prefers approved native elements. When no native element fits, it may use bounded custom code that is validated and rendered only in the documented sandbox. AI never receives private person, attendance, care, children, or giving data; it cannot invent media URLs or destinations or publish a page.
 - AI proposals remain staged until staff explicitly applies them. A normal draft save and separate permission-gated publication remain required.
 
 ## 8. Performance contract

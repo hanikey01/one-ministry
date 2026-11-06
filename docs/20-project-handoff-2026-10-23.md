@@ -52,7 +52,7 @@ Semantic success, warning, and destructive states may retain distinct colours. T
 - Floating element and section library.
 - Block settings inspector with content/style/advanced presentation work in progress.
 - Flat block add, select, top-level drag reorder, duplicate, delete, and session undo/redo.
-- Existing elements: hero, heading, paragraph, image, gallery, video embed, audio, file, media and text, quote, list, accordion, call to action, divider, spacer, service times, events, and groups.
+- Existing elements: hero, heading, paragraph, image, gallery, video embed, audio, file, media and text, quote, list, accordion, call to action, divider, spacer, service times, events, and departments.
 - Media picker with media-type filtering and upload support.
 - Page-level AI planning and partial selected-block AI proposal handling.
 - Public renderer exposes published pages only.

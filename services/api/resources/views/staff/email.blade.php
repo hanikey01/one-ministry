@@ -9,10 +9,10 @@
         <form method="POST" action="{{ route('staff.email.delivery.update') }}" class="email-card email-delivery-card">@csrf @method('PUT')
             <header><div><p>OUTBOUND CONNECTION</p><h2>Delivery provider</h2><span>Credentials are encrypted and never displayed after saving.</span></div><span class="email-card-icon"><x-ui.icon name="email" :size="20"/></span></header>
             <div class="email-form-grid">
-                <label class="field-wide">Provider<select name="provider" x-model="provider" required>@foreach($emailProviders as $key=>$provider)<option value="{{ $key }}">{{ $provider['name'] }}</option>@endforeach</select><small x-text="provider === 'hosting' ? 'Uses the sendmail service configured by the hosting provider.' : 'Uses the SMTP connection owned by this ministry installation.'"></small></label>
+                <label class="field-wide">Provider<select name="provider" x-model="provider" required>@foreach($emailProviders as $key=>$provider)<option value="{{ $key }}">{{ $provider['name'] }}</option>@endforeach</select><small>Use an SMTP connection owned by this ministry installation. Your host or email provider must allow outbound SMTP.</small></label>
                 <label>Sender email<input type="email" name="from_address" value="{{ old('from_address',$emailDelivery->from_address ?: $settings->contact_email) }}" required autocomplete="email"></label>
                 <label>Sender name<input name="from_name" value="{{ old('from_name',$emailDelivery->from_name ?: $settings->name) }}" required></label>
-                <div x-show="provider !== 'hosting'" x-cloak class="email-smtp-grid field-wide">
+                <div class="email-smtp-grid field-wide">
                     <label>SMTP host<input name="host" value="{{ old('host',$emailDelivery->host) }}" placeholder="smtp.provider.com"></label>
                     <label>Port<input type="number" name="port" min="1" max="65535" value="{{ old('port',$emailDelivery->port) }}" placeholder="587"></label>
                     <label>Encryption<select name="encryption"><option value="tls" @selected(old('encryption',$emailDelivery->encryption)==='tls')>TLS</option><option value="ssl" @selected(old('encryption',$emailDelivery->encryption)==='ssl')>SSL</option><option value="" @selected(old('encryption',$emailDelivery->encryption)==='')>None</option></select></label>
@@ -25,10 +25,10 @@
         </form>
 
         <aside class="email-card email-test-card">
-            <header><div><p>CONNECTION TEST</p><h2>Verify before launch</h2><span>A successful save only confirms the fields are complete. A test confirms the provider accepted a real message.</span></div><span class="email-card-icon"><x-ui.icon name="send" :size="20"/></span></header>
+            <header><div><p>CONNECTION TEST</p><h2>Verify before launch</h2><span>A test confirms that the configured transport accepted a real message. It cannot confirm inbox delivery, so also check spam and your provider logs.</span></div><span class="email-card-icon"><x-ui.icon name="send" :size="20"/></span></header>
             <div class="email-test-state {{ $emailDelivery->last_test_status ? 'is-'.$emailDelivery->last_test_status : '' }}"><strong>{{ $emailDelivery->last_test_status === 'succeeded' ? 'Connection verified' : ($emailDelivery->last_test_status === 'failed' ? 'Last test failed' : 'Not tested yet') }}</strong><span>@if($emailDelivery->last_tested_at)Tested {{ $emailDelivery->last_tested_at->diffForHumans() }}@elseSend a test after saving and activating the provider.@endif</span>@if($emailDelivery->last_test_error)<small>{{ $emailDelivery->last_test_error }}</small>@endif</div>
             <form method="POST" action="{{ route('staff.email.delivery.test') }}">@csrf<label>Send test to<input type="email" name="test_email" value="{{ old('test_email',$user->email) }}" required></label><button class="button button-secondary" type="submit" @disabled(! $emailDeliveryActive)><x-ui.icon name="send" :size="16"/>Send test email</button></form>
-            @if(! $emailDeliveryActive)<p class="email-help">Save a complete, active provider before testing.</p>@endif
+            @if(! $emailDeliveryActive)<p class="email-help">Save a complete, active provider before testing.</p>@else<p class="email-help">A successful result means the mail server accepted the message. Delivery can still be delayed, filtered, or rejected after handoff.</p>@endif
         </aside>
     </section>
 

@@ -21,7 +21,7 @@ class StaffSettingsController extends Controller
             'name' => ['sometimes', 'required', 'string', 'max:160'],
             'tagline' => ['sometimes', 'nullable', 'string', 'max:240'],
             'contact_email' => ['sometimes', 'nullable', 'email', 'max:254'],
-            'theme_preset' => ['sometimes', Rule::in(['neutral', 'slate', 'warm'])],
+            'theme_preset' => ['sometimes', Rule::in(['neutral', 'tech_blue', 'warm'])],
             'chrome_mode' => ['sometimes', Rule::in(['preset', 'custom'])],
             'chrome_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'staff_font' => ['sometimes', Rule::in(['modern', 'editorial', 'humanist'])],

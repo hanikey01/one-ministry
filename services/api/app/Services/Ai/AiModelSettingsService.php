@@ -65,8 +65,8 @@ final class AiModelSettingsService
             });
         }
 
-        $rows = $query->orderBy('provider_key')->orderBy('display_name')->limit(250)->get([
-            'provider_key', 'model_id', 'display_name', 'input_modalities', 'output_modalities',
+        $rows = $query->orderBy('provider_key')->orderBy('display_name')->get([
+            'provider_key', 'model_id', 'display_name', 'supports_structured_output', 'input_modalities', 'output_modalities',
         ]);
         $eligible = $rows->filter(fn ($model): bool => $this->isRecommendedCatalogModel($model))->values();
         $models = $eligible->take($limit)->map(function ($model) use ($labels): array {
@@ -80,7 +80,7 @@ final class AiModelSettingsService
             ];
         })->all();
 
-        return ['models' => $models, 'has_more' => $eligible->count() > $limit || $rows->count() === 250];
+        return ['models' => $models, 'has_more' => $eligible->count() > $limit];
     }
 
     public function updateProvider(string $provider, array $data, User $actor, ?string $ip): void
@@ -120,7 +120,7 @@ final class AiModelSettingsService
             if ($models === []) throw new RuntimeException('empty_catalog');
         } catch (Throwable $exception) {
             DB::table('ai_provider_connections')->where('provider_key', $provider)->update(['connection_status' => 'error', 'last_checked_at' => now(), 'last_error_code' => 'catalog_refresh_failed', 'updated_at' => now()]);
-            throw new RuntimeException('The model catalog could not be refreshed. The previous catalog was kept.', previous: $exception);
+            throw new RuntimeException($this->catalogFailureMessage($exception), previous: $exception);
         }
 
         $now = now();
@@ -147,6 +147,20 @@ final class AiModelSettingsService
         });
 
         return ['seen' => count($models), 'unavailable' => DB::table('ai_model_catalog')->where('provider_key', $provider)->where('availability', 'unavailable')->count()];
+    }
+
+    private function catalogFailureMessage(Throwable $exception): string
+    {
+        $reason = $exception->getMessage();
+        if (preg_match('/^provider_http_(\d+|unknown):\s*(.*)$/', $reason, $matches)) {
+            $status = $matches[1];
+            $detail = trim($matches[2]);
+            return 'The provider rejected the catalog request'.($status !== 'unknown' ? " (HTTP {$status})" : '').($detail !== '' ? ": {$detail}" : '.').' The previous catalog was kept.';
+        }
+        if ($reason === 'empty_catalog') return 'The provider returned no usable text models. Check the API key and provider account, then try again. The previous catalog was kept.';
+        if ($reason === 'invalid_catalog') return 'The provider returned an unexpected model-list response. The previous catalog was kept.';
+
+        return 'The model catalog could not be reached. Check outbound HTTPS access and try again. The previous catalog was kept.';
     }
 
     /** @param array<int, string> $fallbackSelections */
@@ -187,7 +201,19 @@ final class AiModelSettingsService
             try {
                 $connection = DB::table('ai_provider_connections')->where('provider_key', $choice['provider'])->where('enabled', true)->first();
                 if (! $connection || blank($connection->api_key_encrypted)) throw new RuntimeException('provider_not_ready');
-                $results[] = ['provider' => $choice['provider'], 'model_id' => $choice['model_id'], ...$this->providers->get($choice['provider'])->validateStructuredOutput(Crypt::decryptString($connection->api_key_encrypted), $choice['model_id'])];
+                $probe = $this->providers->get($choice['provider'])->generateStructuredOutput(
+                    Crypt::decryptString($connection->api_key_encrypted),
+                    $choice['model_id'],
+                    'Return only JSON that matches the supplied schema.',
+                    'Confirm that this model can return a compact, nested structured page-design response.',
+                    $this->pageEditorRouteProbeSchema(),
+                    'ministry_page_editor_route_probe',
+                    180,
+                );
+                if (($probe['output']['ready'] ?? null) !== true || ! is_array($probe['output']['sections'] ?? null)) {
+                    throw new RuntimeException('structured_output_failed');
+                }
+                $results[] = ['provider' => $choice['provider'], 'model_id' => $choice['model_id'], ...$probe];
             } catch (Throwable $exception) {
                 $failures[] = [
                     'provider' => $choice['provider'],
@@ -219,6 +245,20 @@ final class AiModelSettingsService
         });
 
         return ['models' => count($results), 'latency_ms' => array_sum(array_column($results, 'latency_ms'))];
+    }
+
+    /** @return array<string,mixed> */
+    private function pageEditorRouteProbeSchema(): array
+    {
+        return ['type' => 'object', 'properties' => [
+            'ready' => ['type' => 'boolean'],
+            'sections' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 2, 'items' => [
+                'type' => 'object', 'properties' => [
+                    'purpose' => ['type' => 'string'],
+                    'elements' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 3, 'items' => ['type' => 'string']],
+                ], 'required' => ['purpose', 'elements'], 'additionalProperties' => false,
+            ]],
+        ], 'required' => ['ready', 'sections'], 'additionalProperties' => false];
     }
 
     /** @return array{provider:string,model_id:string} */

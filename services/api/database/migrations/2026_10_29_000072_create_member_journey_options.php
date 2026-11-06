@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('member_journey_options', function (Blueprint $table): void {
+        Schema::create('next_step_options', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->string('key', 40)->unique();
             $table->string('label', 120);
@@ -25,9 +25,9 @@ return new class extends Migration
             ['baptism', 'Baptism', 'Talk with the ministry team about baptism.'],
             ['new_member_class', 'New member class', 'Discover the ministry and meet the people who serve here.'],
             ['discipleship', 'Discipleship', 'Find support for growing in faith and practice.'],
-            ['serving', 'Serving', 'Explore a meaningful way to serve with your gifts.'],
+            ['serve', 'Serve', 'Tell the ministry team you would like to contribute.'],
         ] as $order => [$key, $label, $description]) {
-            DB::table('member_journey_options')->insert([
+            DB::table('next_step_options')->insert([
                 'id' => (string) Str::uuid(), 'key' => $key, 'label' => $label,
                 'description' => $description, 'active' => true, 'display_order' => $order,
                 'created_at' => now(), 'updated_at' => now(),
@@ -37,6 +37,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('member_journey_options');
+        Schema::dropIfExists('next_step_options');
     }
 };

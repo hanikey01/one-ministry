@@ -6,6 +6,7 @@ use App\Models\FeatureSetting;
 use App\Models\Location;
 use App\Models\MinistrySetting;
 use App\Models\User;
+use App\Http\Controllers\PageWorkspaceController;
 use App\Support\RoleCatalog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -29,7 +30,7 @@ class InstallMinistry
             'password' => ['required', 'string', 'min:12'],
             'tagline' => ['nullable', 'string', 'max:240'],
             'contact_email' => ['nullable', 'email', 'max:254'],
-            'theme_preset' => ['nullable', 'in:neutral,slate,warm'],
+            'theme_preset' => ['nullable', 'in:tech_blue,neutral,warm'],
         ])->validate();
 
         if (MinistrySetting::query()->exists()) {
@@ -44,7 +45,7 @@ class InstallMinistry
                 'public_domain' => strtolower($input['domain']),
                 'contact_email' => $input['contact_email'] ?? null,
                 'timezone' => $input['timezone'],
-                'theme_preset' => $input['theme_preset'] ?? 'neutral',
+                'theme_preset' => $input['theme_preset'] ?? 'tech_blue',
                 'chrome_mode' => 'preset',
             ]);
 
@@ -122,9 +123,35 @@ class InstallMinistry
                 }
             }
 
-            foreach (['digital_church', 'interactive_meetings', 'people', 'groups', 'giving', 'testimonies', 'books_library', 'audio_sermons', 'video_sermons', 'sermon_series'] as $feature) {
-                FeatureSetting::firstOrCreate(['key' => $feature], ['state' => 'disabled']);
+            foreach (['digital_church', 'interactive_meetings', 'people', 'giving', 'testimonies', 'books_library', 'audio_sermons', 'video_sermons', 'sermon_series'] as $feature) {
+                FeatureSetting::firstOrCreate(['key' => $feature], ['state' => 'enabled']);
             }
+
+            FeatureSetting::query()->update(['state' => 'enabled', 'changed_by' => $admin->id]);
+
+            // Every fresh installation starts with a real, editable homepage page.
+            // This prevents the public route from depending on a missing fallback view.
+            $homepageId = (string) Str::uuid();
+            $homepageDocument = app(PageWorkspaceController::class)->starterDocument('homepage');
+            DB::table('pages')->insert([
+                'id' => $homepageId,
+                'title' => 'Home',
+                'slug' => 'home',
+                'body' => app(\App\Services\PageDocumentService::class)->plainText($homepageDocument, FeatureSetting::query()->where('state', 'enabled')->pluck('key')->all()),
+                'blocks' => json_encode($homepageDocument, JSON_THROW_ON_ERROR),
+                'page_type' => 'homepage',
+                'source_key' => 'homepage',
+                'seo_title' => $input['name'],
+                'seo_description' => $input['tagline'] ?? 'Welcome to our ministry.',
+                'status' => 'published',
+                'created_by' => $admin->id,
+                'updated_by' => $admin->id,
+                'published_by' => $admin->id,
+                'published_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            MinistrySetting::query()->whereKey(MinistrySetting::SINGLETON_ID)->update(['homepage_page_id' => $homepageId]);
 
             foreach ([
                 ['Media & Production', 'media-production', 'Visual, audio, livestream, projection, and service production.'],

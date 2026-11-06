@@ -31,8 +31,8 @@ Within `services/api/app/Modules/<Module>/`, keep `Models`, `Data`, `Policies`, 
 | Attendance | Presence, check-in, computed records, corrections | Attendance confirmed/corrected |
 | Care | Prayer, case assignment, restricted notes | Care request and status events |
 | FollowUp | Rules, tasks, assignments, reminders | Task assigned/completed/escalated |
-| Community | Groups, membership, events, registrations | Group/event participation |
-| Volunteers | Teams, opportunities, shifts, substitutions | Assignment changed |
+| Community | Departments, membership requests, moderated discussion, gatherings, events, registrations | Department/event participation |
+| Follow-up | Member requests, assignment, due dates, completion | Request updated |
 | Messaging | Templates, campaigns, preferences, deliveries | Delivery result |
 | Giving | Funds, donation attempts, verified gifts, receipts, reconciliation | Donation verified/reversed |
 | Reporting | Defined read models and scoped exports | Consumes authorized domain events |
@@ -46,7 +46,7 @@ Within `services/api/app/Modules/<Module>/`, keep `Models`, `Data`, `Policies`, 
 | --- | --- |
 | `resources/views/public` | Home, public pages, content, locations, events, live watch |
 | `resources/views/auth` | Login, recovery, invitation acceptance, verification |
-| `resources/views/member` | Profile, preferences, groups, events, serving, own giving |
+| `resources/views/member` | Profile, preferences, departments, events, participation, own giving |
 | `resources/views/staff` | People, care, follow-up, service production, content, reports, settings |
 | `app/Livewire` | Server-authorized interactive workflows, tables, forms, and dashboards |
 | `resources/js` | Alpine.js progressive enhancement, media controls, drawers, and light browser behavior |
@@ -63,7 +63,7 @@ At least one documented implementation or local simulator is required for each m
 ## 5. Cross-module workflows
 
 - **Live service:** Services checks readiness → Integrations starts/observes media → Services commits state → outbox broadcasts state → Publishing resolves homepage lead → Interaction receives chat/responses → Attendance derives identified records → FollowUp receives opted-in response events.
-- **First-time visitor:** Interaction intake → People lookup/create with consent → FollowUp assigns task → Messaging delivers approved acknowledgement → assigned staff records outcome.
+- **Public contact:** Interaction intake → People lookup/create with consent as a member → FollowUp assigns task → Messaging delivers approved acknowledgement → assigned staff records outcome.
 - **Donation:** Giving creates attempt → provider adapter initiates payment → verified webhook appends event → Giving finalizes donation → Messaging issues receipt. A browser success page cannot finalize payment.
 - **Recording:** Media callback verifies asset → content producer reviews → Publishing links approved media to service.
 

@@ -3,23 +3,113 @@
 namespace Tests\Unit;
 
 use App\Services\PageDocumentService;
+use App\Services\PageElementRegistry;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class PageDocumentServiceTest extends TestCase
 {
-    public function test_legacy_media_and_text_becomes_one_two_column_section(): void
+    public function test_element_registry_is_the_source_of_truth_for_supported_types_and_feature_gates(): void
     {
-        $document = app(PageDocumentService::class)->fromFlat([[
+        $registry = app(PageElementRegistry::class);
+
+        $this->assertContains('statistics', array_keys($registry->all()));
+        $this->assertSame(['title', 'stat_one_value', 'stat_one_label', 'stat_two_value', 'stat_two_label', 'stat_three_value', 'stat_three_label'], $registry->fields('statistics'));
+        $this->assertSame('giving', $registry->feature('giving'));
+        $this->assertFalse($registry->supports('unsupported_element'));
+        $this->assertSame('Statistics', $registry->all()['statistics']['label']);
+        $this->assertSame('text', $registry->all()['statistics']['category']);
+        $this->assertArrayHasKey('defaults', $registry->all()['statistics']);
+        $this->assertArrayHasKey('field_definitions', $registry->all()['statistics']);
+        $this->assertArrayHasKey('settings', $registry->all()['statistics']);
+        $this->assertArrayHasKey('responsive', $registry->all()['statistics']);
+        $this->assertArrayHasKey('ai_guidance', $registry->all()['statistics']);
+        $this->assertArrayNotHasKey('giving', $registry->available([]));
+        $this->assertArrayHasKey('giving', $registry->available(['giving']));
+    }
+
+    public function test_every_registered_element_has_a_complete_capability_and_renderer_contract(): void
+    {
+        $registry = app(PageElementRegistry::class);
+        $renderer = file_get_contents(resource_path('views/public/partials/page-element.blade.php'));
+
+        foreach ($registry->all() as $type => $definition) {
+            foreach (['label','category','fields','field_definitions','defaults','settings','setting_definitions','responsive','responsive_definitions','validation','accessibility','renderer','inspector','purpose','use_cases','factual_restrictions','examples','custom_code','ai_guidance'] as $key) {
+                $this->assertArrayHasKey($key, $definition, "{$type} is missing {$key}");
+            }
+            $this->assertNotEmpty($definition['purpose'], "{$type} needs a purpose");
+            $this->assertNotEmpty($definition['accessibility'], "{$type} needs accessibility rules");
+            $this->assertNotEmpty($definition['use_cases'], "{$type} needs use cases");
+            $this->assertNotEmpty($definition['examples'], "{$type} needs an example");
+            $this->assertSame($type, $definition['renderer']['case']);
+            $this->assertStringContainsString("@case('{$type}')", $renderer, "{$type} has no renderer case");
+            foreach ($definition['fields'] as $field) {
+                $this->assertArrayHasKey($field, $definition['field_definitions']);
+                $this->assertArrayHasKey('validation', $definition['field_definitions'][$field]);
+            }
+        }
+    }
+
+    public function test_registry_rejects_unknown_element_fields_settings_and_missing_custom_fallback(): void
+    {
+        $service = app(PageDocumentService::class);
+        $element = ['id'=>'copy','type'=>'paragraph','content'=>['text'=>'Welcome','invented'=>'No'],'settings'=>[],'responsive'=>[]];
+        $document = ['version'=>2,'sections'=>[['id'=>'section','type'=>'section','settings'=>[],'responsive'=>[],'columns'=>[['id'=>'column','settings'=>[],'responsive'=>[],'elements'=>[$element]]]]]];
+
+        try { $service->normalise($document); $this->fail('Unknown content fields must be rejected.'); } catch (ValidationException) { $this->assertTrue(true); }
+        unset($document['sections'][0]['columns'][0]['elements'][0]['content']['invented']);
+        $document['sections'][0]['columns'][0]['elements'][0]['settings']['invented_style'] = 'yes';
+        try { $service->normalise($document); $this->fail('Unknown design settings must be rejected.'); } catch (ValidationException) { $this->assertTrue(true); }
+        $document['sections'][0]['columns'][0]['elements'][0] = ['id'=>'code','type'=>'custom_code','content'=>['reason'=>'','html'=>'<p>Hello</p>','css'=>'','javascript'=>'','fallback'=>''],'settings'=>[],'responsive'=>[]];
+        $this->expectException(ValidationException::class);
+        $service->normalise($document);
+    }
+
+    public function test_section_and_column_contracts_reject_unknown_settings_and_main_page_javascript(): void
+    {
+        $service=app(PageDocumentService::class);
+        $document=['version'=>2,'sections'=>[['id'=>'section','type'=>'section','settings'=>['invented'=>'value'],'responsive'=>[],'columns'=>[['id'=>'column','settings'=>[],'responsive'=>[],'elements'=>[]]]]]];
+        try { $service->normalise($document); $this->fail('Unknown section settings must be rejected.'); } catch (ValidationException) { $this->assertTrue(true); }
+        $document['sections'][0]['settings']=[];
+        $document['sections'][0]['columns'][0]['settings']=['custom_js'=>'fetch("/private")'];
+        $this->expectException(ValidationException::class);
+        $service->normalise($document);
+    }
+
+    public function test_document_ids_must_be_unique_across_the_complete_hierarchy(): void
+    {
+        $this->expectException(ValidationException::class);
+        app(PageDocumentService::class)->normalise(['version'=>2,'sections'=>[['id'=>'same','type'=>'section','settings'=>[],'responsive'=>[],'columns'=>[['id'=>'same','settings'=>[],'responsive'=>[],'elements'=>[]]]]]]);
+    }
+
+    public function test_only_version_two_structured_documents_are_accepted(): void
+    {
+        $this->expectException(ValidationException::class);
+        app(PageDocumentService::class)->normalise([[
             'type' => 'media_text',
             'data' => ['media_url' => 'https://cdn.example.test/welcome.jpg', 'media_alt' => 'People talking', 'title' => 'Welcome', 'body' => 'Come as you are.', 'button_label' => 'Visit', 'button_url' => '/visit'],
         ]]);
+    }
 
-        $this->assertSame(2, $document['version']);
-        $this->assertCount(1, $document['sections']);
-        $this->assertCount(2, $document['sections'][0]['columns']);
-        $this->assertSame('image', $document['sections'][0]['columns'][0]['elements'][0]['type']);
-        $this->assertSame('call_to_action', $document['sections'][0]['columns'][1]['elements'][0]['type']);
+    public function test_plain_text_summary_is_extracted_without_flattening_the_document(): void
+    {
+        $document = ['version' => 2, 'sections' => [[
+            'id' => 'section-summary', 'type' => 'section', 'settings' => ['title' => 'Visit us'], 'responsive' => [],
+            'columns' => [[
+                'id' => 'column-summary', 'settings' => [], 'responsive' => [],
+                'elements' => [[
+                    'id' => 'summary-copy', 'type' => 'call_to_action',
+                    'content' => ['title' => 'You are welcome', 'body' => 'Join us this Sunday.', 'button_label' => 'Plan a visit', 'button_url' => '/visit'],
+                    'settings' => [], 'responsive' => [],
+                ]],
+            ]],
+        ]]];
+
+        $summary = app(PageDocumentService::class)->plainText($document);
+
+        $this->assertStringContainsString('Visit us', $summary);
+        $this->assertStringContainsString('Join us this Sunday.', $summary);
+        $this->assertStringNotContainsString('/visit', $summary);
     }
 
     public function test_structured_documents_keep_valid_editor_ids_and_reject_unsafe_elements(): void
@@ -148,11 +238,11 @@ class PageDocumentServiceTest extends TestCase
     {
         $document = ['version' => 2, 'sections' => [[
             'id' => 'section-design', 'type' => 'section',
-            'settings' => ['custom_id' => 'welcome-section', 'custom_class' => 'featured-section', 'custom_css' => 'selector { color: #112233; }', 'custom_js' => 'selector.dataset.ready = "yes";', 'radius_top_left' => '12px'],
+            'settings' => ['custom_id' => 'welcome-section', 'custom_class' => 'featured-section', 'custom_css' => 'selector { color: #112233; }', 'radius_top_left' => '12px'],
             'responsive' => ['mobile' => ['alignment' => 'center']],
             'columns' => [[
                 'id' => 'column-design',
-                'settings' => ['custom_id' => 'welcome-column', 'custom_class' => 'featured-column', 'custom_css' => 'padding-inline: 1rem;', 'custom_js' => 'selector.dataset.column = "ready";'],
+                'settings' => ['custom_id' => 'welcome-column', 'custom_class' => 'featured-column', 'custom_css' => 'padding-inline: 1rem;'],
                 'responsive' => ['desktop' => ['padding' => ['top' => '10px', 'right' => '2rem', 'bottom' => '10px', 'left' => '2rem']]],
                 'elements' => [[
                     'id' => 'button-design', 'type' => 'button', 'content' => ['label' => 'Welcome', 'url' => ''],
@@ -182,7 +272,7 @@ class PageDocumentServiceTest extends TestCase
                 'id' => 'column-main', 'settings' => [], 'responsive' => [],
                 'elements' => [[
                     'id' => 'custom-code', 'type' => 'custom_code',
-                    'content' => ['html' => '<button type="button">Open</button>', 'css' => 'button { color: rebeccapurple; }', 'javascript' => 'document.querySelector("button")?.focus();', 'fallback' => 'Custom content is available.'],
+                    'content' => ['reason' => 'A native element cannot provide the required isolated interaction.', 'html' => '<button type="button">Open</button>', 'css' => 'button { color: rebeccapurple; }', 'javascript' => 'document.querySelector("button")?.focus();', 'fallback' => 'Custom content is available.'],
                     'settings' => ['custom_id' => 'welcome-card', 'custom_class' => 'featured-card compact'], 'responsive' => [],
                 ]],
             ]],
@@ -194,6 +284,15 @@ class PageDocumentServiceTest extends TestCase
         $this->assertSame('button { color: rebeccapurple; }', $normalised['sections'][0]['columns'][0]['elements'][0]['content']['css']);
         $this->assertSame('compact', $normalised['sections'][0]['responsive']['desktop']['margin']);
         $this->assertSame('welcome-card', $normalised['sections'][0]['columns'][0]['elements'][0]['settings']['custom_id']);
+    }
+
+    public function test_custom_code_rejects_network_storage_dynamic_code_and_unbounded_execution(): void
+    {
+        $base=['version'=>2,'sections'=>[['id'=>'section','type'=>'section','settings'=>[],'responsive'=>[],'columns'=>[['id'=>'column','settings'=>[],'responsive'=>[],'elements'=>[['id'=>'code','type'=>'custom_code','content'=>['reason'=>'No native element fits.','html'=>'<p>Hello</p>','css'=>'','javascript'=>'','fallback'=>'Hello'],'settings'=>[],'responsive'=>[]]]]]]]];
+        foreach(['fetch("/private")','localStorage.setItem("x","y")','eval("alert(1)")','while(true){}','setInterval(()=>{},1)'] as $javascript){
+            $document=$base; $document['sections'][0]['columns'][0]['elements'][0]['content']['javascript']=$javascript;
+            try { app(PageDocumentService::class)->normalise($document); $this->fail('Unsafe custom JavaScript must be rejected.'); } catch (ValidationException) { $this->assertTrue(true); }
+        }
     }
 
     public function test_section_and_column_layout_controls_survive_normalisation(): void

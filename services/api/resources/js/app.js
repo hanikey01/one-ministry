@@ -370,6 +370,25 @@ document.querySelectorAll('[data-workspace-shell]').forEach((shell) => {
     shell.querySelectorAll('[data-workspace-dialog]').forEach((dialog) => {
         dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
         dialog.querySelectorAll('[data-workspace-dialog-close]').forEach((button) => button.addEventListener('click', () => dialog.close()));
+        if (dialog.hasAttribute('data-workspace-dialog-auto-open') && !dialog.open) dialog.showModal();
+    });
+    shell.querySelectorAll('[data-service-schedule-form]').forEach((form) => {
+        const scheduleKind = form.querySelector('[data-service-schedule-kind]');
+        const groups = [...form.querySelectorAll('[data-service-schedule-fields]')];
+        if (!scheduleKind || groups.length === 0) return;
+        const syncScheduleFields = () => {
+            groups.forEach((group) => {
+                const active = group.dataset.serviceScheduleFields === scheduleKind.value;
+                group.hidden = !active;
+                group.setAttribute('aria-hidden', String(!active));
+                group.querySelectorAll('input, select, textarea').forEach((field) => {
+                    field.disabled = !active;
+                    if (field.hasAttribute('data-required-when-visible')) field.required = active;
+                });
+            });
+        };
+        scheduleKind.addEventListener('change', syncScheduleFields);
+        syncScheduleFields();
     });
     shell.querySelectorAll('.workspace-content .data-panel').forEach((panel) => {
         if (panel.matches('.module-panel, .service-schedule-panel, .security-sessions-panel, .responsive-records')) return;
@@ -398,15 +417,15 @@ if (setupWizard) {
     let current = 0;
 
     const setupPresets = {
+        tech_blue: { action: '#2563EB', chrome: '#0B1F3A' },
         neutral: { action: '#343A40', chrome: '#24262A' },
-        slate: { action: '#315B96', chrome: '#1D2A3D' },
         warm: { action: '#6B5140', chrome: '#332A23' },
     };
 
     const updatePreview = () => {
         const name = form.querySelector('[name="name"]')?.value.trim();
-        const presetKey = form.querySelector('[name="theme_preset"]:checked')?.value ?? 'neutral';
-        const preset = setupPresets[presetKey] ?? setupPresets.neutral;
+        const presetKey = form.querySelector('[name="theme_preset"]:checked')?.value ?? 'tech_blue';
+        const preset = setupPresets[presetKey] ?? setupPresets.tech_blue;
         setupWizard.style.setProperty('--brand', preset.action);
         setupWizard.style.setProperty('--accent', preset.action);
         setupWizard.style.setProperty('--sidebar', preset.chrome);
@@ -417,7 +436,7 @@ if (setupWizard) {
     };
 
     const showStep = (index) => {
-        current = index;
+        current = Math.max(0, Math.min(index, steps.length - 1));
         steps.forEach((step, position) => {
             const active = position === current;
             step.hidden = !active;
@@ -429,8 +448,11 @@ if (setupWizard) {
         });
         count.textContent = `Step ${current + 1} of ${steps.length}`;
         back.hidden = current === 0;
-        next.hidden = current === steps.length - 1;
-        finish.hidden = current !== steps.length - 1;
+        const lastStep = current === steps.length - 1;
+        next.hidden = lastStep;
+        finish.hidden = !lastStep;
+        next.style.display = lastStep ? 'none' : '';
+        finish.style.display = lastStep ? '' : 'none';
         validation.textContent = '';
         updatePreview();
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -451,40 +473,6 @@ if (setupWizard) {
     form?.querySelectorAll('[name="name"], [name="theme_preset"]').forEach((field) => field.addEventListener('input', updatePreview));
     updatePreview();
 }
-
-document.querySelectorAll('[data-setup-timezone-picker]').forEach((picker) => {
-    const trigger = picker.querySelector('.setup-timezone-trigger');
-    const options = picker.querySelector('.setup-timezone-options');
-    const search = picker.querySelector('[data-setup-timezone-search]');
-    const value = picker.querySelector('input[name="timezone"]');
-    const label = picker.querySelector('[data-setup-timezone-label]');
-    const choices = [...picker.querySelectorAll('[data-timezone-option]')];
-    const close = () => {
-        picker.classList.remove('is-open');
-        options.hidden = true;
-        trigger.setAttribute('aria-expanded', 'false');
-    };
-    const open = () => {
-        picker.classList.add('is-open');
-        options.hidden = false;
-        trigger.setAttribute('aria-expanded', 'true');
-        search?.focus();
-    };
-    trigger?.addEventListener('click', () => (picker.classList.contains('is-open') ? close() : open()));
-    choices.forEach((choice) => choice.addEventListener('click', () => {
-        value.value = choice.dataset.value;
-        label.textContent = choice.dataset.value;
-        choices.forEach((item) => item.setAttribute('aria-selected', String(item === choice)));
-        close();
-        trigger.focus();
-    }));
-    search?.addEventListener('input', () => {
-        const term = search.value.trim().toLowerCase();
-        choices.forEach((choice) => { choice.hidden = term !== '' && !choice.textContent.toLowerCase().includes(term); });
-    });
-    addPageListener(document, 'click', (event) => { if (!picker.contains(event.target)) close(); });
-    picker.addEventListener('keydown', (event) => { if (event.key === 'Escape') { close(); trigger.focus(); } });
-});
 
 document.querySelectorAll('[data-page-editor-tabs]').forEach((tabs) => {
     const editor = tabs.closest('[data-page-block-editor]');
@@ -512,6 +500,8 @@ document.querySelectorAll('[data-ai-page-draft]').forEach((panel) => {
     const status = panel.querySelector('[data-ai-status]');
     const editor = panel.closest('[data-page-block-editor]');
     if (!button || !status || !editor) return;
+    let elementCatalog = {};
+    try { elementCatalog = JSON.parse(editor.dataset.elementCatalog || '{}'); } catch { elementCatalog = {}; }
 
     button.addEventListener('click', async () => {
         const brief = panel.querySelector('[data-ai-brief]')?.value.trim() ?? '';
@@ -521,6 +511,8 @@ document.querySelectorAll('[data-ai-page-draft]').forEach((panel) => {
             return;
         }
 
+        const blocksInput = editor.querySelector('[data-page-block-input]');
+        const sourceDocumentSignature = blocksInput?.value ?? '';
         button.disabled = true;
             status.textContent = 'Planning your page…';
         try {
@@ -535,6 +527,15 @@ document.querySelectorAll('[data-ai-page-draft]').forEach((panel) => {
                     brief,
                     title: editor.querySelector('[name="title"]')?.value.trim() ?? '',
                     public_details: panel.querySelector('[data-ai-public-details]')?.value.trim() ?? '',
+                    page_goal: panel.querySelector('[data-ai-page-goal]')?.value.trim() ?? '',
+                    audience: panel.querySelector('[data-ai-audience]')?.value.trim() ?? '',
+                    tone: panel.querySelector('[data-ai-tone]')?.value.trim() ?? '',
+                    visual_direction: panel.querySelector('[data-ai-visual-direction]')?.value.trim() ?? '',
+                    content_density: panel.querySelector('[data-ai-content-density]')?.value ?? 'balanced',
+                    primary_action: panel.querySelector('[data-ai-primary-action]')?.value.trim() ?? '',
+                    required_sections: panel.querySelector('[data-ai-required-sections]')?.value.trim() ?? '',
+                    forbidden_patterns: panel.querySelector('[data-ai-forbidden-patterns]')?.value.trim() ?? '',
+                    brand_constraints: panel.querySelector('[data-ai-brand-constraints]')?.value.trim() ?? '',
                 }),
             });
             const payload = await response.json();
@@ -542,24 +543,75 @@ document.querySelectorAll('[data-ai-page-draft]').forEach((panel) => {
             const previousProposal = panel.querySelector('[data-ai-proposal]');
             previousProposal?.remove();
             const proposal = payload.data;
+            const proposalIsStale = () => (blocksInput?.value ?? '') !== sourceDocumentSignature;
             const preview = document.createElement('section');
             preview.className = 'ai-page-proposal';
             preview.dataset.aiProposal = '';
             preview.tabIndex = -1;
             const heading = document.createElement('h3');
-            heading.textContent = `Page plan ready: ${proposal.title}`;
+            heading.textContent = `Page design ready: ${proposal.title}`;
             const explanation = document.createElement('p');
-            explanation.textContent = 'Review the section plan below. Applying it replaces the current canvas; you can undo the change before saving.';
+            explanation.textContent = 'Review the complete design below. Applying it replaces the current canvas; you can undo the change before saving.';
+            const rationale = document.createElement('div');
+            rationale.className = 'ai-page-design-rationale';
+            const rationaleTitle = document.createElement('strong');
+            rationaleTitle.textContent = 'Design strategy';
+            const rationaleCopy = document.createElement('p');
+            rationaleCopy.textContent = proposal.design_plan?.page_strategy || 'A complete responsive design based on the supplied brief.';
+            const rationaleDetails = document.createElement('ul');
+            [
+                ['Visual direction', proposal.design_plan?.visual_direction],
+                ['Typography', proposal.design_plan?.typography_strategy],
+                ['Spacing rhythm', proposal.design_plan?.spacing_rhythm],
+                ['Responsive strategy', proposal.design_plan?.responsive_strategy],
+                ['CTA strategy', proposal.design_plan?.cta_strategy],
+            ].forEach(([label, value]) => { if (!value) return; const item = document.createElement('li'); item.textContent = `${label}: ${value}`; rationaleDetails.append(item); });
+            rationale.append(rationaleTitle, rationaleCopy, rationaleDetails);
+            if (Array.isArray(proposal.design_review) && proposal.design_review.length) {
+                const reviewTitle = document.createElement('strong');
+                reviewTitle.textContent = 'AI design review and repairs';
+                const reviewList = document.createElement('ul');
+                proposal.design_review.forEach((finding) => {
+                    const item = document.createElement('li');
+                    item.textContent = `${String(finding.category || 'design').replaceAll('_', ' ')}: ${finding.correction || finding.issue || 'Design repaired.'}`;
+                    reviewList.append(item);
+                });
+                rationale.append(reviewTitle, reviewList);
+            }
             const outline = document.createElement('ol');
-            const labels = { hero: 'Welcome section', heading: 'Heading', paragraph: 'Text', media_text: 'Image and text', image: 'Image', quote: 'Quote', list: 'List', accordion: 'Questions and answers', call_to_action: 'Closing invitation' };
+            const originalObjects = new Map();
+            const collectObjects = (documentValue) => { const objects = []; (documentValue?.sections || []).forEach((section) => { objects.push(section); (section.columns || []).forEach((column) => { objects.push(column); (column.elements || []).forEach((element) => objects.push(element)); }); }); return objects; };
+            try {
+                const original = JSON.parse(sourceDocumentSignature || '{}');
+                collectObjects(original).forEach((object) => originalObjects.set(object.id, JSON.stringify(object)));
+            } catch {}
+            const changedObjectIds = new Set(collectObjects(proposal.document).filter((object) => !originalObjects.has(object.id) || originalObjects.get(object.id) !== JSON.stringify(object)).map((object) => object.id));
             const plannedElements = proposal.document?.sections?.flatMap((section) => section.columns?.flatMap((column) => column.elements ?? []) ?? []) ?? [];
             plannedElements.forEach((block) => {
                 const item = document.createElement('li');
+                if (changedObjectIds.has(block.id)) { item.className = 'is-ai-changed'; item.title = 'Added or changed by AI'; }
                 const data = block.content ?? {};
                 const title = data.title || data.text || data.label || data.eyebrow || data.image_hint || data.alt || '';
-                item.textContent = [labels[block.type] ?? 'Section', title].filter(Boolean).join(' · ');
+                item.textContent = [elementCatalog[block.type]?.label ?? block.type?.replaceAll('_', ' ') ?? 'Element', title].filter(Boolean).join(' · ');
                 outline.append(item);
             });
+            const comparison = document.createElement('section');
+            comparison.className = 'ai-page-visual-comparison';
+            const comparisonHeading = document.createElement('div');
+            comparisonHeading.className = 'ai-page-comparison-heading';
+            comparisonHeading.innerHTML = '<strong>Visual before and after</strong><span>Highlighted outline items were added or replaced by AI.</span>';
+            const comparisonControls = document.createElement('div');
+            comparisonControls.className = 'ai-page-comparison-controls';
+            const comparisonFrames = document.createElement('div');
+            comparisonFrames.className = 'ai-page-comparison-frames';
+            const makeFrame = (label) => { const figure = document.createElement('figure'); const caption = document.createElement('figcaption'); caption.textContent = label; const frame = document.createElement('iframe'); frame.title = `${label} page preview`; frame.sandbox = 'allow-scripts'; figure.append(caption, frame); return {figure, frame}; };
+            const beforePreview = makeFrame('Before'); const afterPreview = makeFrame('AI proposal');
+            comparisonFrames.append(beforePreview.figure, afterPreview.figure);
+            ['desktop','tablet','mobile'].forEach((size) => { const control = document.createElement('button'); control.type = 'button'; control.className = `button button-secondary${size === 'desktop' ? ' is-active' : ''}`; control.textContent = size[0].toUpperCase() + size.slice(1); control.addEventListener('click', () => { comparison.dataset.preview = size; comparisonControls.querySelectorAll('button').forEach((item) => item.classList.toggle('is-active', item === control)); }); comparisonControls.append(control); });
+            comparison.dataset.preview = 'desktop'; comparison.append(comparisonHeading, comparisonControls, comparisonFrames);
+            const renderProposalPreview = async (frame, blocks, title, highlightedIds = new Set()) => { try { const response = await fetch(editor.dataset.previewEndpoint, {method:'POST', headers:{Accept:'text/html','Content-Type':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name=csrf-token]')?.content ?? ''}, body:JSON.stringify({title, blocks})}); if (!response.ok) throw new Error(); const html = await response.text(); const parsed = new DOMParser().parseFromString(html, 'text/html'); if (highlightedIds.size) { const style = parsed.createElement('style'); style.textContent = '[data-ai-proposal-changed]{outline:4px solid #f59e0b!important;outline-offset:-4px!important;position:relative}'; parsed.head.append(style); parsed.querySelectorAll('[data-page-editor-id]').forEach((node) => { if (highlightedIds.has(node.dataset.pageEditorId)) node.setAttribute('data-ai-proposal-changed',''); }); } frame.srcdoc = `<!doctype html>${parsed.documentElement.outerHTML}`; } catch { const message=document.createElement('p'); message.className='ai-page-preview-error'; message.textContent='This preview could not be rendered. Regenerate before applying.'; frame.replaceWith(message); apply.disabled=true; } };
+            renderProposalPreview(beforePreview.frame, sourceDocumentSignature, editor.querySelector('[name="title"]')?.value || 'Current page');
+            renderProposalPreview(afterPreview.frame, JSON.stringify(proposal.document), proposal.title || 'AI proposal', changedObjectIds);
             const actions = document.createElement('div');
             actions.className = 'ai-page-proposal-actions';
             const apply = document.createElement('button');
@@ -570,19 +622,26 @@ document.querySelectorAll('[data-ai-page-draft]').forEach((panel) => {
             discard.className = 'button button-secondary';
             discard.type = 'button';
             discard.textContent = 'Discard';
+            const regenerate = document.createElement('button');
+            regenerate.className = 'button button-secondary';
+            regenerate.type = 'button';
+            regenerate.textContent = 'Regenerate';
             apply.addEventListener('click', () => {
+                if (proposalIsStale()) { status.textContent = 'The page changed after this proposal was requested. Regenerate to preserve your manual edits.'; apply.disabled = true; return; }
                 editor.dispatchEvent(new CustomEvent('ai-page-draft', { detail: proposal }));
                 preview.remove();
                 status.textContent = 'Page plan applied. Review the content, choose images and button destinations, then save as a draft.';
                 editor.querySelector('[data-canvas]')?.focus({ preventScroll: false });
             });
+            regenerate.addEventListener('click', () => { preview.remove(); button.click(); });
             discard.addEventListener('click', () => {
                 preview.remove();
                 status.textContent = 'Page plan discarded. Your current page is unchanged.';
                 button.focus();
             });
-            actions.append(apply, discard);
-            preview.append(heading, explanation, outline, actions);
+            actions.append(apply, regenerate, discard);
+            if (proposalIsStale()) { apply.disabled = true; explanation.textContent = 'The page changed while AI was working. Regenerate this proposal to preserve manual edits.'; }
+            preview.append(heading, explanation, rationale, comparison, outline, actions);
             panel.append(preview);
             preview.focus();
             const route = `${payload.data.provider} · ${payload.data.model}`;
@@ -594,167 +653,6 @@ document.querySelectorAll('[data-ai-page-draft]').forEach((panel) => {
             button.disabled = false;
         }
     });
-});
-
-document.querySelectorAll('[data-page-block-editor][data-section-ai-endpoint]').forEach((form) => {
-    const inspector = form.querySelector('[data-inspector]');
-    const canvas = form.querySelector('[data-canvas]');
-    const blocksInput = form.querySelector('[data-page-block-input]');
-    const titleInput = form.querySelector('[name="title"]');
-    const aiPanel = form.querySelector('[data-ai-page-draft]');
-    if (!inspector || !canvas || !blocksInput || !titleInput || !aiPanel) return;
-
-    const inspectorTabs = inspector.closest('.page-block-inspector')?.querySelector('[data-inspector-tabs]');
-    const manualTab = inspectorTabs?.querySelector('[data-inspector-tab="manual"]');
-    const aiTab = inspectorTabs?.querySelector('[data-inspector-tab="ai"]');
-    const setInspectorMode = (mode) => {
-        const aiControls = inspector.querySelector('[data-section-ai-controls]');
-        const hasSelection = Boolean(canvas.querySelector('.page-canvas-block.is-selected'));
-        if (inspectorTabs) inspectorTabs.hidden = !hasSelection;
-        inspector.closest('.page-block-inspector')?.classList.toggle('is-ai-mode', mode === 'ai' && hasSelection);
-        if (manualTab) { manualTab.classList.toggle('is-active', mode === 'manual'); manualTab.setAttribute('aria-selected', mode === 'manual' ? 'true' : 'false'); }
-        if (aiTab) { aiTab.classList.toggle('is-active', mode === 'ai'); aiTab.setAttribute('aria-selected', mode === 'ai' ? 'true' : 'false'); }
-        if (inspector) {
-            const inspectorActions = inspector.querySelector('.page-inspector-actions');
-            [...inspector.children].forEach((child) => {
-                child.hidden = mode === 'ai' && child !== aiControls && child !== inspectorActions;
-            });
-        }
-        if (aiControls) aiControls.hidden = mode !== 'ai';
-    };
-    if (manualTab && !manualTab.dataset.bound) {
-        manualTab.dataset.bound = 'true';
-        manualTab.addEventListener('click', () => setInspectorMode('manual'));
-    }
-    if (aiTab && !aiTab.dataset.bound) {
-        aiTab.dataset.bound = 'true';
-        aiTab.addEventListener('click', () => setInspectorMode('ai'));
-    }
-
-    const installSectionAssistant = () => {
-        if (inspector.querySelector('[data-section-ai-controls]')) return;
-        const actions = inspector.querySelector('.page-inspector-actions');
-        const selected = canvas.querySelector('.page-canvas-block.is-selected');
-        if (!actions || !selected) { setInspectorMode('manual'); return; }
-        const index = Number(selected.dataset.index);
-        let blocks;
-        try { blocks = JSON.parse(blocksInput.value || '[]'); } catch { return; }
-        const block = blocks[index];
-        if (!block?.data || typeof block.data !== 'object' || !Object.keys(block.data).length) return;
-        const originalBlock = JSON.stringify(block);
-
-        const section = document.createElement('section');
-        section.className = 'page-section-ai';
-        section.dataset.sectionAiControls = '';
-        const heading = document.createElement('strong');
-        heading.textContent = 'Edit this section with AI';
-        const description = document.createElement('p');
-        description.textContent = 'The ministry AI receives this full page draft for context. It can propose changes to this section only.';
-        const instruction = document.createElement('textarea');
-        instruction.dataset.sectionAiInstruction = '';
-        instruction.rows = 3;
-        instruction.maxLength = 1500;
-        instruction.minLength = 10;
-        instruction.placeholder = 'Describe what you want changed in this section…';
-        const ask = document.createElement('button');
-        ask.type = 'button';
-        ask.className = 'button';
-        ask.dataset.sectionAiAsk = '';
-        ask.textContent = 'Suggest changes';
-        const aiUnavailable = aiPanel.querySelector('[data-ai-generate]')?.disabled;
-        if (aiUnavailable) ask.disabled = true;
-        const status = document.createElement('p');
-        status.className = 'page-section-ai-status';
-        status.dataset.sectionAiStatus = '';
-        status.setAttribute('role', 'status');
-        status.setAttribute('aria-live', 'polite');
-        if (aiUnavailable) status.textContent = 'AI editing is unavailable until an administrator verifies a model route in AI model settings.';
-        section.append(heading, description, instruction, ask, status);
-        actions.after(section);
-        setInspectorMode('manual');
-
-        ask.addEventListener('click', async () => {
-            const brief = instruction.value.trim();
-            if (brief.length < 10) {
-                status.textContent = 'Describe the change in at least 10 characters.';
-                instruction.focus();
-                return;
-            }
-            ask.disabled = true;
-            status.textContent = 'Reviewing the full page context…';
-            try {
-                const response = await fetch(form.dataset.sectionAiEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        Accept: 'application/json',
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-                    },
-                    body: JSON.stringify({
-                        title: titleInput.value,
-                        instruction: brief,
-                        page_purpose: form.querySelector('[data-ai-brief]')?.value.trim() ?? '',
-                        selected_index: index,
-                        blocks: blocksInput.value,
-                    }),
-                });
-                const payload = await response.json();
-                if (!response.ok) throw new Error(payload?.error?.message ?? payload?.message ?? 'This section could not be revised. Try again.');
-                let latestBlocks;
-                try { latestBlocks = JSON.parse(blocksInput.value || '[]'); } catch { latestBlocks = []; }
-                if (canvas.querySelector('.page-canvas-block.is-selected')?.dataset.index !== String(index)
-                    || JSON.stringify(latestBlocks[index]) !== originalBlock) {
-                    status.textContent = 'This section changed while AI was working. Review the current version and request a fresh suggestion.';
-                    return;
-                }
-                const proposal = payload.data;
-                const preview = document.createElement('div');
-                preview.className = 'page-section-ai-proposal';
-                const title = document.createElement('strong');
-                title.textContent = 'Suggested section update';
-                const list = document.createElement('dl');
-                Object.entries(proposal.data ?? {}).forEach(([key, value]) => {
-                    const term = document.createElement('dt');
-                    term.textContent = key.replaceAll('_', ' ');
-                    const detail = document.createElement('dd');
-                    detail.textContent = value;
-                    list.append(term, detail);
-                });
-                const actions = document.createElement('div');
-                actions.className = 'ai-page-proposal-actions';
-                const apply = document.createElement('button');
-                apply.type = 'button';
-                apply.className = 'button';
-                apply.textContent = 'Apply to this section';
-                apply.addEventListener('click', () => {
-                    form.dispatchEvent(new CustomEvent('ai-section-revision', { detail: { index, data: proposal.data } }));
-                    status.textContent = 'Suggestion applied to this section. Review the page, then save it as a draft.';
-                    section.querySelector('.page-section-ai-proposal')?.remove();
-                });
-                const discard = document.createElement('button');
-                discard.type = 'button';
-                discard.className = 'button button-secondary';
-                discard.textContent = 'Discard';
-                discard.addEventListener('click', () => {
-                    preview.remove();
-                    status.textContent = 'Suggestion discarded. The section is unchanged.';
-                });
-                actions.append(apply, discard);
-                preview.append(title, list, actions);
-                section.querySelector('.page-section-ai-proposal')?.remove();
-                section.append(preview);
-                const route = `${proposal.provider} · ${proposal.model}`;
-                status.textContent = `Suggestion ready from ${route}${proposal.fallback_used ? ' (fallback model)' : ''}. Review it before applying.`;
-            } catch (error) {
-                status.textContent = error instanceof Error ? error.message : 'This section could not be revised. Try again.';
-            } finally {
-                ask.disabled = false;
-            }
-        });
-    };
-
-    new MutationObserver(installSectionAssistant).observe(inspector, { childList: true });
-    installSectionAssistant();
 });
 
 document.querySelectorAll('[data-page-block-editor]').forEach((form) => {
@@ -804,7 +702,7 @@ document.querySelectorAll('[data-page-block-editor]').forEach((form) => {
         const tools = canvasDocument.createElement('div');
         tools.className = 'page-editor-canvas-tools';
         tools.hidden = true;
-        tools.innerHTML = '<button type="button" data-canvas-action="move-up" aria-label="Move up" title="Move up">↑</button><button type="button" data-canvas-action="move-down" aria-label="Move down" title="Move down">↓</button><button type="button" data-canvas-action="duplicate" aria-label="Duplicate" title="Duplicate">⧉</button><button type="button" data-canvas-action="delete" aria-label="Delete" title="Delete">×</button>';
+        tools.innerHTML = '<button type="button" data-canvas-action="edit" aria-label="Edit settings" title="Edit settings">✎</button><button type="button" data-canvas-action="move-up" aria-label="Move up" title="Move up">↑</button><button type="button" data-canvas-action="move-down" aria-label="Move down" title="Move down">↓</button><button type="button" data-canvas-action="duplicate" aria-label="Duplicate" title="Duplicate">⧉</button><button type="button" data-canvas-action="delete" aria-label="Delete" title="Delete">×</button>';
         canvasDocument.body.append(tools);
         canvasDocument.querySelectorAll('.public-page-structured-section').forEach((section, sectionIndex) => {
             section.dataset.pageEditorObject = 'section';
@@ -972,7 +870,6 @@ document.querySelectorAll('[data-page-block-editor]').forEach((form) => {
         }
     });
     form.addEventListener('ai-page-draft', schedulePreview);
-    form.addEventListener('ai-section-revision', schedulePreview);
     form.addEventListener('page-editor-document-change', schedulePreview);
     form.querySelectorAll('[data-public-preview-size]').forEach((button) => button.addEventListener('click', () => {
         const size = button.dataset.publicPreviewSize;
@@ -1045,7 +942,12 @@ enhancedSelects.forEach((select) => {
 
     const sync = () => {
         const selected = select.options[select.selectedIndex];
-        text.textContent = selected?.textContent ?? 'Choose an option';
+        const selectedLabel = selected?.textContent?.trim() || 'Choose an option';
+        text.textContent = selectedLabel;
+        trigger.title = selectedLabel;
+        trigger.disabled = select.disabled;
+        wrapper.classList.toggle('is-disabled', select.disabled);
+        if (select.disabled && wrapper.classList.contains('is-open')) close();
         choices.forEach((option) => option.setAttribute('aria-selected', String(option.dataset.value === select.value)));
     };
     const addChoice = (option) => {
@@ -1079,8 +981,8 @@ enhancedSelects.forEach((select) => {
             const url = new URL(remoteUrl, window.location.href);
             if (query) url.searchParams.set('q', query);
             const response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
-            if (!response.ok) throw new Error('Model choices could not be loaded. Try again.');
-            const result = await response.json();
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.message || 'Model choices could not be loaded. Try again.');
             if (requestId !== remoteRequestId) return;
             const data = result.data ?? {};
             const models = Array.isArray(data.models) ? data.models : [];
@@ -1188,7 +1090,7 @@ enhancedSelects.forEach((select) => {
         if (closeOpenEnhancedSelect === close) closeOpenEnhancedSelect = null;
     };
     const open = () => {
-        if (wrapper.classList.contains('is-open')) return;
+        if (select.disabled || wrapper.classList.contains('is-open')) return;
         closeOpenEnhancedSelect?.();
         const inheritedStyles = getComputedStyle(wrapper);
         options.dataset.themeMode = wrapper.closest('.staff-theme-dark, .member-theme-dark, .public-theme-dark, .worship-theme-dark') ? 'dark' : 'light';
@@ -1232,8 +1134,15 @@ enhancedSelects.forEach((select) => {
     options.addEventListener('keydown', handleMenuKeydown);
     trigger.addEventListener('keydown', (event) => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); open(); } });
     wrapper.addEventListener('keydown', (event) => { if (event.key === 'Escape') { close(); trigger.focus(); } });
+    // Capture pointer interaction before a dialog, card, or other component can
+    // stop bubbling. This keeps portaled listboxes dismissible everywhere.
+    addPageListener(document, 'pointerdown', (event) => {
+        if (!wrapper.contains(event.target) && !options.contains(event.target)) close();
+    }, true);
     addPageListener(document, 'click', (event) => { if (!wrapper.contains(event.target) && !options.contains(event.target)) close(); });
-    select.addEventListener('change', sync); select.before(wrapper); wrapper.append(select, trigger, options); renderChoices();
+    select.addEventListener('change', sync);
+    new MutationObserver(sync).observe(select, { attributes: true, attributeFilter: ['disabled'] });
+    select.before(wrapper); wrapper.append(select, trigger, options); renderChoices();
 });
 };
 const localizeGivingSelects = (root = document) => {
@@ -1371,6 +1280,15 @@ const removeFieldErrors = (form) => {
 
 const showFieldErrors = (form, errors = {}) => {
     Object.entries(errors).forEach(([key, messages]) => {
+        if (key === '_form') {
+            const error = document.createElement('div');
+            error.dataset.asyncFieldError = '';
+            error.className = 'form-errors ai-form-error';
+            error.setAttribute('role', 'alert');
+            error.textContent = Array.isArray(messages) ? messages[0] : String(messages);
+            form.prepend(error);
+            return;
+        }
         const field = [...form.elements].find((element) => element.name === key || (key.startsWith('fallbacks.') && element.name === 'fallbacks[]'));
         if (!field) return;
         field.setAttribute('aria-invalid', 'true');
@@ -1406,6 +1324,7 @@ const applyAiSettingsData = (data = {}) => {
 
 const applyAsyncFormData = (form, data = {}) => {
     if (form.dataset.asyncHandler === 'ai-settings') applyAiSettingsData(data);
+    if (data.document_version) { const version=form.querySelector('[name="document_version"]'); if(version) version.value=data.document_version; }
     form.dispatchEvent(new CustomEvent('ministry:async-success', { bubbles: true, detail: data }));
     if (!data.redirect) return;
     if (window.Livewire?.navigate) {
@@ -1439,10 +1358,11 @@ document.querySelectorAll('form[data-async-form]').forEach((form) => {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}) },
                 credentials: 'same-origin',
             });
-            const result = await response.json();
+            const result = await response.json().catch(() => ({}));
             if (!response.ok) {
-                showFieldErrors(form, result.errors);
-                throw new Error(result.message ?? 'This change could not be saved. Check the highlighted fields.');
+                const errors = result.errors ?? result.error?.fields ?? {};
+                showFieldErrors(form, errors);
+                throw new Error(result.message ?? result.error?.message ?? 'This change could not be saved. Try again.');
             }
             applyAsyncFormData(form, result.data ?? {});
             showAsyncFeedback(result.message ?? 'Saved.', 'success');

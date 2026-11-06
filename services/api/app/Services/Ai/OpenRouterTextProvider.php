@@ -13,7 +13,11 @@ final class OpenRouterTextProvider implements AiTextProvider
 
     public function discoverModels(string $apiKey): array
     {
-        $models = Http::baseUrl(self::BASE_URL)->withToken($apiKey)->acceptJson()->timeout(20)->get('/models')->throw()->json('data', []);
+        try {
+            $models = Http::baseUrl(self::BASE_URL)->withToken($apiKey)->acceptJson()->connectTimeout(5)->timeout(25)->retry(2, 250)->get('/models')->throw()->json('data', []);
+        } catch (RequestException $exception) {
+            throw $this->catalogException($exception);
+        }
         if (! is_array($models)) throw new RuntimeException('invalid_catalog');
 
         return collect($models)->filter(fn ($item): bool => is_array($item) && is_string($item['id'] ?? null) && $item['id'] !== '')
@@ -33,6 +37,13 @@ final class OpenRouterTextProvider implements AiTextProvider
                     'metadata' => ['pricing' => $item['pricing'] ?? null, 'canonical_slug' => $item['canonical_slug'] ?? null],
                 ];
             })->values()->all();
+    }
+
+    private function catalogException(RequestException $exception): RuntimeException
+    {
+        $message = (string) ($exception->response?->json('error.message') ?? 'request rejected');
+        $message = substr((string) preg_replace('/[^a-zA-Z0-9 .:_-]/', '', $message), 0, 180);
+        return new RuntimeException('provider_http_'.($exception->response?->status() ?? 'unknown').': '.$message, previous: $exception);
     }
 
     public function validateStructuredOutput(string $apiKey, string $modelId): array
@@ -62,14 +73,20 @@ final class OpenRouterTextProvider implements AiTextProvider
     public function generateStructuredOutput(string $apiKey, string $modelId, string $systemPrompt, string $userPrompt, array $schema, string $schemaName, int $maxOutputTokens): array
     {
         $started = microtime(true);
-        $schema = $this->strictSchema($schema);
-        $payload = Http::baseUrl(self::BASE_URL)->withToken($apiKey)->acceptJson()->timeout(45)->post('/chat/completions', [
-            'model' => $modelId,
-            'messages' => [['role' => 'system', 'content' => $systemPrompt], ['role' => 'user', 'content' => $userPrompt]],
-            'max_tokens' => $maxOutputTokens,
-            'temperature' => 0.35,
-            'response_format' => ['type' => 'json_schema', 'json_schema' => ['name' => $schemaName, 'strict' => true, 'schema' => $schema]],
-        ])->throw()->json();
+        try {
+            $payload = Http::baseUrl(self::BASE_URL)->withToken($apiKey)->acceptJson()->connectTimeout(10)->timeout(90)->post('/chat/completions', [
+                'model' => $modelId,
+                'messages' => [['role' => 'system', 'content' => $systemPrompt], ['role' => 'user', 'content' => $userPrompt]],
+                'max_tokens' => $maxOutputTokens,
+                'temperature' => 0.35,
+                // Do not allow OpenRouter to silently select an upstream provider
+                // that ignores this request's structured-output contract.
+                'provider' => ['require_parameters' => true],
+                'response_format' => ['type' => 'json_schema', 'json_schema' => ['name' => $schemaName, 'strict' => false, 'schema' => $schema]],
+            ])->throw()->json();
+        } catch (RequestException $exception) {
+            throw $this->catalogException($exception);
+        }
         $content = $payload['choices'][0]['message']['content'] ?? null;
         $output = is_string($content) ? json_decode($content, true) : null;
         if (! is_array($output)) throw new RuntimeException('structured_output_failed');
@@ -77,20 +94,4 @@ final class OpenRouterTextProvider implements AiTextProvider
         return ['model' => (string) ($payload['model'] ?? $modelId), 'latency_ms' => (int) ((microtime(true) - $started) * 1000), 'output' => $output];
     }
 
-    /** @param array<string,mixed> $schema
-     *  @return array<string,mixed>
-     */
-    private function strictSchema(array $schema): array
-    {
-        if (is_array($schema['properties'] ?? null)) {
-            foreach ($schema['properties'] as $key => $property) {
-                if (is_array($property)) $schema['properties'][$key] = $this->strictSchema($property);
-            }
-            $schema['required'] = array_keys($schema['properties']);
-            $schema['additionalProperties'] = false;
-        }
-        if (is_array($schema['items'] ?? null)) $schema['items'] = $this->strictSchema($schema['items']);
-
-        return $schema;
-    }
 }

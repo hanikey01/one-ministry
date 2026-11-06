@@ -38,7 +38,7 @@ return new class extends Migration
             $table->foreignUuid('actor_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('event_type', 40)->index();
             $table->string('source', 30)->default('operator');
-            $table->string('external_event_id', 255)->nullable();
+            $table->string('external_event_id', 191)->nullable();
             $table->json('changes_json');
             $table->timestampTz('created_at')->useCurrent();
             $table->unique(['source', 'external_event_id']);

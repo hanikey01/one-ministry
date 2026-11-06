@@ -12,7 +12,7 @@ return new class extends Migration
         Schema::create('school_courses', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->string('title', 200);
-            $table->string('slug', 220)->unique();
+            $table->string('slug', 191)->unique();
             $table->string('category', 100)->nullable();
             $table->string('level', 30)->default('all_levels');
             $table->string('instructor_name', 160)->nullable();

@@ -3,12 +3,38 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class EventOperationsController extends Controller
 {
+    public function webRegister(Request $r, string $event): RedirectResponse
+    {
+        $record = DB::table('events')->where('id', $event)->where('status', 'published')->first();
+        abort_unless($record && ! $record->cancelled_at && $record->registration_open, 404);
+        if ($record->registration_deadline && now()->greaterThan($record->registration_deadline)) return back()->withErrors(['registration'=>'Registration for this event has closed.']);
+        $person = $r->user() ? DB::table('people')->where('user_id', $r->user()->id)->first() : null;
+        $data = $r->validate(['name'=>['required','string','max:160'],'email'=>['nullable','email','max:254']]);
+        if ($person && DB::table('event_registrations')->where(['event_id'=>$event,'person_id'=>$person->id])->whereIn('status',['registered','waitlisted','checked_in'])->exists()) return back()->with('status','You are already registered for this event.');
+        if ($data['email'] && DB::table('event_registrations')->where(['event_id'=>$event,'email'=>$data['email']])->whereIn('status',['registered','waitlisted','checked_in'])->exists()) return back()->withInput()->withErrors(['email'=>'This email is already registered for the event.']);
+        $registered = DB::table('event_registrations')->where('event_id',$event)->whereIn('status',['registered','checked_in'])->count();
+        $status = $record->capacity !== null && $registered >= $record->capacity ? 'waitlisted' : 'registered';
+        if ($status === 'waitlisted' && ! $record->waitlist_enabled) return back()->withErrors(['registration'=>'This event is full.']);
+        DB::table('event_registrations')->insert(['id'=>(string)Str::uuid(),'event_id'=>$event,'person_id'=>$person?->id,'name'=>$data['name'],'email'=>$data['email'],'status'=>$status,'created_at'=>now(),'updated_at'=>now()]);
+        return back()->with('status', $status === 'waitlisted' ? 'You joined the waitlist.' : 'Your registration is confirmed.');
+    }
+
+    public function memberCancel(Request $r, string $event): RedirectResponse
+    {
+        $person = DB::table('people')->where('user_id',$r->user()->id)->first();
+        abort_unless($person, 404);
+        $registration = DB::table('event_registrations')->where(['event_id'=>$event,'person_id'=>$person->id])->whereIn('status',['registered','waitlisted'])->first();
+        abort_unless($registration, 404);
+        $this->cancelRegistration($event, $registration->id);
+        return back()->with('status','Event registration cancelled.');
+    }
     public function show(string $event): JsonResponse
     {
         $record = DB::table('events')->where('id', $event)->first();

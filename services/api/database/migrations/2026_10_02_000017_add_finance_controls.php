@@ -13,7 +13,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('donation_id')->nullable()->constrained('donations')->nullOnDelete();
             $table->string('provider', 40);
-            $table->string('provider_event_id', 255);
+$table->string('provider_event_id', 191);
             $table->string('event_type', 100);
             $table->unsignedBigInteger('amount_minor')->nullable();
             $table->char('currency', 3)->nullable();

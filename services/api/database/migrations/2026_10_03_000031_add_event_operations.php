@@ -9,9 +9,6 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('events', function (Blueprint $t): void {
-            $t->boolean('waitlist_enabled')->default(true);
-            $t->timestamp('cancelled_at')->nullable();
-            $t->text('cancellation_reason')->nullable();
             $t->timestamp('reminder_at')->nullable();
         });
         Schema::table('event_registrations', function (Blueprint $t): void {
@@ -29,6 +26,6 @@ return new class extends Migration
             $t->dropConstrainedForeignId('checked_in_by');
             $t->dropColumn(['checked_in_at', 'cancelled_at']);
         });
-        Schema::table('events', fn (Blueprint $t) => $t->dropColumn(['waitlist_enabled', 'cancelled_at', 'cancellation_reason', 'reminder_at']));
+        Schema::table('events', fn (Blueprint $t) => $t->dropColumn('reminder_at'));
     }
 };

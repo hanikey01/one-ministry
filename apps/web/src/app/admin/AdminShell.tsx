@@ -6,7 +6,7 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { api, type Identity, type Settings } from "./api";
 import AdminIcon, { type AdminIconName } from "./AdminIcon";
 
-const navigation: ReadonlyArray<readonly [string,string,AdminIconName]> = [["Overview", "/admin", "home"], ["People", "/admin/people", "people"], ["Care & follow-up", "/admin/follow-up", "heart"], ["Services", "/admin/services", "calendar"], ["Groups", "/admin/groups", "groups"], ["Events", "/admin/events", "event"], ["Volunteers", "/admin/volunteers", "volunteer"], ["Pages", "/admin/pages", "pages"], ["Content library", "/admin/libraries", "library"], ["Communications", "/admin/campaigns", "message"], ["Giving", "/admin/giving", "giving"], ["Reports", "/admin/reports", "chart"]];
+const navigation: ReadonlyArray<readonly [string,string,AdminIconName]> = [["Overview", "/admin", "home"], ["People", "/admin/people", "people"], ["Care & follow-up", "/admin/follow-up", "heart"], ["Services", "/admin/services", "calendar"], ["Events", "/admin/events", "event"], ["Pages", "/admin/pages", "pages"], ["Content library", "/admin/libraries", "library"], ["Communications", "/admin/campaigns", "message"], ["Giving", "/admin/giving", "giving"], ["Reports", "/admin/reports", "chart"]];
 const management: ReadonlyArray<readonly [string,string,AdminIconName]> = [["Staff access", "/admin/staff", "staff"], ["Locations", "/admin/locations", "location"], ["Modules", "/admin/modules", "modules"], ["Settings", "/admin/settings", "settings"], ["Security", "/admin/security", "security"]];
 const fallback: Settings = { name: "Ministry Platform", tagline: null, contact_email: null, primary_color: "#1F6B55", accent_color: "#D8AB5D" };
 
@@ -31,7 +31,7 @@ export default function AdminShell({ children, title, eyebrow }: { children: (id
       <div className="workspace-sidebar-footer"><Link href="/" target="_blank">View public site ↗</Link><button onClick={logout}>Sign out</button></div>
     </aside>
     <section className="workspace-main">
-      <header className="workspace-topbar"><button className="workspace-menu" aria-label="Open navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><i/><i/><i/></button><label><span>⌕</span><input aria-label="Search ministry workspace" placeholder="Search people, groups, services…"/><kbd>Ctrl K</kbd></label><div><button className="workspace-notification" aria-label="Notifications">♢<i/></button>{identity && <div className="workspace-profile"><span>{identity.name.slice(0, 1).toUpperCase()}</span><div><strong>{identity.name}</strong><small>{identity.email}</small></div></div>}</div></header>
+      <header className="workspace-topbar"><button className="workspace-menu" aria-label="Open navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><i/><i/><i/></button><label><span>⌕</span><input aria-label="Search ministry workspace" placeholder="Search people, departments, services…"/><kbd>Ctrl K</kbd></label><div><button className="workspace-notification" aria-label="Notifications">♢<i/></button>{identity && <div className="workspace-profile"><span>{identity.name.slice(0, 1).toUpperCase()}</span><div><strong>{identity.name}</strong><small>{identity.email}</small></div></div>}</div></header>
       <div className="workspace-content"><header className="workspace-header"><div><p className="workspace-eyebrow">{eyebrow}</p><h1>{title}</h1></div></header>{identity ? children(identity) : <div className="workspace-loading">Opening your workspace…</div>}</div>
     </section>
   </main>;

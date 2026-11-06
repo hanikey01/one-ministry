@@ -47,7 +47,8 @@ class InstallationTest extends TestCase
         $this->assertNotSame('long-private-password', $admin->password);
         $this->assertDatabaseHas('user_role_assignments', ['user_id' => $admin->id, 'role_key' => 'security_administrator']);
         $this->assertDatabaseHas('role_permissions', ['role_key' => 'ministry_administrator', 'permission_key' => 'services.manage']);
-        $this->assertDatabaseHas('feature_settings', ['key' => 'digital_church', 'state' => 'disabled']);
+        $this->assertDatabaseHas('feature_settings', ['key' => 'digital_church', 'state' => 'enabled']);
+        $this->assertSame(0, FeatureSetting::query()->where('state', '!=', 'enabled')->count());
 
         Location::create(['name' => 'Private Office', 'slug' => 'private-office', 'timezone' => 'Africa/Lagos', 'is_public' => false]);
         FeatureSetting::where('key', 'digital_church')->update(['state' => 'staff_preview']);
