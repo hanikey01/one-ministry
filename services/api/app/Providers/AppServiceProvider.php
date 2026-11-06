@@ -7,7 +7,11 @@ use App\Services\Payments\StripePaymentProcessor;
 use App\Services\Payments\PayPalPaymentProcessor;
 use App\Services\Payments\FlutterwavePaymentProcessor;
 use App\Services\Payments\PaystackPaymentProcessor;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\View\View as ViewInstance;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -29,6 +33,20 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        View::composer(['components.layouts.workspace', 'components.layouts.public'], function (ViewInstance $view): void {
+            $avatarUrl = null;
+
+            if (auth()->check()) {
+                $profileImagePath = DB::table('people')
+                    ->where('user_id', auth()->id())
+                    ->value('profile_image_path');
+
+                if (is_string($profileImagePath) && $profileImagePath !== '' && Storage::disk('public')->exists($profileImagePath)) {
+                    $avatarUrl = route('public.storage', ['path' => $profileImagePath]);
+                }
+            }
+
+            $view->with('authenticatedPersonAvatarUrl', $avatarUrl);
+        });
     }
 }

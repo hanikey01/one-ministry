@@ -40,7 +40,7 @@ class DepartmentService
         DB::table('departments')->insert([
             'id' => $id, 'name' => $input['name'], 'slug' => Str::slug($input['name']),
             'description' => $input['description'] ?? null, 'image_url'=>$input['image_url']??null, 'image_alt'=>$input['image_alt']??null, 'category'=>$input['category']??null, 'contact_email'=>$input['contact_email']??null, 'featured'=>(bool)($input['featured']??false), 'status' => 'active',
-            'is_public' => (bool) ($input['is_public'] ?? false),
+            'is_public' => (bool) ($input['is_public'] ?? true),
             'accepting_requests' => (bool) ($input['accepting_requests'] ?? false),
             'discussion_enabled' => (bool) ($input['discussion_enabled'] ?? true),
             'created_by' => $actor->id, 'created_at' => now(), 'updated_at' => now(),

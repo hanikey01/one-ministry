@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('contact_email', 191)->nullable();
             $table->boolean('featured')->default(false);
             $table->string('status', 20)->default('active');
-            $table->boolean('is_public')->default(false);
+            $table->boolean('is_public')->default(true);
             $table->boolean('accepting_requests')->default(false);
             $table->boolean('discussion_enabled')->default(true);
             $table->foreignUuid('created_by')->nullable()->constrained('users')->nullOnDelete();

@@ -40,15 +40,21 @@
             </nav>
             <div class="workspace-sidebar-actions"><a href="{{ $worshipUrl }}" wire:navigate.hover><x-ui.icon name="worship"/><span>{{ $worshipLabel }}</span></a></div>
             <div class="workspace-account">
-                @if(auth()->check())<span>{{ mb_strtoupper(mb_substr(auth()->user()?->name ?? 'M', 0, 1)) }}</span><div><strong>My ministry</strong><small>Member portal</small></div><a href="{{ route('member.home') }}" wire:navigate.hover aria-label="Open member portal"><x-ui.icon name="external" :size="16"/></a>
+                @if(auth()->check())<span class="workspace-account-avatar">@if($authenticatedPersonAvatarUrl)<img src="{{ $authenticatedPersonAvatarUrl }}" alt="">@else{{ mb_strtoupper(mb_substr(auth()->user()?->name ?? 'M', 0, 1)) }}@endif</span><div><strong>My ministry</strong><small>Member portal</small></div><a href="{{ route('member.home') }}" wire:navigate.hover aria-label="Open member portal"><x-ui.icon name="external" :size="16"/></a>
                 @else<span><x-ui.icon name="people" :size="17"/></span><div><strong>Welcome back</strong><small>Sign in to continue</small></div><a href="{{ route('login') }}" wire:navigate.hover aria-label="Sign in"><x-ui.icon name="external" :size="16"/></a>@endif
             </div>
         </aside>
         <main class="workspace-main">
             <header class="workspace-topbar app-topbar">
                 <button class="workspace-menu" type="button" aria-expanded="false" data-public-menu aria-label="Open navigation"><x-ui.icon name="menu" :size="20"/><x-ui.icon name="close" :size="19"/></button>
-                <span class="mobile-header-brand" aria-label="{{ $settings->name }}">@if($settings->logo_path)<img src="{{ asset('storage/'.$settings->logo_path) }}" alt="">@else{{ mb_strtoupper(mb_substr($settings->name, 0, 1)) }}@endif</span>
-                <div class="workspace-context"><span>{{ now()->timezone($settings->timezone)->format('l, F j') }}</span><strong>{{ $title ?? 'Welcome' }}</strong></div>
+                <a class="public-header-brand" href="{{ route('public.home') }}" wire:navigate.hover aria-label="{{ $settings->name }} home">
+                    @if($settings->logo_path)
+                        <img src="{{ asset('storage/'.$settings->logo_path) }}" alt="{{ $settings->name }}">
+                    @else
+                        <span class="public-header-brand-fallback">{{ mb_strtoupper(mb_substr($settings->name, 0, 1)) }}</span>
+                        <strong>{{ $settings->name }}</strong>
+                    @endif
+                </a>
                 <div class="workspace-top-actions"><button class="workspace-theme-toggle" type="button" data-public-theme-toggle aria-pressed="false" aria-label="Switch to dark mode"><span class="workspace-theme-track" aria-hidden="true"></span><span class="workspace-theme-label">Light</span></button><a class="public-worship-action" href="{{ $worshipUrl }}" wire:navigate.hover><span>{{ $worshipLabel }}</span><x-ui.icon name="worship" :size="16"/></a></div>
             </header>
             <section class="workspace-content public-content">{{ $slot }}</section>

@@ -329,20 +329,24 @@ class StaffWorkspaceController extends Controller
 
         $locations = DB::table('locations')->where('is_public', true)->orderBy('name')->get(['name']);
 
-        return view('staff.events', compact('settings', 'events', 'locations') + ['user' => $request->user()]);
+        $imageAssets = $this->eventImageAssets();
+
+        return view('staff.events', compact('settings', 'events', 'locations', 'imageAssets') + ['user' => $request->user()]);
     }
 
     public function storeEvent(Request $request): RedirectResponse
     {
         $data = $request->validate([
             'title' => ['required', 'string', 'max:200'], 'description' => ['nullable', 'string', 'max:5000'],
-            'image_url' => ['nullable', 'string', 'max:1000'], 'image_alt' => ['nullable', 'string', 'max:255'],
+            'image_url' => ['nullable', 'url:https', 'max:1000'], 'image_alt' => ['nullable', 'string', 'max:255'],
+            'media_asset_id' => ['nullable', 'uuid'], 'image_upload' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:10240'],
             'category' => ['nullable', 'string', 'max:80'], 'status' => ['required', Rule::in(['draft','published'])],
             'starts_at' => ['required', 'date'], 'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
             'location' => ['nullable', 'string', 'max:200'], 'online_url' => ['nullable', 'url', 'max:1000'], 'capacity' => ['nullable', 'integer', 'min:1'],
             'registration_deadline' => ['nullable', 'date', 'before_or_equal:starts_at'],
             'waitlist_enabled' => ['nullable', 'boolean'], 'registration_open' => ['nullable', 'boolean'],
         ]);
+        $data = $this->resolveEventImage($request, $data);
         DB::table('events')->insert([...$data, 'id' => (string) Str::uuid(), 'slug' => Str::slug($data['title']).'-'.Str::lower(Str::random(6)), 'featured' => $request->boolean('featured'), 'waitlist_enabled' => $request->boolean('waitlist_enabled'), 'registration_open' => $request->boolean('registration_open'), 'created_at' => now(), 'updated_at' => now()]);
 
         return to_route('staff.events')->with('status', 'Event created.');
@@ -354,14 +358,72 @@ class StaffWorkspaceController extends Controller
         abort_unless($record, 404);
         $data = $request->validate([
             'title' => ['required','string','max:200'], 'description' => ['nullable','string','max:5000'],
-            'image_url' => ['nullable','string','max:1000'], 'image_alt' => ['nullable','string','max:255'],
+            'image_url' => ['nullable','url:https','max:1000'], 'image_alt' => ['nullable','string','max:255'],
+            'media_asset_id' => ['nullable', 'uuid'], 'image_upload' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:10240'],
             'category' => ['nullable','string','max:80'], 'status' => ['required',Rule::in(['draft','published'])],
             'starts_at' => ['required','date'], 'ends_at' => ['nullable','date','after_or_equal:starts_at'],
             'location' => ['nullable','string','max:200'], 'online_url' => ['nullable','url','max:1000'],
             'capacity' => ['nullable','integer','min:1'], 'registration_deadline' => ['nullable','date','before_or_equal:starts_at'],
         ]);
+        $data = $this->resolveEventImage($request, $data);
         DB::table('events')->where('id', $event)->update([...$data, 'featured'=>$request->boolean('featured'), 'registration_open'=>$request->boolean('registration_open'), 'waitlist_enabled'=>$request->boolean('waitlist_enabled'), 'updated_at'=>now()]);
         return to_route('staff.events')->with('status', 'Event updated.');
+    }
+
+    /** @return \Illuminate\Support\Collection<int, object> */
+    private function eventImageAssets(): \Illuminate\Support\Collection
+    {
+        return DB::table('media_assets')
+            ->where('library', 'media_library')
+            ->where('status', 'published')
+            ->where('file_mime', 'like', 'image/%')
+            ->orderByDesc('published_at')
+            ->orderByDesc('created_at')
+            ->get(['id', 'title', 'alt_text'])
+            ->map(function (object $asset): object {
+                $asset->url = route('public.media', $asset->id);
+
+                return $asset;
+            });
+    }
+
+    /** @param array<string, mixed> $data
+     *  @return array<string, mixed>
+     */
+    private function resolveEventImage(Request $request, array $data): array
+    {
+        $assetId = $data['media_asset_id'] ?? null;
+        unset($data['media_asset_id'], $data['image_upload']);
+
+        if ($request->hasFile('image_upload')) {
+            $file = $request->file('image_upload');
+            $assetId = (string) Str::uuid();
+            $path = $file->store('media-library', 'local');
+            $title = str($file->getClientOriginalName())->beforeLast('.')->replace(['-', '_'], ' ')->headline()->toString();
+            DB::table('media_assets')->insert([
+                'id' => $assetId, 'title' => $title, 'description' => null,
+                'provider' => 'local', 'provider_key' => $path, 'library' => 'media_library', 'kind' => 'image',
+                'status' => 'published', 'published_at' => now(), 'file_disk' => 'local', 'file_path' => $path,
+                'file_name' => $file->getClientOriginalName(), 'file_mime' => $file->getMimeType(),
+                'file_size_bytes' => $file->getSize(), 'alt_text' => $data['image_alt'] ?: null,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+
+        if ($assetId) {
+            $asset = DB::table('media_assets')->where([
+                'id' => $assetId,
+                'library' => 'media_library',
+                'status' => 'published',
+            ])->where('file_mime', 'like', 'image/%')->first();
+            abort_unless($asset, 422, 'Choose a published image from the ministry Media Library.');
+            $data['image_url'] = route('public.media', $asset->id);
+            if (blank($data['image_alt']) && filled($asset->alt_text)) {
+                $data['image_alt'] = $asset->alt_text;
+            }
+        }
+
+        return $data;
     }
 
     public function storePerson(Request $request): RedirectResponse

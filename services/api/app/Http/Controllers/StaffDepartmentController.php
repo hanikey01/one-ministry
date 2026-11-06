@@ -41,7 +41,7 @@ class StaffDepartmentController extends Controller
             'category'=>['nullable','string','max:80'], 'contact_email'=>['nullable','email','max:191'], 'featured'=>['nullable','boolean'],
             'is_public' => ['nullable', 'boolean'], 'accepting_requests' => ['nullable', 'boolean'], 'discussion_enabled' => ['nullable', 'boolean'],
         ]);
-        $data['is_public'] = $request->boolean('is_public');
+        $data['is_public'] = $request->has('is_public') ? $request->boolean('is_public') : true;
         $data['accepting_requests'] = $request->boolean('accepting_requests');
         $data['discussion_enabled'] = $request->boolean('discussion_enabled');
         $data['featured'] = $request->boolean('featured');
