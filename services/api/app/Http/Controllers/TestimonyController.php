@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\FeatureSetting;
 use App\Models\MinistrySetting;
+use App\Services\ConnectionRequestService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,6 +16,12 @@ use Illuminate\Validation\Rule;
 class TestimonyController extends Controller
 {
     private const CATEGORIES=['general','healing','provision','family','salvation','restoration','guidance','community'];
+
+    /** @return array<int, string> */
+    public static function categories(): array
+    {
+        return self::CATEGORIES;
+    }
 
     public function publicIndex(Request $request): View
     {
@@ -35,14 +42,36 @@ class TestimonyController extends Controller
 
     public function memberIndex(Request $request): View
     {
-        $this->enabled(); $person=$this->person($request);
-        return view('member.testimonies',['settings'=>MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID),'features'=>FeatureSetting::query()->where('state','enabled')->pluck('key')->all(),'title'=>'My testimonies','testimonies'=>DB::table('testimonies')->where('person_id',$person->id)->latest()->get(),'categories'=>self::CATEGORIES,'profileImageUrl'=>$this->profileImageUrl($person->profile_image_path)]);
+        $this->enabled();
+        $features = FeatureSetting::query()->where('state', 'enabled')->pluck('key')->all();
+        if (! $request->user()) {
+            return view('member.testimonies', [
+                'settings' => MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID),
+                'features' => $features,
+                'title' => 'Share a testimony',
+                'testimonies' => collect(),
+                'categories' => self::CATEGORIES,
+                'profileImageUrl' => null,
+                'guest' => true,
+            ]);
+        }
+
+        $person = $this->person($request);
+        return view('member.testimonies', ['settings'=>MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID),'features'=>$features,'title'=>'My testimonies','testimonies'=>DB::table('testimonies')->where('person_id',$person->id)->latest()->get(),'categories'=>self::CATEGORIES,'profileImageUrl'=>$this->profileImageUrl($person->profile_image_path),'guest'=>false]);
     }
 
-    public function memberStore(Request $request): RedirectResponse
+    public function memberStore(Request $request, ConnectionRequestService $connections): RedirectResponse
     {
-        $this->enabled(); $person=$this->person($request); $request->validate(['consent_public'=>['accepted']]); $data=$this->validated($request,false);
-        $id=(string)Str::uuid(); DB::table('testimonies')->insert([...$data,'id'=>$id,'person_id'=>$person->id,'submitted_by_user_id'=>$request->user()->id,'author_name'=>trim($person->first_name.' '.($person->last_name??'')),'slug'=>$this->slug($data['title']),'status'=>'submitted','consent_public'=>true,'submitted_at'=>now(),'created_at'=>now(),'updated_at'=>now()]);
+        $this->enabled();
+        $rules = ['title'=>['required','string','max:180'],'category'=>['required',Rule::in(self::CATEGORIES)],'body'=>['required','string','min:20','max:12000'],'consent_public'=>['accepted'],'show_author_name'=>['nullable','boolean'],'website'=>['nullable','string','max:0']];
+        if (! $request->user()) {
+            $rules += ['first_name'=>['required','string','max:100'],'last_name'=>['nullable','string','max:100'],'email'=>['required','email','max:254'],'phone'=>['nullable','string','max:40'],'consent_to_contact'=>['accepted']];
+        }
+        $data = $request->validate($rules);
+        $connections->rejectBot($data);
+        $person = $request->user() ? $this->person($request) : $connections->person($request, $data);
+        $testimony = collect($data)->only(['title', 'category', 'body'])->all();
+        $id=(string)Str::uuid(); DB::table('testimonies')->insert([...$testimony,'id'=>$id,'person_id'=>$person->id,'submitted_by_user_id'=>$request->user()?->id,'author_name'=>trim($person->first_name.' '.($person->last_name??'')),'slug'=>$this->slug($data['title']),'status'=>'submitted','consent_public'=>true,'show_author_name'=>$request->boolean('show_author_name'),'submitted_at'=>now(),'created_at'=>now(),'updated_at'=>now()]);
         $this->audit($request,'testimony.member_submitted','testimonies',$id,['title'=>$data['title']]);
         return to_route('member.testimonies')->with('status','Your testimony was submitted for staff review. It is not public yet.');
     }

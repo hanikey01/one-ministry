@@ -20,7 +20,17 @@
         </form>
         <div class="giving-state" x-show="status" x-cloak role="status"><h2 x-text="statusTitle"></h2><p x-text="statusMessage"></p><button type="button" x-show="status==='pending'" @click="poll">Check again</button></div>
         @endif
-        @if($funds->isNotEmpty() && $givingMarkets->isEmpty())<div class="giving-state giving-empty-state"><h2>Online checkout is not available yet</h2><p>Donation purposes are published, but no payment provider is currently available for the configured ministry markets.</p></div>@endif
+        @if($funds->isNotEmpty() && $givingMarkets->isEmpty())
+            <div class="giving-state giving-empty-state"><h2>Online checkout is not available yet</h2><p>Donation purposes are still available below. Use the published bank-transfer details where available, or contact the ministry for another way to give.</p></div>
+            <section class="giving-purpose-list" aria-labelledby="giving-purposes-title">
+                <div><p class="eyebrow">DONATION PURPOSES</p><h2 id="giving-purposes-title">Choose where your gift goes</h2></div>
+                <div>
+                    @foreach($funds as $fund)
+                        <article><h3>{{ $fund->name }}</h3>@if($fund->description)<p>{{ $fund->description }}</p>@endif @if($fund->currency)<small>Currency: {{ $fund->currency }}</small>@endif</article>
+                    @endforeach
+                </div>
+            </section>
+        @endif
     </section>
     @if($offlineGivingMethods->isNotEmpty())
     <section class="public-card bank-giving" aria-labelledby="bank-giving-title">

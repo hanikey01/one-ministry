@@ -35,7 +35,7 @@ class StaffContentLibraryController extends Controller
             $items = DB::table('media_assets')
                 ->leftJoin('library_categories', 'library_categories.id', '=', 'media_assets.library_category_id')
                 ->where('media_assets.library', $library)
-                ->when($query !== '', fn ($builder) => $builder->where(fn ($inner) => $inner->where('media_assets.title', 'like', "%{$query}%")->orWhere('media_assets.speaker', 'like', "%{$query}%")->orWhere('media_assets.scripture_reference', 'like', "%{$query}%")))
+                ->when($query !== '', fn ($builder) => $builder->where(fn ($inner) => $inner->where('media_assets.title', 'like', "%{$query}%")->orWhere('media_assets.speaker', 'like', "%{$query}%")->orWhere('media_assets.author', 'like', "%{$query}%")))
                 ->when($status !== '', fn ($builder) => $builder->where('media_assets.status', $status))
                 ->select('media_assets.*', 'library_categories.name as category_name')
                 ->orderByDesc('media_assets.created_at')->paginate(15)->withQueryString();
@@ -66,9 +66,9 @@ class StaffContentLibraryController extends Controller
         $this->library($library, $request);
         if ($library === 'sermon_series') return $this->storeSeries($request);
 
-        $base = ['title' => ['required', 'string', 'max:200'], 'description' => ['nullable', 'string', 'max:5000'], 'speaker' => ['nullable', 'string', 'max:160'], 'scripture_reference' => ['nullable', 'string', 'max:255'], 'duration_seconds' => ['nullable', 'integer', 'min:0'], 'sermon_series_id' => ['nullable', 'uuid', 'exists:sermon_series,id'], 'library_category_id' => ['nullable', 'uuid', 'exists:library_categories,id'], 'tag_ids' => ['nullable', 'array'], 'tag_ids.*' => ['uuid', 'exists:library_tags,id']];
+        $base = $this->assetRules($library);
         $rules = [...$base];
-        if ($library === 'books_library') $rules['file'] = ['required', 'file', 'mimes:pdf,epub,doc,docx,mobi,azw,azw3,txt', 'max:102400'];
+        if ($library === 'books_library') { $rules['file'] = ['required', 'file', 'mimes:pdf,epub,doc,docx,mobi,azw,azw3,txt', 'max:102400']; $rules['cover_image'] = ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240']; }
         if ($library === 'audio_sermons') $rules['file'] = ['required', 'file', 'mimes:mp3,m4a,wav,ogg,aac', 'max:512000'];
         if ($library === 'video_sermons') { $rules['file'] = ['nullable', 'file', 'mimes:mp4,webm,mov,m4v', 'max:512000']; $rules['youtube_url'] = ['nullable', 'url', 'max:500', 'required_without:file']; }
         $data = $request->validate($rules);
@@ -78,13 +78,15 @@ class StaffContentLibraryController extends Controller
         $file = $request->file('file');
         $isYoutube = filled($data['youtube_url'] ?? null);
         $path = $file?->store('library/'.match ($library) {'books_library' => 'books', 'audio_sermons' => 'audio', default => 'video'}, 'local');
+        $coverPath = $request->file('cover_image')?->store('library/covers', 'local');
         $tags = $data['tag_ids'] ?? [];
-        unset($data['tag_ids'], $data['youtube_url'], $data['file']);
-        DB::transaction(function () use ($request, $data, $id, $library, $file, $path, $isYoutube, $tags): void {
+        unset($data['tag_ids'], $data['youtube_url'], $data['file'], $data['cover_image']);
+        DB::transaction(function () use ($request, $data, $id, $library, $file, $path, $coverPath, $isYoutube, $tags): void {
             DB::table('media_assets')->insert([
                 'id' => $id, ...$data, 'library' => $library, 'kind' => $library === 'books_library' ? 'book' : 'sermon', 'status' => 'draft',
                 'provider' => $isYoutube ? 'youtube' : 'local', 'provider_key' => $isYoutube ? $this->youtubeId((string) $request->input('youtube_url')) : $path,
                 'file_disk' => $file ? 'local' : null, 'file_path' => $path, 'file_name' => $file?->getClientOriginalName(), 'file_mime' => $file?->getMimeType(), 'file_size_bytes' => $file?->getSize(),
+                'cover_image_path' => $coverPath,
                 'created_at' => now(), 'updated_at' => now(),
             ]);
             $this->syncTags($id, $tags);
@@ -99,8 +101,13 @@ class StaffContentLibraryController extends Controller
         $this->library($library, $request);
         if ($library === 'sermon_series') return $this->updateSeries($request, $item);
         $record = DB::table('media_assets')->where(['id' => $item, 'library' => $library])->first(); abort_unless($record, 404);
-        $data = $request->validate(['title' => ['required', 'string', 'max:200'], 'description' => ['nullable', 'string', 'max:5000'], 'speaker' => ['nullable', 'string', 'max:160'], 'scripture_reference' => ['nullable', 'string', 'max:255'], 'duration_seconds' => ['nullable', 'integer', 'min:0'], 'sermon_series_id' => ['nullable', 'uuid', 'exists:sermon_series,id'], 'library_category_id' => ['nullable', 'uuid', 'exists:library_categories,id'], 'tag_ids' => ['sometimes', 'array'], 'tag_ids.*' => ['uuid', 'exists:library_tags,id']]);
-        DB::transaction(function () use ($request, $data, $item): void { DB::table('media_assets')->where('id', $item)->update([...collect($data)->except('tag_ids')->all(), 'updated_at' => now()]); if ($request->has('tag_ids')) $this->syncTags($item, $data['tag_ids'] ?? []); $this->audit($request, 'library.item_updated', 'media_assets', $item); });
+        $data = $request->validate($this->assetRules($library, true));
+        $coverPath = $request->file('cover_image')?->store('library/covers', 'local');
+        unset($data['cover_image']);
+        if ($coverPath) $data['cover_image_path'] = $coverPath;
+        $data += ['duration_seconds' => null];
+        if ($library === 'books_library') $data += ['speaker' => null, 'sermon_series_id' => null];
+        DB::transaction(function () use ($request, $data, $item, $record, $coverPath): void { DB::table('media_assets')->where('id', $item)->update([...collect($data)->except('tag_ids')->all(), 'updated_at' => now()]); if ($coverPath && $record->cover_image_path) Storage::disk('local')->delete($record->cover_image_path); if ($request->has('tag_ids')) $this->syncTags($item, $data['tag_ids'] ?? []); $this->audit($request, 'library.item_updated', 'media_assets', $item); });
         return $this->back($library, 'Content details saved.');
     }
 
@@ -120,7 +127,7 @@ class StaffContentLibraryController extends Controller
         $this->library($library, $request); $table = $library === 'sermon_series' ? 'sermon_series' : 'media_assets';
         $query = DB::table($table)->where('id', $item); if ($table === 'media_assets') $query->where('library', $library);
         $record = $query->first(); abort_unless($record, 404);
-        DB::transaction(function () use ($request, $query, $record, $table, $item): void { if ($table === 'media_assets' && $record->file_disk && $record->file_path) Storage::disk($record->file_disk)->delete($record->file_path); $query->delete(); $this->audit($request, 'library.item_deleted', $table, $item); });
+        DB::transaction(function () use ($request, $query, $record, $table, $item): void { if ($table === 'media_assets' && $record->file_disk && $record->file_path) Storage::disk($record->file_disk)->delete($record->file_path); if ($record->cover_image_path) Storage::disk('local')->delete($record->cover_image_path); $query->delete(); $this->audit($request, 'library.item_deleted', $table, $item); });
         return $this->back($library, 'Content removed.');
     }
 
@@ -140,16 +147,27 @@ class StaffContentLibraryController extends Controller
 
     private function storeSeries(Request $request): RedirectResponse
     {
-        $data = $request->validate(['title' => ['required', 'string', 'max:200'], 'description' => ['nullable', 'string', 'max:5000']]); $id = (string) Str::uuid();
+        $data = $request->validate(['title' => ['required', 'string', 'max:200'], 'description' => ['nullable', 'string', 'max:5000'], 'cover_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'], 'cover_image_alt' => ['nullable', 'string', 'max:180']]); $id = (string) Str::uuid();
+        $data['cover_image_path'] = $request->file('cover_image')?->store('library/covers', 'local'); unset($data['cover_image']);
         DB::table('sermon_series')->insert(['id' => $id, ...$data, 'status' => 'draft', 'created_at' => now(), 'updated_at' => now()]); $this->audit($request, 'library.series_created', 'sermon_series', $id);
         return $this->back('sermon_series', 'Sermon series created as a draft.');
     }
 
     private function updateSeries(Request $request, string $item): RedirectResponse
     {
-        abort_unless(DB::table('sermon_series')->where('id', $item)->exists(), 404); $data = $request->validate(['title' => ['required', 'string', 'max:200'], 'description' => ['nullable', 'string', 'max:5000']]);
+        $record = DB::table('sermon_series')->where('id', $item)->first(); abort_unless($record, 404); $data = $request->validate(['title' => ['required', 'string', 'max:200'], 'description' => ['nullable', 'string', 'max:5000'], 'cover_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'], 'cover_image_alt' => ['nullable', 'string', 'max:180']]);
+        $coverPath = $request->file('cover_image')?->store('library/covers', 'local'); unset($data['cover_image']); if ($coverPath) $data['cover_image_path'] = $coverPath;
         DB::table('sermon_series')->where('id', $item)->update([...$data, 'updated_at' => now()]); $this->audit($request, 'library.series_updated', 'sermon_series', $item);
+        if ($coverPath && $record->cover_image_path) Storage::disk('local')->delete($record->cover_image_path);
         return $this->back('sermon_series', 'Series details saved.');
+    }
+
+    private function assetRules(string $library, bool $updating = false): array
+    {
+        $rules = ['title' => ['required', 'string', 'max:200'], 'description' => ['nullable', 'string', 'max:5000'], 'cover_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'], 'cover_image_alt' => ['nullable', 'string', 'max:180'], 'library_category_id' => ['nullable', 'uuid', 'exists:library_categories,id'], 'tag_ids' => [$updating ? 'sometimes' : 'nullable', 'array'], 'tag_ids.*' => ['uuid', 'exists:library_tags,id']];
+        if ($library === 'books_library') $rules += ['author' => ['nullable', 'string', 'max:160']];
+        else $rules += ['speaker' => ['nullable', 'string', 'max:160'], 'sermon_series_id' => ['nullable', 'uuid', 'exists:sermon_series,id']];
+        return $rules;
     }
 
     private function syncTags(string $assetId, array $tags): void { DB::table('library_asset_tags')->where('media_asset_id', $assetId)->delete(); foreach (array_unique($tags) as $tag) DB::table('library_asset_tags')->insert(['media_asset_id' => $assetId, 'library_tag_id' => $tag]); }

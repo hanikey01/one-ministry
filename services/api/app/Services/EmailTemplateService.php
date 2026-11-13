@@ -18,6 +18,7 @@ final class EmailTemplateService
     {
         return [
             'staff_email_verification' => ['name' => 'Staff email verification', 'description' => 'Sent when a staff member verifies their email address.', 'subject' => 'Verify your ministry staff email', 'body' => "Hello {{ user_name }},\n\nVerify your staff email address using the button below. The link expires in {{ expires_minutes }} minutes.", 'variables' => ['user_name' => 'Staff member name', 'expires_minutes' => 'Link lifetime', 'action_url' => 'Protected verification link']],
+            'member_signup_verification' => ['name' => 'Member sign-up code', 'description' => 'Sent before a new member account can be created.', 'subject' => 'Your {{ ministry_name }} sign-up code', 'body' => "Hello {{ member_name }},\n\nUse this code to continue creating your account:\n\n{{ verification_code }}\n\nThis code expires in {{ expires_minutes }} minutes. If you did not start this sign-up, you can ignore this email.", 'variables' => ['member_name' => 'Prospective member name', 'verification_code' => 'Six-digit sign-up code', 'expires_minutes' => 'Code lifetime', 'ministry_name' => 'Ministry name']],
             'password_reset' => ['name' => 'Password reset', 'description' => 'Sent after a valid password recovery request.', 'subject' => 'Reset your ministry staff password', 'body' => "Hello {{ user_name }},\n\nA password reset was requested for your account. Use the button below within {{ expires_minutes }} minutes. If you did not request this, you can ignore this message.", 'variables' => ['user_name' => 'Account name', 'expires_minutes' => 'Link lifetime', 'action_url' => 'Protected reset link']],
             'staff_invitation' => ['name' => 'Staff invitation', 'description' => 'Sent when an administrator invites a staff member.', 'subject' => 'You are invited to serve with {{ ministry_name }}', 'body' => "Hello {{ invitee_name }},\n\n{{ inviter_name }} invited you to join {{ ministry_name }} as {{ role_name }}. Use the button below within {{ expires_hours }} hours.", 'variables' => ['invitee_name' => 'Invitee name', 'inviter_name' => 'Inviting staff member', 'ministry_name' => 'Ministry name', 'role_name' => 'Assigned role', 'expires_hours' => 'Invitation lifetime', 'action_url' => 'Protected invitation link']],
             'member_welcome' => ['name' => 'Member welcome', 'description' => 'Welcome copy for new member accounts.', 'subject' => 'Welcome to {{ ministry_name }}', 'body' => "Hello {{ member_name }},\n\nWelcome to {{ ministry_name }}. Your member account is ready.", 'variables' => ['member_name' => 'Member name', 'ministry_name' => 'Ministry name']],
@@ -70,7 +71,7 @@ final class EmailTemplateService
     {
         $template = $this->template($key);
         if (! $template->enabled) {
-            if (in_array($key, ['staff_email_verification', 'password_reset', 'staff_invitation'], true)) abort(503, 'This required account email template is inactive. Contact the ministry administrator.');
+            if (in_array($key, ['staff_email_verification', 'member_signup_verification', 'password_reset', 'staff_invitation'], true)) abort(503, 'This required account email template is inactive. Contact the ministry administrator.');
             return;
         }
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);

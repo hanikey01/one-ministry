@@ -1,4 +1,4 @@
-<x-layouts.public :title="$page->seo_title ?: $page->title" :settings="$settings" :features="$features" :editor-preview="$editorPreview ?? false">
+<x-layouts.public :title="$page->seo_title ?: $page->title" :settings="$settings" :features="$features" :editor-preview="$editorPreview ?? false" :full-bleed="true">
     @php
         $blocks = $page->blocks ? json_decode($page->blocks, true) : [];
     @endphp

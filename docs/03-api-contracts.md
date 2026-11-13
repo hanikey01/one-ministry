@@ -1,5 +1,11 @@
 # 03 — HTTP, Integration, and Polling Contracts
 
+## AI route compatibility addendum - 2026-11-13
+
+The existing protected route-test endpoint returns the saved route with status `verified` when all models pass or `degraded` when the primary passes but a fallback fails. Both permit proposal requests. Successful JSON responses add `data.failures`, containing provider, model, and safe reason for failed attempts. A primary probe failure leaves the route `unverified` and returns the existing 422 failure response. Each model is tested independently against a bounded nested composition schema; a boolean-only response cannot verify it. Catalog selection includes unverified Gemini text candidates without claiming schema support. The server records probe evidence in catalog metadata.
+
+Provider exceptions carry stable diagnostic codes, optional HTTP status, and an allowlisted provider status. Raw provider messages, HTTP exception objects, credentials, prompts, and generated content are excluded from generation diagnostics. Invalid keys, denied access, missing models, rate limits, timeouts, connection failures, schema rejection, malformed structured output, and truncation have distinct safe codes.
+
 **Status:** Canonical HTTP contract. Laravel web routes and Livewire components may call domain services directly; these contracts remain required for public browser polling, webhooks, optional asynchronous interfaces, and third-party integrations. Field-level OpenAPI schemas are required before implementation of each phase.
 
 ## 1. Conventions

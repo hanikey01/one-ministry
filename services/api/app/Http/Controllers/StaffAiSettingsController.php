@@ -125,8 +125,12 @@ class StaffAiSettingsController extends Controller
         try {
             $result = $ai->testPageEditorRoute($request->user(), $request->ip());
             $overview = $ai->overview();
-            return $this->success($request, "Page editor route verified across {$result['models']} models ({$result['latency_ms']} ms total test time).", [
+            $message = $result['degraded']
+                ? "Page editor primary verified; route degraded because one or more fallbacks failed. {$result['models']} models passed."
+                : "Page editor route verified across {$result['models']} models ({$result['latency_ms']} ms total test time).";
+            return $this->success($request, $message, [
                 'route' => $this->clientRoute($overview['route'] ?? null),
+                'failures' => $result['failures'],
             ]);
         } catch (Throwable $exception) {
             $message = $exception instanceof RuntimeException ? $exception->getMessage() : 'The page editor route could not be tested.';
@@ -141,7 +145,12 @@ class StaffAiSettingsController extends Controller
     private function success(Request $request, string $message, array $data = []): RedirectResponse|JsonResponse
     {
         if ($request->expectsJson()) {
-            return response()->json(['message' => $message, 'data' => $data]);
+            $request->session()->flash('status', $message);
+
+            return response()->json([
+                'message' => $message,
+                'data' => $data + ['redirect' => route('staff.ai-settings')],
+            ]);
         }
 
         return back()->with('status', $message);

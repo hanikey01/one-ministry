@@ -84,9 +84,10 @@ class MemberController extends Controller
         return response()->json(['data' => [
             'departments' => DB::table('department_memberships')->join('departments', 'departments.id', '=', 'department_memberships.department_id')->where('person_id', $person->id)->where('department_memberships.status', 'active')->get(['departments.id', 'departments.name', 'department_memberships.role']),
             'events' => DB::table('event_registrations')->join('events', 'events.id', '=', 'event_registrations.event_id')->where('person_id', $person->id)->where('event_registrations.status', 'registered')->orderBy('events.starts_at')->get(['events.id', 'events.title', 'events.starts_at', 'events.location']),
-            'attendance' => DB::table('attendance_records')->join('service_occurrences', 'service_occurrences.id', '=', 'attendance_records.service_occurrence_id')->where('person_id', $person->id)->latest('attendance_records.observed_at')->limit(10)->get(['service_occurrences.title', 'attendance_records.status', 'attendance_records.observed_at']),
             'tasks' => DB::table('follow_up_tasks')->where('person_id', $person->id)->where('status', '!=', 'completed')->get(['id', 'summary', 'status', 'due_at']),
-        ]]);
+        ] + (app(\App\Services\ModuleAvailability::class)->enabled('attendance') ? [
+            'attendance' => DB::table('attendance_records')->join('service_occurrences', 'service_occurrences.id', '=', 'attendance_records.service_occurrence_id')->where('person_id', $person->id)->latest('attendance_records.observed_at')->limit(10)->get(['service_occurrences.title', 'attendance_records.status', 'attendance_records.observed_at']),
+        ] : [])]);
     }
 
     public function donations(Request $request): JsonResponse

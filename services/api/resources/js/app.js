@@ -1,3 +1,5 @@
+import { waitForAiProposal } from './ai-page-generation.js';
+
 let closeOpenEnhancedSelect = null;
 let enhancedSelectIndex = 0;
 let pageCleanups = [];
@@ -27,10 +29,74 @@ const setPageInterval = (callback, delay) => {
     return timer;
 };
 
+const initializePublicCarousels = () => {
+    document.querySelectorAll('[data-public-carousel]').forEach((carousel) => {
+        if (carousel.dataset.carouselInitialized === 'true') return;
+        carousel.dataset.carouselInitialized = 'true';
+        const slides = [...carousel.querySelectorAll('[data-carousel-slide]')];
+        const dots = [...carousel.querySelectorAll('[data-carousel-dot]')];
+        if (slides.length < 2) return;
+        let active = 0;
+        let paused = false;
+        const show = (next) => {
+            active = (next + slides.length) % slides.length;
+            slides.forEach((slide, index) => {
+                const selected = index === active;
+                slide.hidden = !selected;
+                slide.setAttribute('aria-hidden', String(!selected));
+            });
+            dots.forEach((dot, index) => dot.setAttribute('aria-selected', String(index === active)));
+        };
+        carousel.querySelector('[data-carousel-previous]')?.addEventListener('click', () => show(active - 1));
+        carousel.querySelector('[data-carousel-next]')?.addEventListener('click', () => show(active + 1));
+        dots.forEach((dot, index) => dot.addEventListener('click', () => show(index)));
+        carousel.addEventListener('mouseenter', () => { paused = true; });
+        carousel.addEventListener('mouseleave', () => { paused = false; });
+        carousel.addEventListener('focusin', () => { paused = true; });
+        carousel.addEventListener('focusout', () => { paused = false; });
+        if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) setPageInterval(() => { if (!paused) show(active + 1); }, 6000);
+    });
+};
+
 const initializePage = (force = false) => {
     const pageUrl = window.location.href;
     cleanupPage();
     initializedPageUrl = pageUrl;
+    initializePublicCarousels();
+
+    const appearanceForm = document.querySelector('[data-appearance-settings]');
+    if (appearanceForm) {
+        const presetOptions = appearanceForm.querySelector('[data-appearance-preset-options]');
+        const customColour = appearanceForm.querySelector('[data-appearance-custom-colour]');
+        const chromeModes = appearanceForm.querySelectorAll('[data-chrome-mode]');
+        const presets = appearanceForm.querySelectorAll('[data-theme-preset]');
+        const colourPicker = appearanceForm.querySelector('[data-chrome-colour-picker]');
+        const colourValue = appearanceForm.querySelector('[data-chrome-colour-value]');
+        const presetChrome = { tech_blue: '#0B1F3A', neutral: '#24262A', warm: '#332A23' };
+
+        const normaliseHex = (value) => /^#[0-9a-f]{6}$/i.test(value) ? value.toUpperCase() : null;
+        const selectedValue = (controls) => [...controls].find((control) => control.checked)?.value;
+        const sync = () => {
+            const custom = selectedValue(chromeModes) === 'custom';
+            const preset = selectedValue(presets) ?? 'tech_blue';
+            const colour = normaliseHex(colourValue?.value ?? '') ?? presetChrome[preset];
+            if (presetOptions) presetOptions.hidden = custom;
+            if (customColour) customColour.hidden = !custom;
+            if (colourPicker && normaliseHex(colourPicker.value) !== colour) colourPicker.value = colour;
+        };
+        chromeModes.forEach((control) => addPageListener(control, 'change', sync));
+        presets.forEach((control) => addPageListener(control, 'change', sync));
+        addPageListener(colourPicker, 'input', () => { if (colourValue) colourValue.value = colourPicker.value.toUpperCase(); sync(); });
+        addPageListener(colourValue, 'input', sync);
+        addPageListener(colourValue, 'change', () => {
+            const colour = normaliseHex(colourValue?.value ?? '');
+            if (!colour) return;
+            colourValue.value = colour;
+            if (colourPicker) colourPicker.value = colour;
+            sync();
+        });
+        sync();
+    }
 
     document.querySelectorAll('.page-quick-edit').forEach((details) => {
         const form = details.querySelector('form');
@@ -314,7 +380,7 @@ if (serviceRoom) {
 
 document.querySelectorAll('[data-workspace-shell]').forEach((shell) => {
     const sidebar = shell.querySelector('[data-workspace-sidebar]');
-    const toggle = shell.querySelector('[data-workspace-toggle]');
+    const toggles = shell.querySelectorAll('[data-workspace-toggle]');
     const backdrop = shell.querySelector('.workspace-backdrop');
     const closers = shell.querySelectorAll('[data-workspace-close]');
     const themeToggle = shell.querySelector('[data-workspace-theme-toggle]');
@@ -326,7 +392,7 @@ document.querySelectorAll('[data-workspace-shell]').forEach((shell) => {
         shell.classList.toggle('navigation-open', open);
         sidebar?.classList.toggle('is-open', open);
         backdrop?.classList.toggle('is-open', open);
-        toggle?.setAttribute('aria-expanded', String(open));
+        toggles.forEach((toggle) => toggle.setAttribute('aria-expanded', String(open)));
     };
 
     const setTheme = (theme) => {
@@ -345,7 +411,7 @@ document.querySelectorAll('[data-workspace-shell]').forEach((shell) => {
     setTheme(savedTheme === 'dark' ? 'dark' : 'light');
     if (!chromeAlreadyReady) {
         shell.dataset.workspaceChromeReady = 'true';
-        toggle?.addEventListener('click', () => setNavigation(!shell.classList.contains('navigation-open')));
+        toggles.forEach((toggle) => toggle.addEventListener('click', () => setNavigation(!shell.classList.contains('navigation-open'))));
         closers.forEach((button) => button.addEventListener('click', () => setNavigation(false)));
         sidebar?.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => setNavigation(false)));
         addPageListener(window, 'keydown', (event) => { if (event.key === 'Escape') setNavigation(false); });
@@ -363,6 +429,7 @@ document.querySelectorAll('[data-workspace-shell]').forEach((shell) => {
     shell.querySelectorAll('[data-service-edit-dialog]').forEach((dialog) => {
         dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
         dialog.querySelectorAll('[data-service-edit-close]').forEach((button) => button.addEventListener('click', () => dialog.close()));
+        if (dialog.hasAttribute('data-service-edit-auto-open') && !dialog.open) dialog.showModal();
     });
     shell.querySelectorAll('[data-workspace-dialog-open]').forEach((trigger) => {
         trigger.addEventListener('click', () => document.getElementById(trigger.dataset.workspaceDialogOpen)?.showModal());
@@ -496,6 +563,8 @@ document.querySelectorAll('[data-page-editor-tabs]').forEach((tabs) => {
 });
 
 document.querySelectorAll('[data-ai-page-draft]').forEach((panel) => {
+    if (panel.dataset.aiDraftReady === 'true') return;
+    panel.dataset.aiDraftReady = 'true';
     const button = panel.querySelector('[data-ai-generate]');
     const status = panel.querySelector('[data-ai-status]');
     const editor = panel.closest('[data-page-block-editor]');
@@ -514,6 +583,22 @@ document.querySelectorAll('[data-ai-page-draft]').forEach((panel) => {
         const blocksInput = editor.querySelector('[data-page-block-input]');
         const sourceDocumentSignature = blocksInput?.value ?? '';
         button.disabled = true;
+        panel.querySelectorAll('[data-ai-cancel]').forEach((existing) => existing.remove());
+        const cancel = document.createElement('button');
+        cancel.type = 'button'; cancel.className = 'button button-secondary'; cancel.textContent = 'Cancel generation';
+        cancel.dataset.aiCancel = '';
+        let generation = null;
+        cancel.hidden = true;
+        status.after(cancel);
+        cancel.addEventListener('click', async () => {
+            if (!generation) return;
+            cancel.disabled = true;
+            try {
+                const result = await fetch(generation.cancel_url, {method:'DELETE', headers:{Accept:'application/json', 'X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]')?.content ?? ''}});
+                if (!result.ok) throw new Error();
+                status.textContent = 'Generation cancelled.';
+            } catch { status.textContent = 'Cancellation could not be confirmed. Check the generation status.'; cancel.disabled = false; }
+        });
             status.textContent = 'Planning your page…';
         try {
             const response = await fetch(panel.dataset.endpoint, {
@@ -521,10 +606,12 @@ document.querySelectorAll('[data-ai-page-draft]').forEach((panel) => {
                 headers: {
                     Accept: 'application/json',
                     'Content-Type': 'application/json',
+                    'Idempotency-Key': crypto.randomUUID(),
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
                 },
                 body: JSON.stringify({
                     brief,
+                    review: panel.querySelector('[data-ai-optional-review]')?.checked ?? false,
                     title: editor.querySelector('[name="title"]')?.value.trim() ?? '',
                     public_details: panel.querySelector('[data-ai-public-details]')?.value.trim() ?? '',
                     page_goal: panel.querySelector('[data-ai-page-goal]')?.value.trim() ?? '',
@@ -538,8 +625,29 @@ document.querySelectorAll('[data-ai-page-draft]').forEach((panel) => {
                     brand_constraints: panel.querySelector('[data-ai-brand-constraints]')?.value.trim() ?? '',
                 }),
             });
-            const payload = await response.json();
+            let payload = await response.json();
             if (!response.ok) throw new Error(payload?.error?.message ?? payload?.message ?? 'The page draft could not be generated. Try again.');
+            generation = payload.data;
+            cancel.hidden = false;
+            const completedProposal = await waitForAiProposal(generation, {
+                onState:(message) => {status.textContent = message;},
+                wait:() => new Promise((resolve) => setTimeout(resolve, Math.max(750, Number(generation?.retry_after_ms || 0)))),
+                isConnected:() => panel.isConnected,
+                fetchStatus:async (url) => {
+                    const processUrl = generation.process_url;
+                    const poll = await fetch(processUrl || url, {
+                        method: processUrl ? 'POST' : 'GET',
+                        headers:{Accept:'application/json', 'X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]')?.content ?? ''},
+                        cache:'no-store',
+                    });
+                    const progress = await poll.json();
+                    if (!poll.ok) throw new Error(progress?.message ?? 'Generation status is unavailable.');
+                    generation = progress.data;
+                    return generation;
+                },
+            });
+            cancel.remove();
+            payload = {data:completedProposal};
             const previousProposal = panel.querySelector('[data-ai-proposal]');
             previousProposal?.remove();
             const proposal = payload.data;
@@ -651,6 +759,7 @@ document.querySelectorAll('[data-ai-page-draft]').forEach((panel) => {
             status.textContent = error instanceof Error ? error.message : 'The page draft could not be generated. Try again.';
         } finally {
             button.disabled = false;
+            cancel.remove();
         }
     });
 });
@@ -1195,6 +1304,102 @@ document.querySelectorAll('form[data-confirm]').forEach((form) => form.addEventL
 }));
 
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+
+const departmentChat = document.querySelector('[data-department-chat]');
+if (departmentChat) {
+    const feed = departmentChat.querySelector('[data-chat-feed]');
+    const composer = departmentChat.querySelector('[data-chat-composer]');
+    const composerInput = departmentChat.querySelector('[data-chat-composer-input]');
+    const feedback = departmentChat.querySelector('[data-chat-feedback]');
+    let refreshing = false;
+
+    const setFeedback = (message = '', state = '') => {
+        if (!feedback) return;
+        feedback.textContent = message;
+        feedback.dataset.state = state;
+    };
+    const nearBottom = () => !feed || feed.scrollHeight - feed.scrollTop - feed.clientHeight < 120;
+    const scrollToBottom = (behavior = 'auto') => feed?.scrollTo({ top: feed.scrollHeight, behavior });
+    const resizeTextarea = (textarea) => {
+        textarea.style.height = 'auto';
+        textarea.style.height = `${Math.min(textarea.scrollHeight, 140)}px`;
+    };
+    const refreshMessages = async ({ force = false, scroll = false } = {}) => {
+        if (!feed || refreshing || document.hidden) return;
+        if (!force && departmentChat.querySelector('.department-chat-inline:not([hidden])')) return;
+        refreshing = true;
+        const shouldScroll = scroll || nearBottom();
+        try {
+            const response = await fetch(departmentChat.dataset.messagesUrl, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.message || 'Messages could not be refreshed.');
+            if (typeof result.html === 'string' && result.html !== feed.innerHTML) feed.innerHTML = result.html;
+            if (shouldScroll) scrollToBottom(scroll ? 'smooth' : 'auto');
+        } catch (error) {
+            setFeedback(error instanceof Error ? error.message : 'Messages could not be refreshed.', 'error');
+        } finally {
+            refreshing = false;
+        }
+    };
+    const submitChatForm = async (form) => {
+        if (form.dataset.submitting === 'true') return;
+        form.dataset.submitting = 'true';
+        const submit = form.querySelector('[type="submit"],button:not([type])');
+        if (submit) submit.disabled = true;
+        setFeedback('Sending…', 'pending');
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST', body: new FormData(form), credentials: 'same-origin',
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}) },
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.message || Object.values(result.errors || {})[0]?.[0] || 'The message could not be saved.');
+            if (form === composer) { form.reset(); resizeTextarea(composerInput); }
+            form.hidden = form !== composer;
+            setFeedback(result.message || 'Saved.', 'success');
+            await refreshMessages({ force: true, scroll: true });
+            window.setTimeout(() => setFeedback(), 1600);
+        } catch (error) {
+            setFeedback(error instanceof Error ? error.message : 'The message could not be saved.', 'error');
+        } finally {
+            delete form.dataset.submitting;
+            if (submit) submit.disabled = false;
+        }
+    };
+
+    addPageListener(departmentChat, 'click', (event) => {
+        const message = event.target.closest('[data-chat-message]');
+        if (event.target.closest('[data-chat-reply]')) {
+            message?.querySelector('[data-chat-edit-form]')?.setAttribute('hidden', '');
+            const form = message?.querySelector('[data-chat-reply-form]');
+            if (form) { form.hidden = false; form.querySelector('textarea')?.focus(); }
+        }
+        if (event.target.closest('[data-chat-edit]')) {
+            message?.querySelector('[data-chat-reply-form]')?.setAttribute('hidden', '');
+            const form = message?.querySelector('[data-chat-edit-form]');
+            if (form) { form.hidden = false; form.querySelector('textarea')?.focus(); }
+        }
+        if (event.target.closest('[data-chat-inline-cancel]')) event.target.closest('.department-chat-inline').hidden = true;
+    });
+    addPageListener(departmentChat, 'submit', (event) => {
+        const form = event.target.closest('[data-chat-composer],[data-chat-reply-form],[data-chat-edit-form],[data-chat-delete-form]');
+        if (!form) return;
+        event.preventDefault();
+        if (form.matches('[data-chat-delete-form]') && !window.confirm('Delete this message?')) return;
+        void submitChatForm(form);
+    });
+    addPageListener(composerInput, 'input', () => resizeTextarea(composerInput));
+    addPageListener(composerInput, 'keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+            event.preventDefault();
+            composer.requestSubmit();
+        }
+    });
+    addPageListener(document, 'visibilitychange', () => { if (!document.hidden) void refreshMessages(); });
+    setPageInterval(() => void refreshMessages(), 4000);
+    resizeTextarea(composerInput);
+    window.requestAnimationFrame(() => scrollToBottom());
+}
 
 const notificationStack = document.querySelector('[data-notification-stack]');
 const notificationTimers = new Map();

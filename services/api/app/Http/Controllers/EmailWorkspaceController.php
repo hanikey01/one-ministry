@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\MinistrySetting;
 use App\Services\EmailDeliverySettingsService;
+use App\Services\EmailCampaignService;
 use App\Services\EmailTemplateService;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -12,9 +14,9 @@ use Illuminate\Validation\Rule;
 
 final class EmailWorkspaceController extends Controller
 {
-    public function index(Request $request, EmailDeliverySettingsService $delivery, EmailTemplateService $templates): View
+    public function index(Request $request, EmailDeliverySettingsService $delivery, EmailTemplateService $templates, EmailCampaignService $campaigns): View
     {
-        return view('staff.email', ['settings' => MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID), 'user' => $request->user(), 'emailDelivery' => $delivery->setting(), 'emailDeliveryActive' => $delivery->active(), 'emailProviders' => EmailDeliverySettingsService::providers(), 'templates' => $templates->templates()]);
+        return view('staff.email', ['settings' => MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID), 'user' => $request->user(), 'emailDelivery' => $delivery->setting(), 'emailDeliveryActive' => $delivery->active(), 'emailProviders' => EmailDeliverySettingsService::providers(), 'templates' => $templates->templates(), 'campaigns' => \Illuminate\Support\Facades\DB::table('email_campaigns')->orderByDesc('created_at')->paginate(12, ['*'], 'campaign_page'), 'eligibleCampaignRecipients' => $campaigns->eligibleRecipientCount()]);
     }
 
     public function updateDelivery(Request $request, EmailDeliverySettingsService $delivery): RedirectResponse
@@ -56,5 +58,28 @@ final class EmailWorkspaceController extends Controller
     public function preview(string $template, EmailTemplateService $templates): \Illuminate\Http\Response
     {
         return response($templates->preview($template))->header('Content-Type', 'text/html')->header('Content-Security-Policy', "default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; frame-ancestors 'self';");
+    }
+
+    public function createCampaign(Request $request, EmailCampaignService $campaigns): RedirectResponse
+    {
+        $data = $request->validate(['name' => ['required', 'string', 'max:160'], 'subject' => ['required', 'string', 'max:255'], 'body' => ['required', 'string', 'max:12000']]);
+        $campaigns->create($data, $request->user(), $request->ip());
+        return to_route('staff.email', ['campaigns' => 1])->with('status', 'Email campaign saved as a draft. Review its recipient estimate, then choose when to send it.');
+    }
+
+    public function scheduleCampaign(Request $request, string $campaign, EmailCampaignService $campaigns): RedirectResponse
+    {
+        $data = $request->validate(['scheduled_at' => ['required', 'date']]);
+        $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
+        $scheduledAt = CarbonImmutable::parse($data['scheduled_at'], $settings->timezone)->utc();
+        if ($scheduledAt->lt(now()->subMinute())) return back()->withErrors(['scheduled_at' => 'Choose a time now or in the future.']);
+        $campaigns->schedule($campaign, $scheduledAt, $request->user(), $request->ip());
+        return to_route('staff.email', ['campaigns' => 1])->with('status', 'Campaign scheduled. It will send only to people who still allow ministry email when their delivery is processed.');
+    }
+
+    public function cancelCampaign(Request $request, string $campaign, EmailCampaignService $campaigns): RedirectResponse
+    {
+        $campaigns->cancel($campaign, $request->user(), $request->ip());
+        return to_route('staff.email', ['campaigns' => 1])->with('status', 'Scheduled campaign cancelled.');
     }
 }

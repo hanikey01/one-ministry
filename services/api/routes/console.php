@@ -11,4 +11,6 @@ Artisan::command('inspire', function () {
 Schedule::command('ministry:prune-playback-diagnostics')->dailyAt('03:20')->withoutOverlapping();
 Schedule::command('ministry:probe-live-streams')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('ministry:record-scheduler-heartbeat')->everyMinute()->withoutOverlapping();
+Schedule::command('ministry:send-email-campaigns --limit=50')->everyMinute()->withoutOverlapping();
+Schedule::command('ministry:process-ai-pages --limit=1')->everyMinute()->withoutOverlapping();
 Schedule::command('ministry:refresh-ai-model-catalogs')->dailyAt('04:10')->withoutOverlapping();

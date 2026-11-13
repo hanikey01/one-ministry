@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ModuleAvailability;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -10,6 +11,9 @@ class StaffReportController extends Controller
 {
     public function show(Request $request, string $report): JsonResponse
     {
+        if ($report === 'services') {
+            abort_unless(app(ModuleAvailability::class)->visibleToStaff('attendance', $request->user()), 404);
+        }
         $request->validate(['from' => ['nullable', 'date'], 'to' => ['nullable', 'date', 'after_or_equal:from']]);
         $from = $request->date('from')?->startOfDay() ?? now()->subDays(30)->startOfDay();
         $to = $request->date('to')?->endOfDay() ?? now()->endOfDay();

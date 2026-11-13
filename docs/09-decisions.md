@@ -1,5 +1,11 @@
 # 09 — Decisions and Open Questions
 
+### D-043 - Page AI transport and route verification upgrade
+
+Accepted by user direction, 2026-11-13. This supersedes the all-models-must-pass route activation rule in older AI documentation. Test each configured provider/model independently with a bounded nested composition probe. A passing primary may activate a degraded route when a fallback fails. Runtime readiness failures advance through configured fallbacks inside the attempt boundary; disappearance of one model must not disable usable alternatives. Persist per-model probe version, outcome, timestamp, and safe failure code. Gemini catalog discovery alone is not evidence of structured-output support; unverified text candidates remain selectable for testing.
+
+The requested compact composition compiler, two-stage workflow, durable generation jobs, approved media context, and proposal-review upgrades are subsequent work. This decision does not claim those upgrades are implemented. Staff application, save, and publication remain separate explicit actions.
+
 **Status:** Living record. This file distinguishes user-set direction from working assumptions and implementation choices awaiting validation.
 
 ## 1. Confirmed product direction
@@ -196,3 +202,19 @@ When a question is resolved, record date, decision maker, evidence, alternatives
 **Reason:** Delivery credentials, operational verification, and message content form one supportable workflow but do not belong to visual appearance settings. Bounded templates preserve ministry voice without allowing arbitrary HTML, broken security links, or provider-specific content storage.
 
 **Status:** Accepted by user direction, 2026-10-29. Initial wiring covers staff verification, password recovery, and staff invitations; other catalog templates are available for subsequent workflow integration.
+
+### D-041 — Attendance is unreleased and disabled by default
+
+**Decision:** Core service attendance is an unreleased optional feature. Every fresh installation creates it disabled. When disabled, the application hides member Participation navigation and attendance metrics, omits attendance data from member and staff-person responses, and rejects attendance routes and mutations server-side. Existing attendance tables and historical records remain intact. Playback diagnostics remain available as a separate operational media-health capability and must not be presented as attendance. Department gathering attendance remains part of the Department domain and is not changed by this decision.
+
+**Reason:** User direction, 2026-11-11. The current service-attendance workflow is not ready for deployers, so it must not appear in the product until its end-to-end experience and release checks are complete.
+
+**Status:** Accepted for the pre-release baseline. Re-enabling Attendance requires the outstanding workflow, authorization, browser, and data-verification gates to be completed.
+
+### D-042 — Campaign email belongs in the Email workspace
+
+**Decision:** The Email workspace owns installation delivery configuration, transactional templates, and custom ministry email campaigns. Campaigns may target only people with a valid email address who have opted in to optional ministry email. Campaigns are saved as drafts, explicitly scheduled, then sent in bounded, restart-safe scheduler batches. Delivery rechecks consent immediately before each send and records sent, failed, or skipped results. The separate Communications campaign surface and its incomplete legacy tables are removed from the fresh-install baseline.
+
+**Reason:** One Email workspace gives staff a coherent delivery and campaign workflow while preserving consent, shared-hosting operation, and clear separation from transactional system messages.
+
+**Status:** Accepted and implemented for the fresh-install baseline, 2026-11-11. SMS remains outside this implementation step.

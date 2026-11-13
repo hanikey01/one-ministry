@@ -27,7 +27,10 @@ class AiModelSettingsTest extends TestCase
             ->assertJsonPath('data.provider_key', 'gemini')
             ->assertJsonPath('data.provider.configured', true)
             ->assertJsonPath('data.provider.enabled', true)
+            ->assertJsonPath('data.redirect', route('staff.ai-settings'))
             ->assertJsonMissing(['api_key' => 'gemini-private-key']);
+
+        $response->assertSessionHas('status', 'AI provider settings saved. Refresh its model catalog to verify the connection.');
 
         $connection = DB::table('ai_provider_connections')->where('provider_key', 'gemini')->first();
         $this->assertNotNull($connection);

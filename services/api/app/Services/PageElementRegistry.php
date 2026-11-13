@@ -21,7 +21,7 @@ final class PageElementRegistry
             'social_links'=>['title','facebook_url','instagram_url','youtube_url'], 'contact_form'=>['title','body','submit_label'],
             'map_directions'=>['title','address','directions_url','button_label'], 'spacer'=>['height'], 'quote'=>['text','attribution'], 'divider'=>[],
             'call_to_action'=>['title','body','button_label','button_url'], 'service_times'=>['title','body'], 'events'=>['title','body'], 'departments'=>['title','body'],
-            'locations'=>['title','body','button_label','button_url'], 'carousel'=>['eyebrow','title','body','slides','button_label','button_url'],
+            'locations'=>['title','body','button_label','button_url'], 'carousel'=>['eyebrow','title','body','slide_one_type','slide_one_media_url','slide_one_title','slide_one_body','slide_one_button_label','slide_one_button_url','slide_two_type','slide_two_media_url','slide_two_title','slide_two_body','slide_two_button_label','slide_two_button_url','slide_three_type','slide_three_media_url','slide_three_title','slide_three_body','slide_three_button_label','slide_three_button_url','slides','button_label','button_url'],
             'live_service'=>['title','body','button_label','button_url'], 'giving'=>['title','body','button_label','button_url'], 'prayer'=>['title','body','button_label','button_url'],
             'sermon_spotlight'=>['title','body','button_label','button_url'], 'books'=>['title','body','button_label','button_url'], 'announcements'=>['title','body'],
             'newsletter'=>['title','body'], 'next_steps'=>['title','body'], 'welcome'=>['title','body'],
@@ -99,7 +99,7 @@ final class PageElementRegistry
         $long=['body','text','description','items','rows','slides','quote','reason','html','css','javascript','fallback','address']; $result=[];
         foreach($fields as $field) $result[$field]=['label'=>str($field)->replace('_',' ')->title()->toString(),
             'control'=>in_array($field,$long,true)||str_contains($field,'content')||str_contains($field,'answer')?'textarea':'text',
-            'media'=>in_array($field,['url','media_url','images'],true)&&$type!=='button', 'options'=>$this->fieldOptions($field), 'validation'=>$this->fieldValidation($type,$field)];
+            'media'=>(in_array($field,['url','media_url','images'],true)||str_ends_with($field,'_media_url'))&&$type!=='button', 'options'=>$this->fieldOptions($field), 'validation'=>$this->fieldValidation($type,$field)];
         return $result;
     }
     /** @return array<int,string> */
@@ -119,7 +119,7 @@ final class PageElementRegistry
         if ($field==='height') $rule['enum']=['small','medium','large'];
         if ($field==='icon') $rule['enum']=['heart','people','calendar','location','message','book','star','check','hand-heart','globe'];
         if ($field==='value') $rule += ['format'=>'integer','min'=>0,'max_value'=>100];
-        if ($field==='button_url'||($type==='button'&&$field==='url')) $rule['format']='internal_or_http_url';
+        if ($field==='button_url'||preg_match('/^slide_(one|two|three)_button_url$/', $field)===1||($type==='button'&&$field==='url')) $rule['format']='internal_or_http_url';
         elseif ($field==='images') $rule += ['format'=>'http_url_list','max_items'=>12];
         elseif ($field==='url'||$field==='media_url'||str_ends_with($field,'_url')) $rule['format']='http_url';
         return $rule;
@@ -131,7 +131,8 @@ final class PageElementRegistry
             'tone'=>[['info','Information'],['success','Success'],['warning','Warning']],
             'icon'=>[['heart','Heart'],['people','People'],['calendar','Calendar'],['location','Location'],['message','Message'],['book','Book'],['star','Star'],['check','Check'],['hand-heart','Care'],['globe','Globe']],
             'columns'=>[['two','Two'],['three','Three'],['four','Four']], 'placement'=>[['left','Media left'],['right','Media right']],
-            'ordered'=>[['no','Bulleted'],['yes','Numbered']], 'height'=>[['small','Small'],['medium','Medium'],['large','Large']], default=>[]};
+            'ordered'=>[['no','Bulleted'],['yes','Numbered']], 'height'=>[['small','Small'],['medium','Medium'],['large','Large']],
+            'slide_one_type','slide_two_type','slide_three_type'=>[['flyer','Flyer'],['video','Video']], default=>[]};
     }
     /** @param array<int,string> $keys @return array<string,array<string,mixed>> */
     private function controlDefinitions(array $keys): array
@@ -141,7 +142,7 @@ final class PageElementRegistry
             'background'=>['canvas','surface','surface_muted','action','brand'],'background_position'=>['left_top','center_top','right_top','left_center','center_center','right_center','left_bottom','center_bottom','right_bottom'],
             'background_size'=>['auto','cover','contain'],'background_repeat'=>['no_repeat','repeat','repeat_x','repeat_y'],'background_attachment'=>['scroll','fixed'],
             'border'=>['none','subtle','strong'],'border_style'=>['none','solid','dashed','dotted'],'overflow'=>['visible','hidden'],'vertical_alignment'=>['start','center','end','stretch'],
-            'font_family'=>['inherit','system','arial','verdana','trebuchet','georgia','times','palatino','courier'],'font_weight'=>['400','500','600','700','800'],
+            'font_family'=>['inherit','system','verdana','trebuchet','georgia','palatino'],'font_weight'=>['400','500','600','700','800'],
             'text_transform'=>['none','uppercase','lowercase','capitalize'],'button_width'=>['auto','full'],'visibility'=>['visible','hidden'],
             'alignment'=>['left','center','right','stretch'],'order'=>['1','2','3','4'],
         ];

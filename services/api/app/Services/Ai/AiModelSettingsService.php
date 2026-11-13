@@ -5,6 +5,7 @@ namespace App\Services\Ai;
 use App\Models\User;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -52,7 +53,7 @@ final class AiModelSettingsService
 
         $labels = AiProviderRegistry::labels();
         $query = DB::table('ai_model_catalog')->whereIn('provider_key', $enabledProviders)
-            ->where('availability', 'available')->where('supports_structured_output', true);
+            ->where('availability', 'available')->where(fn ($query) => $query->where('supports_structured_output', true)->orWhere('provider_key', 'gemini'));
         $term = mb_strtolower(trim($search));
         if ($term !== '') {
             $pattern = '%'.$term.'%';
@@ -129,10 +130,15 @@ final class AiModelSettingsService
             foreach ($models as $model) {
                 if (! is_string($model['model_id'] ?? null) || $model['model_id'] === '' || strlen($model['model_id']) > 190) continue;
                 $key = ['provider_key' => $provider, 'model_id' => $model['model_id']];
+                $previous = DB::table('ai_model_catalog')->where($key)->first();
+                $previousMetadata = json_decode($previous->metadata ?? '{}', true) ?: [];
+                $compatibility = $previousMetadata['page_editor_compatibility'] ?? null;
+                $metadata = $model['metadata'];
+                if (is_array($compatibility)) $metadata['page_editor_compatibility'] = $compatibility;
                 $values = [
                     'display_name' => Str::limit((string) $model['display_name'], 255, ''), 'context_window' => $model['context_window'],
-                    'supports_structured_output' => $model['supports_structured_output'], 'input_modalities' => json_encode($model['input_modalities'], JSON_THROW_ON_ERROR),
-                    'output_modalities' => json_encode($model['output_modalities'], JSON_THROW_ON_ERROR), 'metadata' => json_encode($model['metadata'], JSON_THROW_ON_ERROR),
+                    'supports_structured_output' => $model['supports_structured_output'] || ($provider === 'gemini' && ($compatibility['passed'] ?? false)), 'input_modalities' => json_encode($model['input_modalities'], JSON_THROW_ON_ERROR),
+                    'output_modalities' => json_encode($model['output_modalities'], JSON_THROW_ON_ERROR), 'metadata' => json_encode($metadata, JSON_THROW_ON_ERROR),
                     'availability' => 'available', 'last_seen_at' => $now, 'updated_at' => $now,
                 ];
                 if (DB::table('ai_model_catalog')->where($key)->exists()) {
@@ -151,6 +157,9 @@ final class AiModelSettingsService
 
     private function catalogFailureMessage(Throwable $exception): string
     {
+        if ($exception instanceof AiProviderException) {
+            return 'Model catalog request failed: '.$exception->diagnosticCode.($exception->httpStatus ? ' (HTTP '.$exception->httpStatus.')' : '').'. The previous catalog was kept.';
+        }
         $reason = $exception->getMessage();
         if (preg_match('/^provider_http_(\d+|unknown):\s*(.*)$/', $reason, $matches)) {
             $status = $matches[1];
@@ -187,7 +196,7 @@ final class AiModelSettingsService
         });
     }
 
-    /** @return array{model:string, latency_ms:int} */
+    /** @return array{models:int,latency_ms:int,degraded:bool,failures:array} */
     public function testPageEditorRoute(User $actor, ?string $ip): array
     {
         $route = DB::table('ai_task_routes')->where('task_key', 'page_editor')->first();
@@ -201,37 +210,33 @@ final class AiModelSettingsService
             try {
                 $connection = DB::table('ai_provider_connections')->where('provider_key', $choice['provider'])->where('enabled', true)->first();
                 if (! $connection || blank($connection->api_key_encrypted)) throw new RuntimeException('provider_not_ready');
-                $probe = $this->providers->get($choice['provider'])->generateStructuredOutput(
+                $probe = $this->providers->get($choice['provider'])->validateStructuredOutput(
                     Crypt::decryptString($connection->api_key_encrypted),
                     $choice['model_id'],
-                    'Return only JSON that matches the supplied schema.',
-                    'Confirm that this model can return a compact, nested structured page-design response.',
-                    $this->pageEditorRouteProbeSchema(),
-                    'ministry_page_editor_route_probe',
-                    180,
                 );
-                if (($probe['output']['ready'] ?? null) !== true || ! is_array($probe['output']['sections'] ?? null)) {
-                    throw new RuntimeException('structured_output_failed');
-                }
+                $this->recordCompatibility($choice, true, null);
                 $results[] = ['provider' => $choice['provider'], 'model_id' => $choice['model_id'], ...$probe];
             } catch (Throwable $exception) {
+                $diagnostic = $exception instanceof AiProviderException ? $exception->diagnosticCode : match ($exception->getMessage()) {
+                    'provider_not_ready' => 'provider_not_ready',
+                    'structured_output_failed' => 'structured_output_failed',
+                    default => 'compatibility_probe_error',
+                };
+                Log::warning('AI model compatibility probe failed.', ['provider' => $choice['provider'], 'model' => $choice['model_id'], 'diagnostic' => $diagnostic, 'exception' => $exception::class]);
+                $this->recordCompatibility($choice, false, $diagnostic);
                 $failures[] = [
                     'provider' => $choice['provider'],
                     'model' => $choice['model_id'],
-                    'reason' => match ($exception->getMessage()) {
+                    'reason' => $exception instanceof AiProviderException ? $exception->diagnosticCode.($exception->httpStatus ? ' (HTTP '.$exception->httpStatus.')' : '') : match ($exception->getMessage()) {
                         'provider_not_ready' => 'provider is not configured or enabled',
                         'structured_output_failed' => 'provider did not return the required JSON shape',
-                        str_starts_with($exception->getMessage(), 'provider_http_400:') => 'provider rejected the structured-output request (HTTP 400): '.substr($exception->getMessage(), strlen('provider_http_400: ')),
-                        str_starts_with($exception->getMessage(), 'provider_http_401:') => 'provider rejected the API key (HTTP 401): '.substr($exception->getMessage(), strlen('provider_http_401: ')),
-                        str_starts_with($exception->getMessage(), 'provider_http_403:') => 'provider denied access to this model (HTTP 403): '.substr($exception->getMessage(), strlen('provider_http_403: ')),
-                        str_starts_with($exception->getMessage(), 'provider_http_404:') => 'model was not found or is no longer available (HTTP 404): '.substr($exception->getMessage(), strlen('provider_http_404: ')),
-                        str_starts_with($exception->getMessage(), 'provider_http_429:') => 'provider rate limit reached (HTTP 429): '.substr($exception->getMessage(), strlen('provider_http_429: ')),
-                        default => 'provider error: '.substr((string) preg_replace('/[^a-zA-Z0-9 .:_-]/', '', $exception->getMessage()), 0, 180),
+                        default => $diagnostic,
                     },
                 ];
             }
         }
-        if ($failures !== []) {
+        $primaryPassed = collect($results)->contains(fn (array $result): bool => $result['provider'] === $route->primary_provider && $result['model_id'] === $route->primary_model);
+        if (! $primaryPassed) {
             DB::transaction(function () use ($actor, $ip): void {
                 DB::table('ai_task_routes')->where('task_key', 'page_editor')->update(['status' => 'unverified', 'last_verified_at' => null, 'updated_at' => now()]);
                 $this->audit($actor, 'ai.page_editor_route.test_failed', 'page_editor', ['failed' => true, 'ip' => $ip]);
@@ -239,26 +244,25 @@ final class AiModelSettingsService
             $details = collect($failures)->map(fn (array $failure): string => strtoupper($failure['provider']).' / '.$failure['model'].' — '.$failure['reason'])->implode('; ');
             throw new RuntimeException('Compatibility check failed for: '.$details.'. The route remains inactive.');
         }
-        DB::transaction(function () use ($actor, $ip, $results): void {
-            DB::table('ai_task_routes')->where('task_key', 'page_editor')->update(['status' => 'verified', 'last_verified_at' => now(), 'updated_at' => now()]);
+        DB::transaction(function () use ($actor, $ip, $results, $failures): void {
+            DB::table('ai_task_routes')->where('task_key', 'page_editor')->update(['status' => $failures === [] ? 'verified' : 'degraded', 'last_verified_at' => now(), 'updated_at' => now()]);
             $this->audit($actor, 'ai.page_editor_route.test_passed', 'page_editor', ['models' => array_map(fn (array $result): array => ['provider' => $result['provider'], 'model' => $result['model'], 'latency_ms' => $result['latency_ms']], $results), 'ip' => $ip]);
         });
 
-        return ['models' => count($results), 'latency_ms' => array_sum(array_column($results, 'latency_ms'))];
+        return ['models' => count($results), 'latency_ms' => array_sum(array_column($results, 'latency_ms')), 'degraded' => $failures !== [], 'failures' => $failures];
     }
 
-    /** @return array<string,mixed> */
-    private function pageEditorRouteProbeSchema(): array
+    /** @param array{provider:string,model_id:string} $choice */
+    private function recordCompatibility(array $choice, bool $passed, ?string $code): void
     {
-        return ['type' => 'object', 'properties' => [
-            'ready' => ['type' => 'boolean'],
-            'sections' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 2, 'items' => [
-                'type' => 'object', 'properties' => [
-                    'purpose' => ['type' => 'string'],
-                    'elements' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 3, 'items' => ['type' => 'string']],
-                ], 'required' => ['purpose', 'elements'], 'additionalProperties' => false,
-            ]],
-        ], 'required' => ['ready', 'sections'], 'additionalProperties' => false];
+        $query = DB::table('ai_model_catalog')->where('provider_key', $choice['provider'])->where('model_id', $choice['model_id']);
+        $row = $query->first();
+        if (! $row) return;
+        $metadata = json_decode($row->metadata ?: '{}', true) ?: [];
+        $metadata['page_editor_compatibility'] = ['version' => AiCompositionProbe::VERSION, 'passed' => $passed, 'checked_at' => now()->toIso8601String(), 'failure_code' => $code];
+        $values = ['metadata' => json_encode($metadata, JSON_THROW_ON_ERROR), 'updated_at' => now()];
+        if ($passed) $values['supports_structured_output'] = true;
+        $query->update($values);
     }
 
     /** @return array{provider:string,model_id:string} */
@@ -282,6 +286,16 @@ final class AiModelSettingsService
         if (! $route || ! $route->primary_model) return;
         $fallbacks = json_decode($route->fallback_models ?: '[]', true);
         $selected = [['provider' => $route->primary_provider, 'model_id' => $route->primary_model], ...(is_array($fallbacks) ? $fallbacks : [])];
+        $usable = 0;
+        foreach ($selected as $choice) {
+            if (is_array($choice) && $this->isModelRouteCompatible((string) ($choice['provider'] ?? ''), (string) ($choice['model_id'] ?? ''))) $usable++;
+        }
+        if ($usable > 0) {
+            if ($usable < count($selected) && in_array($route->status, ['verified', 'degraded'], true)) {
+                DB::table('ai_task_routes')->where('task_key', 'page_editor')->update(['status' => 'degraded', 'updated_at' => now()]);
+            }
+            return;
+        }
         foreach ($selected as $choice) {
             if (! is_array($choice) || ! $this->isModelRouteCompatible((string) ($choice['provider'] ?? ''), (string) ($choice['model_id'] ?? ''))) {
                 if ($route->status !== 'unavailable') {
@@ -302,7 +316,7 @@ final class AiModelSettingsService
 
     private function isRecommendedCatalogModel(object $model): bool
     {
-        if (! $model->supports_structured_output) return false;
+        if (! $model->supports_structured_output && ($model->provider_key ?? null) !== 'gemini') return false;
         $inputs = json_decode($model->input_modalities ?: '[]', true);
         $outputs = json_decode($model->output_modalities ?: '[]', true);
         $identity = mb_strtolower((string) ($model->model_id ?? '').' '.(string) ($model->display_name ?? ''));
@@ -315,11 +329,15 @@ final class AiModelSettingsService
 
     private function invalidateRoutesUsingProvider(string $provider): void
     {
-        foreach (DB::table('ai_task_routes')->where('status', 'verified')->get() as $route) {
+        foreach (DB::table('ai_task_routes')->whereIn('status', ['verified', 'degraded'])->get() as $route) {
             $fallbacks = json_decode($route->fallback_models ?: '[]', true) ?: [];
             $usesProvider = $route->primary_provider === $provider || collect($fallbacks)->contains(fn ($model): bool => is_array($model) && ($model['provider'] ?? null) === $provider);
             if ($usesProvider) {
-                DB::table('ai_task_routes')->where('task_key', $route->task_key)->update(['status' => 'unverified', 'last_verified_at' => null, 'updated_at' => now()]);
+                DB::table('ai_task_routes')->where('task_key', $route->task_key)->update([
+                    'status' => $route->primary_provider === $provider ? 'unverified' : 'degraded',
+                    'last_verified_at' => $route->primary_provider === $provider ? null : $route->last_verified_at,
+                    'updated_at' => now(),
+                ]);
             }
         }
     }

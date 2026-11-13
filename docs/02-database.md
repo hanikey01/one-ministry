@@ -1,5 +1,9 @@
 # 02 — Data Model and Migration Rules
 
+## Durable AI page proposals - 2026-11-13
+
+`ai_page_generations` stores installation-local, owner-scoped proposal work. UUID primary key; actor_user_id references users with cascade deletion; actor/idempotency_key is unique; request_hash prevents key reuse with different input. State is queued, planning, composing, compiling, completed, failed, or cancelled. Encrypted payload holds staff input, intermediate plan/composition and proposal; it is never public content. stage_attempt bounds attempts to six per provider stage. available_at indexes due work; lease_token and lease_expires_at provide compare-and-swap ownership and stale recovery. failure_code is safe diagnostics only. Created/updated/completed timestamps support seven-day terminal retention. Cancellation invalidates the lease so in-flight results cannot overwrite it. No page record is written by generation.
+
 **Status:** Logical schema. Column-level migrations follow the approved contracts. MySQL/MariaDB is the shared-hosting baseline; PostgreSQL remains supported.
 
 ## 1. Conventions
@@ -53,7 +57,7 @@ Staff invitations use `staff_invitations(id uuid PK, email varchar(254), name va
 | Attendance | `attendance_records`, `attendance_corrections`, `anonymous_viewer_aggregates`, `presence_sessions` | Identified attendance unique per person, occurrence, and channel after reconciliation; anonymous aggregates never linked to people. |
 | Care | `prayer_requests`, `care_cases`, `care_notes`, `follow_up_tasks`, `task_activity` | Restricted visibility; assignments and state history; no general profile notes containing pastoral details. |
 | Community | `departments`, `department_memberships`, `department_join_requests`, `department_gatherings`, `department_attendance_records`, `department_messages`, `events`, `event_registrations` | Scoped membership, moderated discussion, dates and location, waitlist order, and registration integrity. |
-| Communication | `message_templates`, `campaigns`, `message_deliveries`, `notification_preferences` | Delivery outcome; consent snapshot; provider message ID unique where present. |
+| Communication | `email_templates`, `email_campaigns`, `email_campaign_deliveries`, `notification_preferences` | Transactional template configuration plus consent-filtered campaign delivery outcomes and retry state. |
 | Giving | `funds`, `donations`, `payment_attempts`, `payment_events`, `receipts`, `reconciliation_batches` | Append-only payment events; unique provider transaction ID; donation state derived from verified events. |
 | Testimonies | `testimonies` | Member submissions remain private until reviewed; public rows require explicit consent and published status. Author visibility is separate from authorship. |
 | Operations | `outbox_events`, `webhook_receipts`, `audit_events`, `export_jobs`, `backup_manifests` | Unique event IDs; immutable audit and webhook receipt rows. |

@@ -1,0 +1,85 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600;1,700&display=swap');
+
+/*
+ * Application typography contract.
+ * UI chrome is always Instrument Sans; editorial hierarchy is always Georgia.
+ * Public page content may select from the curated editor library.
+ */
+:root {
+    --font-ui: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-display: Georgia, 'Times New Roman', serif;
+    --type-xs: .75rem;
+    --type-sm: .875rem;
+    --type-base: 1rem;
+    --type-lg: 1.125rem;
+    --type-xl: 1.25rem;
+    --type-2xl: 1.5rem;
+    --type-3xl: 2rem;
+    --type-display: clamp(2.5rem, 5vw, 4rem);
+}
+
+html { font-size: 16px; }
+body, button, input, select, textarea { font-family: var(--font-ui); }
+
+.workspace-shell,
+.member-shell,
+.public-shell,
+.worship-shell,
+.meeting-shell,
+.auth-shell,
+.homepage,
+.public-page,
+.public-page-structured-section,
+.public-page-structured-column,
+.public-page-element > .page-element {
+    font-family: var(--font-ui) !important;
+}
+
+.workspace-shell :is(h1,h2,h3),
+.member-shell :is(h1,h2,h3),
+.public-shell :is(h1,h2,h3),
+.worship-shell :is(h1,h2,h3),
+.meeting-shell :is(h1,h2,h3),
+.auth-shell :is(h1,h2,h3),
+.homepage :is(h1,h2,h3) {
+    font-family: var(--font-display) !important;
+}
+
+.public-page-element[data-page-type='heading'],
+.public-page-element .public-page-structured-heading {
+    font-family: var(--font-display) !important;
+}
+
+/* Header wordmarks remain legible without a logo image. */
+.app-header-brand-wordmark {
+    font-family: var(--font-ui) !important;
+    font-size: clamp(.9rem, 2.6vw, 1.08rem) !important;
+    font-weight: 800;
+    letter-spacing: .07em;
+    line-height: 1;
+}
+
+/* The staff footer always reserves one slot for the complete sidebar menu. */
+.workspace-mobile-nav .workspace-mobile-menu {
+    display: grid !important;
+    min-width: 0;
+    place-items: center;
+    gap: 3px;
+    border: 0;
+    border-radius: 10px;
+    padding: 4px 2px;
+    background: transparent;
+    color: color-mix(in srgb, var(--sidebar-ink) 74%, transparent);
+    font: inherit;
+    font-size: .56rem;
+    font-weight: 760;
+    line-height: 1.1;
+}
+
+.workspace-mobile-nav .workspace-mobile-menu svg { width: 19px; height: 19px; }
+.workspace-mobile-nav .workspace-mobile-menu:hover,
+.workspace-mobile-nav .workspace-mobile-menu:focus-visible {
+    background: color-mix(in srgb, var(--sidebar-ink) 14%, transparent);
+    color: var(--sidebar-ink);
+    outline: 0;
+}

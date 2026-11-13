@@ -13,10 +13,11 @@ use RuntimeException;
 
 class AiPageDraftController extends Controller
 {
-    public function __invoke(Request $request, AiPageDraftService $drafts): JsonResponse
+    public function __invoke(Request $request): JsonResponse
     {
         $input = $request->validate([
             'brief' => ['required', 'string', 'min:20', 'max:3000'],
+            'review' => ['sometimes', 'boolean'],
             'title' => ['nullable', 'string', 'max:200'],
             'public_details' => ['nullable', 'string', 'max:5000'],
             'page_goal' => ['nullable', 'string', 'max:1000'],
@@ -30,29 +31,31 @@ class AiPageDraftController extends Controller
             'brand_constraints' => ['nullable', 'string', 'max:1500'],
         ]);
 
-        try {
-            $draft = $drafts->generate([
-                'brief' => trim($input['brief']),
-                'title' => isset($input['title']) ? trim($input['title']) : null,
-                'public_details' => isset($input['public_details']) ? trim($input['public_details']) : null,
-                'page_goal' => trim($input['page_goal'] ?? ''),
-                'audience' => trim($input['audience'] ?? ''),
-                'tone' => trim($input['tone'] ?? ''),
-                'visual_direction' => trim($input['visual_direction'] ?? ''),
-                'content_density' => $input['content_density'] ?? 'balanced',
-                'primary_action' => trim($input['primary_action'] ?? ''),
-                'required_sections' => trim($input['required_sections'] ?? ''),
-                'forbidden_patterns' => trim($input['forbidden_patterns'] ?? ''),
-                'brand_constraints' => trim($input['brand_constraints'] ?? ''),
-            ], $request->user(), $request->ip());
-            $draft['slug'] = Str::slug($draft['title']) ?: 'page-'.Str::lower(Str::random(6));
+        $key = $request->header('Idempotency-Key', (string) Str::uuid());
+        if (! is_string($key) || ! preg_match('/^[A-Za-z0-9_-]{1,80}$/', $key)) throw ValidationException::withMessages(['idempotency_key' => 'Use a valid request key.']);
+        $generations = app(\App\Services\Ai\AiPageGenerationService::class);
+        $row = $generations->enqueue($input, $request->user(), $key);
 
-            return response()->json(['data' => $draft]);
-        } catch (ValidationException $exception) {
-            throw $exception;
-        } catch (RuntimeException $exception) {
-            return response()->json(['error' => ['code' => 'ai_page_draft_unavailable', 'message' => $exception->getMessage()]], 503);
-        }
+        return response()->json(['data' => $generations->view($row)], 202);
+    }
+
+    public function generationStatus(Request $request, string $generation, \App\Services\Ai\AiPageGenerationService $generations): JsonResponse
+    {
+        return response()->json(['data' => $generations->view($generations->owned($generation, $request->user()))])->header('Cache-Control', 'no-store');
+    }
+
+    public function processGeneration(Request $request, string $generation, \App\Services\Ai\AiPageGenerationService $generations): JsonResponse
+    {
+        $row = $generations->processOwned($generation, $request->user());
+
+        return response()->json(['data' => $generations->view($row)])->header('Cache-Control', 'no-store');
+    }
+
+    public function cancelGeneration(Request $request, string $generation, \App\Services\Ai\AiPageGenerationService $generations): JsonResponse
+    {
+        $generations->cancel($generation, $request->user());
+
+        return response()->json(['data' => ['id' => $generation, 'state' => 'cancelled']]);
     }
 
     public function reviseObject(Request $request, AiPageDraftService $drafts, PageDocumentService $documents): JsonResponse

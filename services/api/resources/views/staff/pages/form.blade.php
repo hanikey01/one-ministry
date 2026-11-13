@@ -2,13 +2,13 @@
 <x-slot:navigation></x-slot:navigation>
 <header class="workspace-page-heading staff-page-command page-management-heading"><div><p>PUBLIC SITE · {{ $page ? str($page->status)->upper() : 'DRAFT' }}</p><h1>{{ $page ? $page->title : ($starter['label'] ?? 'New page') }}</h1><span>Build a responsive public page with visual sections, then save it as a private draft.</span></div><a class="button button-secondary" href="{{ route('staff.pages') }}" aria-label="Back to all pages" title="All pages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6M8 12h10"/></svg><span>All pages</span></a></header>
 @if(session('status'))<div class="workspace-notice workspace-notice-success">{{ session('status') }}</div>@endif @if($errors->any())<div class="workspace-notice workspace-notice-error">{{ $errors->first() }}</div>@endif
-<form class="page-block-editor-form" method="POST" action="{{ $page ? route('staff.pages.update',$page->id) : route('staff.pages.store') }}" data-page-block-editor data-element-catalog='@json($elementCatalog ?? [])' data-async-form data-async-pending-label="Saving draft…" data-preview-endpoint="{{ route('staff.pages.preview') }}" data-object-ai-endpoint="{{ route('staff.pages.ai-object-revision') }}" data-ai-available="{{ ($aiDraftRoute->status ?? null) === 'verified' ? 'true' : 'false' }}" data-blocks='@json($blocks)'>@csrf @if($page)@method('PUT')@endif<input type="hidden" name="blocks" data-page-block-input>
+<form class="page-block-editor-form" method="POST" action="{{ $page ? route('staff.pages.update',$page->id) : route('staff.pages.store') }}" data-page-block-editor data-element-catalog='@json($elementCatalog ?? [])' data-async-form data-async-pending-label="Saving draft…" data-preview-endpoint="{{ route('staff.pages.preview') }}" data-object-ai-endpoint="{{ route('staff.pages.ai-object-revision') }}" data-ai-available="{{ in_array($aiDraftRoute->status ?? null, ['verified', 'degraded'], true) ? 'true' : 'false' }}" data-blocks='@json($blocks)'>@csrf @if($page)@method('PUT')@endif<input type="hidden" name="blocks" data-page-block-input>
 <section class="page-editor-meta"><label>Page title<input name="title" required value="{{ old('title',$page->title ?? $starter['label'] ?? '') }}"></label><label>Page address<input name="slug" required value="{{ old('slug',$page->slug ?? $starter['slug'] ?? '') }}"></label><span><strong>Draft workspace</strong><small>Publish only after review.</small></span></section>
 @if(!$page && ($canPublish ?? false))<button class="button button-secondary" type="submit" name="publish" value="1">Publish page</button>@endif
 @if($aiDraftAvailable ?? false)
 <section class="ai-page-draft-panel" data-ai-page-draft data-endpoint="{{ route('staff.pages.ai-draft') }}" data-existing="{{ $page ? 'true' : 'false' }}">
     <div><p>AI PAGE DESIGNER</p><h2>What page would you like to create?</h2><span>Describe the result in your own words. AI will choose an appropriate structure, visual direction, responsive layout, and enabled elements. You can review everything before applying it.</span></div>
-    @if(($aiDraftRoute->status ?? null) === 'verified')
+    @if(in_array($aiDraftRoute->status ?? null, ['verified', 'degraded'], true))
         <p class="ai-page-route-state">Ready: {{ $aiDraftRoute->primary_provider }} · {{ $aiDraftRoute->primary_model }}</p>
     @else
         <p class="ai-page-route-state is-unavailable">AI drafting is unavailable until an administrator verifies a model route in AI model settings.</p>
@@ -21,6 +21,7 @@
             <label>Primary audience<input data-ai-audience maxlength="500" placeholder="First-time guests, members, parents, families…"></label>
             <label>Tone<input data-ai-tone maxlength="300" placeholder="Warm, confident, calm, energetic…"></label>
             <label>Content density<select data-ai-content-density><option value="balanced">Let AI decide</option><option value="concise">Concise</option><option value="detailed">Detailed</option></select></label>
+            <label><input type="checkbox" data-ai-optional-review> Add an optional design review<small>Keeps the first valid design if the review is unavailable.</small></label>
             <label>Visual direction<textarea data-ai-visual-direction maxlength="1000" rows="2" placeholder="Editorial, spacious, bold photography, understated cards…"></textarea></label>
             <label>Primary action<input data-ai-primary-action maxlength="500" placeholder="Plan a visit, register, request prayer…"></label>
             <label>Required sections or content<textarea data-ai-required-sections maxlength="1500" rows="2" placeholder="Content that must appear in the design"></textarea></label>
@@ -29,7 +30,7 @@
             <label>Additional confirmed public facts<textarea data-ai-public-details maxlength="5000" rows="3" placeholder="Service details, ministry language, or other public facts not included above"></textarea></label>
         </div>
     </details>
-    <div class="ai-page-draft-actions"><button class="button" type="button" data-ai-generate @disabled(($aiDraftRoute->status ?? null) !== 'verified')>Plan and design this page</button><span data-ai-status role="status" aria-live="polite"></span></div>
+    <div class="ai-page-draft-actions"><button class="button" type="button" data-ai-generate @disabled(! in_array($aiDraftRoute->status ?? null, ['verified', 'degraded'], true))>Plan and design this page</button><span data-ai-status role="status" aria-live="polite"></span></div>
 </section>
 @endif
 <button class="page-block-library-trigger" type="button" data-block-library-open aria-label="Open elements and sections" title="Add elements and sections"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button><div class="page-block-library-backdrop" data-block-library-close></div>

@@ -158,7 +158,7 @@ final class PageDocumentService
                 'overflow' => ['visible', 'hidden'],
                 'grid_preset' => ['one', 'two', 'three', 'four'],
                 'border_style' => ['none', 'solid', 'dashed', 'dotted'],
-                'font_family' => ['inherit', 'system', 'arial', 'verdana', 'trebuchet', 'georgia', 'times', 'palatino', 'courier'],
+                'font_family' => ['inherit', 'system', 'verdana', 'trebuchet', 'georgia', 'palatino', 'display'],
                 'font_weight' => ['400', '500', '600', '700', '800'],
                 'text_transform' => ['none', 'uppercase', 'lowercase', 'capitalize'],
                 'button_width' => ['auto', 'full'],

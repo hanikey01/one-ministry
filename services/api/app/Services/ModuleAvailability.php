@@ -14,12 +14,13 @@ class ModuleAvailability
      * @var array<string, list<string>>
      */
     private const ROUTE_PREFIXES = [
+        'attendance' => ['/member/activity', '/api/v1/staff/attendance'],
         'people' => [
             '/staff/people', '/api/v1/staff/people', '/staff/celebrations', '/api/v1/staff/celebrations',
             '/staff/follow-up', '/staff/follow-up-tasks', '/api/v1/staff/follow-up-tasks',
         ],
         'giving' => ['/staff/giving', '/api/v1/staff/giving', '/member/giving', '/give', '/api/v1/me/donations', '/api/v1/public/giving', '/api/v1/webhooks/giving'],
-        'testimonies' => ['/staff/testimonies','/member/testimonies','/testimonies'],
+        'testimonies' => ['/staff/testimonies', '/member/testimonies', '/testimonies'],
         'digital_church' => [
             '/staff/services', '/api/v1/staff/services', '/staff/service-schedule', '/api/v1/staff/service-schedule',
             '/staff/service-templates', '/api/v1/staff/service-templates', '/staff/recordings', '/api/v1/staff/recordings',
@@ -54,6 +55,10 @@ class ModuleAvailability
     {
         $path = '/'.ltrim($path, '/');
 
+        if (preg_match('#^/api/v1/staff/services/[^/]+/(?:attendance|anonymous-viewers|presence)$#', $path)) {
+            return 'attendance';
+        }
+
         foreach (self::ROUTE_PREFIXES as $key => $prefixes) {
             foreach ($prefixes as $prefix) {
                 if ($path === $prefix || str_starts_with($path, $prefix.'/')) {
@@ -69,7 +74,7 @@ class ModuleAvailability
         if (preg_match('#^/(?:api/v1/)?staff/libraries/([^/]+)#', $path, $matches)
             || preg_match('#^/api/v1/public/libraries/([^/]+)#', $path, $matches)
             || preg_match('#^/api/v1/public/sermon-series/([^/]+)#', $path, $matches)
-            || preg_match('#^/(?:api/v1/)?resources/([^/]+)#', $path, $matches)) {
+            || preg_match('#^/(?:api/v1/)?library/([^/]+)#', $path, $matches)) {
             return in_array($matches[1], self::LIBRARY_KEYS, true) ? $matches[1] : null;
         }
 

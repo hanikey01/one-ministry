@@ -21,6 +21,8 @@
                 <div class="content-edit-fields">
                     <label>Title<input name="title" value="{{ old('title') }}" required maxlength="200"></label>
                     @if($isSeries)
+                        <label>Series artwork<input type="file" name="cover_image" accept="image/jpeg,image/png,image/webp"></label>
+                        <label>Artwork description<input name="cover_image_alt" maxlength="180" placeholder="Describe the series artwork"></label>
                         <label class="field-wide">Description<textarea name="description" rows="4" maxlength="5000">{{ old('description') }}</textarea></label>
                     @else
                         @if($isVideo)
@@ -29,10 +31,14 @@
                         @else
                             <label class="field-wide">{{ $isBook ? 'Book file' : 'Audio file' }}<input type="file" name="file" required accept="{{ $isBook ? '.pdf,.epub,.doc,.docx,.mobi,.azw,.azw3,.txt' : 'audio/mpeg,audio/mp4,audio/wav,audio/ogg,audio/aac' }}"></label>
                         @endif
-                        <label>Speaker <input name="speaker" value="{{ old('speaker') }}" maxlength="160"></label>
-                        <label>Scripture reference <input name="scripture_reference" value="{{ old('scripture_reference') }}" maxlength="255"></label>
-                        <label>Duration in seconds <input type="number" name="duration_seconds" value="{{ old('duration_seconds') }}" min="0"></label>
-                        @if(!$isBook)<label>Series<select name="sermon_series_id"><option value="">No series</option>@foreach($series as $seriesItem)<option value="{{ $seriesItem->id }}">{{ $seriesItem->title }}</option>@endforeach</select></label>@endif
+                        @if(!$isBook)
+                            <label>Speaker <input name="speaker" value="{{ old('speaker') }}" maxlength="160"></label>
+                            <label>Series<select name="sermon_series_id"><option value="">No series</option>@foreach($series as $seriesItem)<option value="{{ $seriesItem->id }}">{{ $seriesItem->title }}</option>@endforeach</select></label>
+                        @else
+                            <label>Author <input name="author" value="{{ old('author') }}" maxlength="160"></label>
+                        @endif
+                        <label>Cover artwork @if($isBook)<em>Required</em>@endif<input type="file" name="cover_image" accept="image/jpeg,image/png,image/webp" @required($isBook)><small>Used as the public cover or media artwork.</small></label>
+                        <label>Artwork description<input name="cover_image_alt" maxlength="180" placeholder="Describe the cover image"></label>
                         <label>Category<select name="library_category_id"><option value="">No category</option>@foreach($categories as $category)<option value="{{ $category->id }}">{{ $category->name }}</option>@endforeach</select></label>
                         <label class="field-wide">Tags<select name="tag_ids[]" multiple size="4">@foreach($tags as $tag)<option value="{{ $tag->id }}">{{ $tag->name }}</option>@endforeach</select></label>
                         <label class="field-wide">Description<textarea name="description" rows="4" maxlength="5000">{{ old('description') }}</textarea></label>
@@ -61,7 +67,7 @@
 
         <form class="table-toolbar" method="GET" role="search">
             <input type="hidden" name="library" value="{{ $library }}">
-            <label class="people-search-field"><span class="sr-only">Search {{ $labels[$library] }}</span><input type="search" name="q" value="{{ $query }}" placeholder="Search title, speaker, or scripture"></label>
+            <label class="people-search-field"><span class="sr-only">Search {{ $labels[$library] }}</span><input type="search" name="q" value="{{ $query }}" placeholder="Search title, author, or speaker"></label>
             <label><span class="sr-only">Publication status</span><select name="status"><option value="">All statuses</option>@foreach(['draft' => 'Draft', 'published' => 'Published', 'rejected' => 'Rejected'] as $value => $label)<option value="{{ $value }}" @selected($status === $value)>{{ $label }}</option>@endforeach</select></label>
             <button class="button button-secondary" type="submit">Filter</button>
         </form>
@@ -74,7 +80,7 @@
                 @forelse($items as $item)
                     <tr>
                         <td data-label="Title"><strong>{{ $item->title }}</strong>@if(!$isSeries && $item->file_name)<small>{{ $item->file_name }}</small>@endif</td>
-                        <td data-label="Details">@if($isSeries){{ str($item->description)->limit(90) ?: '—' }}@else{{ $item->speaker ?: $item->category_name ?: '—' }}@if($item->scripture_reference)<small>{{ $item->scripture_reference }}</small>@endif@endif</td>
+                        <td data-label="Details">@if($isSeries){{ str($item->description)->limit(90) ?: '—' }}@else{{ $item->author ?: $item->speaker ?: $item->category_name ?: '—' }}@endif</td>
                         <td data-label="Status"><span class="table-status">{{ str($item->status)->headline() }}</span></td>
                         <td data-label="Actions">
                             <div class="content-library-row-actions">
@@ -86,7 +92,7 @@
                                 <form method="POST" action="{{ route('staff.content.destroy', [$library, $item->id]) }}" onsubmit="return confirm('Remove this content item?');">@csrf @method('DELETE')<button class="button button-secondary content-library-icon-action" type="submit" aria-label="Delete {{ $item->title }}" title="Delete"><x-ui.icon name="trash" :size="16"/><span class="sr-only">Delete</span></button></form>
                             </div>
                             <dialog class="workspace-dialog content-edit-dialog" id="content-edit-{{ $item->id }}" data-workspace-dialog aria-labelledby="content-edit-title-{{ $item->id }}">
-                                <form method="POST" action="{{ route('staff.content.update', [$library, $item->id]) }}" class="workspace-dialog-card content-edit-form">
+                                <form method="POST" action="{{ route('staff.content.update', [$library, $item->id]) }}" enctype="multipart/form-data" class="workspace-dialog-card content-edit-form">
                                     @csrf @method('PUT')
                                     <header>
                                         <div><p>{{ strtoupper(str($labels[$library])->singular()) }}</p><h2 id="content-edit-title-{{ $item->id }}">Edit {{ $item->title }}</h2><span>Update details without leaving this library.</span></div>
@@ -95,10 +101,19 @@
                                     <div class="content-edit-fields">
                                         <label>Title<input name="title" value="{{ $item->title }}" required maxlength="200"></label>
                                         @if(!$isSeries)
-                                            <label>Speaker<input name="speaker" value="{{ $item->speaker }}" maxlength="160"></label><label>Scripture reference<input name="scripture_reference" value="{{ $item->scripture_reference }}" maxlength="255"></label><label>Duration in seconds<input type="number" name="duration_seconds" value="{{ $item->duration_seconds }}" min="0"></label>
-                                            @if(!$isBook)<label>Series<select name="sermon_series_id"><option value="">No series</option>@foreach($series as $seriesItem)<option value="{{ $seriesItem->id }}" @selected($item->sermon_series_id === $seriesItem->id)>{{ $seriesItem->title }}</option>@endforeach</select></label>@endif
+                                            @if(!$isBook)
+                                                <label>Speaker<input name="speaker" value="{{ $item->speaker }}" maxlength="160"></label>
+                                                <label>Series<select name="sermon_series_id"><option value="">No series</option>@foreach($series as $seriesItem)<option value="{{ $seriesItem->id }}" @selected($item->sermon_series_id === $seriesItem->id)>{{ $seriesItem->title }}</option>@endforeach</select></label>
+                                            @else
+                                                <label>Author<input name="author" value="{{ $item->author }}" maxlength="160"></label>
+                                            @endif
+                                            <label>Replace cover artwork<input type="file" name="cover_image" accept="image/jpeg,image/png,image/webp"></label>
+                                            <label>Artwork description<input name="cover_image_alt" value="{{ $item->cover_image_alt }}" maxlength="180"></label>
                                             <label>Category<select name="library_category_id"><option value="">No category</option>@foreach($categories as $category)<option value="{{ $category->id }}" @selected($item->library_category_id === $category->id)>{{ $category->name }}</option>@endforeach</select></label>
                                             <label class="field-wide">Tags<select name="tag_ids[]" multiple size="4">@foreach($tags as $tag)<option value="{{ $tag->id }}" @selected(in_array($tag->id, $assetTagIds->get($item->id, []), true))>{{ $tag->name }}</option>@endforeach</select></label>
+                                        @else
+                                            <label>Replace series artwork<input type="file" name="cover_image" accept="image/jpeg,image/png,image/webp"></label>
+                                            <label>Artwork description<input name="cover_image_alt" value="{{ $item->cover_image_alt }}" maxlength="180"></label>
                                         @endif
                                         <label class="field-wide">Description<textarea name="description" rows="4" maxlength="5000">{{ $item->description }}</textarea></label>
                                     </div>

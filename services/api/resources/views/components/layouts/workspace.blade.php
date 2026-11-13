@@ -2,12 +2,12 @@
     @php($staffAppearance = \App\Models\MinistrySetting::find(\App\Models\MinistrySetting::SINGLETON_ID))
     @php($surface = $surface ?? 'staff')
     @php($surfaceFeatures = $features ?? [])
-    <div class="workspace-shell staff-font-{{ $staffAppearance?->staff_font ?? 'modern' }} staff-density-{{ $staffAppearance?->staff_density ?? 'comfortable' }}" data-workspace-shell data-workspace-surface="{{ $surface }}">
+    <div class="workspace-shell" data-workspace-shell data-workspace-surface="{{ $surface }}">
         <button class="workspace-backdrop" type="button" data-workspace-close aria-label="Close navigation"></button>
         <aside class="workspace-sidebar app-sidebar" data-workspace-sidebar>
             <div class="workspace-brand">
-                @if($staffAppearance?->dark_logo_path || $staffAppearance?->logo_path)<span class="workspace-brand-mark workspace-brand-logo"><img src="{{ asset('storage/'.($staffAppearance->dark_logo_path ?: $staffAppearance->logo_path)) }}" alt="{{ $ministryName }} logo"></span>@else<span class="workspace-brand-mark">{{ mb_strtoupper(mb_substr($ministryName ?? 'M', 0, 1)) }}</span>@endif
-                <span><strong>{{ $ministryName ?? config('app.name') }}</strong><small>{{ $surface === 'member' ? 'Member community' : 'Ministry workspace' }}</small></span>
+                @if($staffAppearance?->dark_logo_path || $staffAppearance?->logo_path)<span class="workspace-brand-mark workspace-brand-logo"><img src="{{ asset('storage/'.($staffAppearance->dark_logo_path ?: $staffAppearance->logo_path)) }}" alt="{{ $ministryName }} logo"></span>@endif
+                <span><strong class="workspace-brand-wordmark">{{ $staffAppearance?->dark_logo_path || $staffAppearance?->logo_path ? ($ministryName ?? config('app.name')) : mb_strtoupper($ministryName ?? config('app.name')) }}</strong><small>{{ $surface === 'member' ? 'Member community' : 'Ministry workspace' }}</small></span>
                 <button class="workspace-close" type="button" data-workspace-close aria-label="Close navigation"><x-ui.icon name="close"/></button>
             </div>
             <nav class="workspace-nav" aria-label="{{ $surface === 'member' ? 'Member' : 'Staff' }} navigation">
@@ -33,13 +33,23 @@
         <main class="workspace-main">
             <header class="workspace-topbar app-topbar">
                 <button class="workspace-menu" type="button" data-workspace-toggle aria-expanded="false" aria-label="Open navigation"><x-ui.icon name="menu" :size="20"/><x-ui.icon name="close" :size="19"/></button>
-                <span class="mobile-header-brand" aria-label="{{ $ministryName ?? config('app.name') }}">@if($staffAppearance?->logo_path)<img src="{{ asset('storage/'.$staffAppearance->logo_path) }}" alt="">@else{{ mb_strtoupper(mb_substr($ministryName ?? 'M', 0, 1)) }}@endif</span>
-                <div class="workspace-context"><span>{{ $surface === 'member' ? 'Member portal' : now()->timezone(config('app.timezone'))->format('l, F j') }}</span><strong>{{ $title ?? ($surface === 'member' ? 'My ministry' : 'Workspace') }}</strong></div>
+                <a class="app-header-brand" href="{{ $surface === 'member' ? route('member.home') : route('staff.overview') }}" wire:navigate.hover aria-label="{{ $ministryName ?? config('app.name') }} {{ $surface === 'member' ? 'member home' : 'staff home' }}">
+                    @if($staffAppearance?->logo_path)
+                        <img src="{{ asset('storage/'.$staffAppearance->logo_path) }}" alt="{{ $ministryName ?? config('app.name') }}">
+                    @else
+                        <strong class="app-header-brand-wordmark">{{ mb_strtoupper($ministryName ?? config('app.name')) }}</strong>
+                    @endif
+                </a>
                 <div class="workspace-top-actions">@if($surface === 'member')<span class="member-top-avatar" aria-label="Signed in as {{ auth()->user()?->name }}">@if($authenticatedPersonAvatarUrl)<img src="{{ $authenticatedPersonAvatarUrl }}" alt="">@else{{ mb_strtoupper(mb_substr(auth()->user()?->name ?? 'M', 0, 1)) }}@endif</span>@endif<button class="workspace-theme-toggle" type="button" data-workspace-theme-toggle aria-pressed="false" aria-label="Switch to dark mode"><span class="workspace-theme-track" aria-hidden="true"></span><span class="workspace-theme-label">Light</span></button></div>
             </header>
             <section @class(['workspace-content', 'member-content' => $surface === 'member'])>
                 {{ $slot }}
             </section>
+            <footer class="app-shell-footer">
+                @php($footerLogo = $staffAppearance?->dark_logo_path ?: $staffAppearance?->logo_path)
+                <a class="app-shell-footer-mark" href="{{ $surface === 'member' ? route('member.home') : route('staff.overview') }}" wire:navigate.hover aria-label="{{ $ministryName ?? config('app.name') }} {{ $surface === 'member' ? 'member home' : 'staff home' }}">@if($footerLogo)<img src="{{ asset('storage/'.$footerLogo) }}" alt="{{ $ministryName ?? config('app.name') }}">@else<span>{{ mb_strtoupper(mb_substr($ministryName ?? 'M', 0, 1)) }}</span>@endif</a>
+                <p>© {{ now()->year }} {{ $ministryName ?? config('app.name') }}. All rights reserved.</p>
+            </footer>
         </main>
         <nav class="workspace-mobile-nav" aria-label="{{ $surface === 'member' ? 'Member' : 'Staff' }} mobile navigation">
             @foreach(app(\App\Services\NavigationLayout::class)->entries($surface, 'mobile', auth()->user(), $surfaceFeatures) as $entry)<a href="{{ $entry['url'] }}" wire:navigate.hover @if(request()->routeIs($entry['match'], $entry['match'].'.*') && ($surface !== 'member' || !str_starts_with($entry['key'], 'page:') || request()->route('slug') === str($entry['key'])->after(':'))) aria-current="page" @endif><x-ui.icon :name="$entry['icon']"/><span>{{ $entry['label'] }}</span></a>@endforeach

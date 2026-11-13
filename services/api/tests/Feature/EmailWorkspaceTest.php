@@ -33,7 +33,17 @@ class EmailWorkspaceTest extends TestCase
     {
         Mail::fake();
         $admin = $this->install();
-        app(EmailDeliverySettingsService::class)->update(['provider' => 'hosting', 'enabled' => true, 'from_address' => 'hello@hope.example.org', 'from_name' => 'Hope'], $admin, '127.0.0.1');
+        app(EmailDeliverySettingsService::class)->update([
+            'provider' => 'custom_smtp',
+            'enabled' => true,
+            'from_address' => 'hello@hope.example.org',
+            'from_name' => 'Hope',
+            'host' => 'smtp.example.org',
+            'port' => 587,
+            'encryption' => 'tls',
+            'username' => 'smtp-user',
+            'password' => 'smtp-password',
+        ], $admin, '127.0.0.1');
         $this->actingAs($admin)->post('/staff/email/delivery/test', ['test_email' => 'admin@example.org'])->assertRedirect(route('staff.email'));
         $this->assertDatabaseHas('email_delivery_settings', ['last_test_status' => 'succeeded']);
         $this->assertDatabaseHas('audit_events', ['action' => 'email_delivery.tested']);

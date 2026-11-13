@@ -2,11 +2,12 @@
 
 namespace App\Actions;
 
+use App\Http\Controllers\PageWorkspaceController;
 use App\Models\FeatureSetting;
 use App\Models\Location;
 use App\Models\MinistrySetting;
 use App\Models\User;
-use App\Http\Controllers\PageWorkspaceController;
+use App\Services\PageDocumentService;
 use App\Support\RoleCatalog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -126,8 +127,9 @@ class InstallMinistry
             foreach (['digital_church', 'interactive_meetings', 'people', 'giving', 'testimonies', 'books_library', 'audio_sermons', 'video_sermons', 'sermon_series'] as $feature) {
                 FeatureSetting::firstOrCreate(['key' => $feature], ['state' => 'enabled']);
             }
+            FeatureSetting::firstOrCreate(['key' => 'attendance'], ['state' => 'disabled']);
 
-            FeatureSetting::query()->update(['state' => 'enabled', 'changed_by' => $admin->id]);
+            FeatureSetting::query()->where('key', '!=', 'attendance')->update(['state' => 'enabled', 'changed_by' => $admin->id]);
 
             // Every fresh installation starts with a real, editable homepage page.
             // This prevents the public route from depending on a missing fallback view.
@@ -137,7 +139,7 @@ class InstallMinistry
                 'id' => $homepageId,
                 'title' => 'Home',
                 'slug' => 'home',
-                'body' => app(\App\Services\PageDocumentService::class)->plainText($homepageDocument, FeatureSetting::query()->where('state', 'enabled')->pluck('key')->all()),
+                'body' => app(PageDocumentService::class)->plainText($homepageDocument, FeatureSetting::query()->where('state', 'enabled')->pluck('key')->all()),
                 'blocks' => json_encode($homepageDocument, JSON_THROW_ON_ERROR),
                 'page_type' => 'homepage',
                 'source_key' => 'homepage',

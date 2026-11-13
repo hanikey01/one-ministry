@@ -1,13 +1,39 @@
 # 12 — Implementation Status
 
-**Updated:** 2026-11-05
+**Updated:** 2026-11-13
+
+### 2026-11-13 - AI Assist provider and routing foundation, partial upgrade
+
+Gemini generateContent now submits responseMimeType and responseJsonSchema instead of the mixed responseFormat payload. Both adapters map HTTP and connection failures into safe typed exceptions without retaining credential-bearing HTTP exceptions. Generation logs no longer echo arbitrary exception messages. Truncation and malformed JSON fail explicitly. Gemini discovery no longer labels every generateContent model schema-compatible; OpenRouter requires structured_outputs catalog evidence rather than response_format alone.
+
+Full-page and scoped readiness checks run inside model attempts, allowing unavailable primaries to advance to configured fallbacks. Route tests use a bounded nested composition probe and persist per-model outcomes in catalog metadata. A working primary remains active with degraded status when fallback checks fail. Single-model catalog disappearance no longer disables all usable choices.
+
+Verified: focused adapter, catalog-evidence, probe, database routing, full-page fallback, and scoped fallback suite passes on PHP 8.5.9 with SQLite enabled per command: 38 tests, 159 assertions. Pint passes for the five new exception/probe/test files. PHP syntax checks for both modified routing services and git diff --check pass. No Docker Compose was run.
+
+Not verified/release blockers: existing installer-dependent AI tests fail before reaching AI because the pre-existing local homepage starter returns version 1 to the strict version-2 validator. The existing provider/drafting/settings service files have broader Pint failures; unrelated code was not reformatted. Production Vite build fails with Windows spawn EPERM using both default and runner config loaders. Real-provider, browser, accessibility, supported-production-database, and full release gates remain pending. Batches 1-2 are not claimed release-complete; practical routing/schema budgets, additional per-provider compatibility cases, staff diagnostic polish, and Batches 3-10 remain work.
 **Current phase:** Shared-hosting transition verification — Laravel-first production profile
 
 This file records verified implementation status. Product rules remain in documents `00`–`11` and `18`; this file is not a substitute for their quality gates.
 
+### 2026-11-12 — Fixed application typography contract
+
+Staff, member, public, worship, meeting, and authentication surfaces now use Instrument Sans for interface and body text and Georgia for display hierarchy. The page editor keeps a curated page-content library: application sans, system sans, Verdana, Trebuchet MS, Georgia, and Palatino. Email templates and printable certificates remain separate output contexts with their required compatibility typography. The production Vite build passes; PHP runtime and browser verification remain pending deployment.
+
 ### 2026-11-05 — Portable public profile-photo delivery
 
 Member profile photos now store a replacement before removing the prior file, verify that the new object exists, and render initials when a recorded file is unavailable. Public-disk uploads have a traversal-safe `/storage/*` application fallback for shared hosts that prohibit symbolic links; the browser installer still attempts the normal static storage link and now verifies writable public-upload storage. The conflicting private local-disk route no longer claims `/storage/*`. Member, staff, and public testimony surfaces resolve profile photos only when the object exists. The fallback delivery tests pass with 2 tests and 6 assertions; PHP syntax, Blade compilation, route inspection, and diff checks pass. The database-backed profile replacement test is present but cannot execute in the host PHP runtime because it has no PDO database driver.
+
+### 2026-11-11 — Public connection forms
+
+Prayer, Next Steps, and Testimony now use their existing member routes as the sole canonical experience for both guests and signed-in members; duplicate public connection pages and routes were removed. Guests may open those three routes without an account and see the same page and submission flow with name, email, optional phone, and explicit request-specific consent fields. The shared page uses the public shell for guests and the member shell for signed-in users; personal request/testimony history and withdrawals remain member-only, and other member routes remain protected. A shared intake service resolves a signed-in person's record or safely creates/matches a consented person record by normalized email; it never creates a user account. Prayer text remains encrypted and guest prayer records have no user account reference. Next-step requests retain duplicate-open-request prevention, and testimonies remain submitted for staff review until an authorized publisher approves them. Published Digital School courses and deliberately marked preview lessons are now discoverable publicly; enrolment, progress, assessments, and certificates remain member-only. Source-level feature tests cover the shared-route guest submissions, no automatic user creation, encrypted guest prayer, and testimony consent. Database-backed execution remains pending the available PHP runtime's PostgreSQL PDO driver.
+
+### 2026-11-11 — Attendance release hold
+
+Core service attendance is now an explicit feature setting and is disabled by default for fresh installations. While disabled, member Participation navigation and routes, attendance dashboard metrics, attendance fields in member/staff-person responses, service attendance reporting, and direct attendance mutation routes are unavailable server-side. The underlying records and correction history remain preserved. Anonymous playback diagnostics are not part of this hold because they are operational media telemetry rather than person attendance. Department gathering attendance is also unchanged because it belongs to the Department domain. Focused database-backed feature tests are included but cannot run in the current PHP runtime because its PostgreSQL PDO driver is unavailable.
+
+### 2026-11-11 — Fresh-install mobile navigation defaults
+
+The five-item public mobile fallback is Home, Events, Service times, Prayer, and Testimonies. Member defaults are Overview, Next steps, Prayer, Departments, and Profile. Staff defaults are Overview, People, Services, Follow-up, and Giving. These defaults apply only until an administrator saves a navigation layout; saved ministry navigation remains untouched. Existing permission and feature filtering continues to remove unavailable destinations, including the unreleased Attendance area.
 
 ## Current product direction — 2026-10-22
 
@@ -144,6 +170,10 @@ The canonical source-of-truth map is in `00-product-master.md`; the accepted cro
 - Shared-hosting transition SH-1 through SH-6: port the interface to Blade/Livewire/Alpine, establish server-rendered public/staff/member/worship shells, migrate workflows route by route, provide host-cron and deployment guides, then retire the Next.js production deployment after parity validation.
 
 ## Recent implementation notes
+
+### 2026-11-11 — Email campaign workspace
+
+The staff Email workspace now includes a Campaigns section for custom ministry email. Staff can save a draft, see the current opted-in recipient estimate, schedule delivery, cancel a draft or scheduled campaign, and review completed sent, failed, and skipped counts. A bounded scheduler command snapshots eligible recipients when scheduling, rechecks email consent before each delivery, retries transport failures up to three attempts, and records campaign actions in the audit history. The unfinished Communications workspace, API, permission, navigation entry, controller, view, and legacy campaign migration are removed from the fresh-install source baseline. Email template-list rows now use neutral theme surfaces and readable text tokens rather than inheriting the global primary-button treatment.
 
 ### 2026-10-17 — Digital School core experience
 

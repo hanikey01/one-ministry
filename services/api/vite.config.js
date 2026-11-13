@@ -1,11 +1,18 @@
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 
+const buildVersion = process.env.BUILD_VERSION || new Date().toISOString().replace(/\D/g, '').slice(0, 14);
+
 export default defineConfig({
     build: {
         assetsDir: 'static',
         rollupOptions: {
             external: ['@zoom/videosdk'],
+            output: {
+                entryFileNames: `static/[name]-${buildVersion}-[hash].js`,
+                chunkFileNames: `static/[name]-${buildVersion}-[hash].js`,
+                assetFileNames: `static/[name]-${buildVersion}-[hash][extname]`,
+            },
         },
     },
     plugins: [

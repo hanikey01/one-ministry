@@ -12,7 +12,7 @@ class StaffFeatureController extends Controller
 {
     public function index(): JsonResponse
     {
-        return response()->json(['data' => FeatureSetting::query()->orderBy('key')->get(['key', 'state'])]);
+        return response()->json(['data' => FeatureSetting::query()->where('key', '!=', 'attendance')->orderBy('key')->get(['key', 'state'])]);
     }
 
     public function update(Request $request, string $key, AdministrationService $administration): JsonResponse

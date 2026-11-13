@@ -57,7 +57,7 @@ final class NavigationLayout
         $options = $this->options($surface);
         $layout = $this->layoutFor($surface);
         $stored = $layout ? json_decode($slot === 'sidebar' ? $layout->sidebar_items : $layout->mobile_items, true) : null;
-        $configured = is_array($stored) ? $stored : $this->defaults($surface, $slot, $options);
+        $configured = is_array($stored) && ($slot !== 'mobile' || count($stored) >= 5) ? $stored : $this->defaults($surface, $slot, $options);
         $permissions = $surface === 'staff' && $user ? collect(app(PermissionChecker::class)->installationPermissions($user)) : collect();
         if ($surface === 'staff' && $slot === 'sidebar' && $permissions->contains('content.manage') && ! collect($configured)->contains(fn ($entry) => (is_string($entry) ? $entry : ($entry['key'] ?? null)) === 'staff.navigation')) {
             $configured[] = ['key' => 'staff.navigation', 'icon' => $options['staff.navigation']['icon']];
@@ -106,6 +106,10 @@ final class NavigationLayout
             ];
         }
 
+        if ($slot === 'mobile') {
+            $entries = array_slice($entries, 0, 5);
+        }
+
         $request->attributes->set($cacheKey, $entries);
 
         return $entries;
@@ -123,7 +127,6 @@ final class NavigationLayout
             'staff.events' => $this->item('Events', 'calendar', 'staff.events', 'Ministry', 'community.manage'),
             'staff.departments' => $this->item('Departments', 'departments', 'staff.departments', 'Ministry'),
             'staff.school.index' => $this->item('Digital school', 'school', 'staff.school.index', 'Ministry', 'school.manage', 'digital_school'),
-            'staff.communications' => $this->item('Communications', 'message', 'staff.communications', 'Ministry', 'communications.manage'),
             'staff.giving' => $this->item('Giving', 'giving', 'staff.giving', 'Ministry', 'giving.manage', null, 'giving'),
             'staff.reports' => $this->item('Reports', 'reports', 'staff.reports', 'Ministry', 'reports.view'),
             'staff.content' => $this->item('Content library', 'content', 'staff.content', 'Publishing', 'content.manage'),
@@ -150,7 +153,7 @@ final class NavigationLayout
             'member.departments' => $this->item('Departments', 'departments', 'member.departments', 'My ministry'),
             'member.events' => $this->item('Events', 'calendar', 'member.events', 'My ministry'),
             'member.school.index' => $this->item('Digital school', 'school', 'member.school.index', 'My ministry', null, null, 'digital_school'),
-            'member.activity' => $this->item('Participation', 'services', 'member.activity', 'My ministry'),
+            'member.activity' => $this->item('Participation', 'services', 'member.activity', 'My ministry', null, null, 'attendance'),
             'member.next-steps' => $this->item('Next steps', 'followup', 'member.next-steps', 'My ministry'),
             'member.prayer.page' => $this->item('Prayer', 'care', 'member.prayer.page', 'My ministry'),
             'member.testimonies' => $this->item('My testimonies','sparkles','member.testimonies','My ministry',null,null,'testimonies'),
@@ -169,9 +172,9 @@ final class NavigationLayout
     {
         $keys = match ([$surface, $slot]) {
             ['staff', 'sidebar'] => array_keys($options),
-            ['staff', 'mobile'] => ['staff.overview', 'staff.people', 'staff.services', 'staff.events'],
+            ['staff', 'mobile'] => ['staff.overview', 'staff.people', 'staff.events', 'staff.content', 'staff.settings'],
             ['member', 'sidebar'] => array_keys($options),
-            ['member', 'mobile'] => ['member.home', 'member.events', 'member.departments', 'member.giving'],
+            ['member', 'mobile'] => ['member.home', 'member.next-steps', 'member.prayer.page', 'member.departments', 'member.profile'],
             default => [],
         };
 

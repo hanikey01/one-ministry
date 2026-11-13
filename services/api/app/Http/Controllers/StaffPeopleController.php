@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ModuleAvailability;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -13,14 +14,17 @@ class StaffPeopleController extends Controller
 {
     public function contact(Request $r): JsonResponse|RedirectResponse
     {
-        $d = $r->validate(['first_name' => ['required', 'string', 'max:100'], 'last_name' => ['nullable', 'string', 'max:100'], 'email' => ['nullable', 'email', 'max:254'], 'phone' => ['nullable', 'string', 'max:40'], 'consent_to_contact' => ['accepted']]);
+        $d = $r->validate(['first_name' => ['required', 'string', 'max:100'], 'last_name' => ['nullable', 'string', 'max:100'], 'email' => ['nullable', 'email', 'max:254'], 'phone' => ['nullable', 'string', 'max:40'], 'message' => ['nullable', 'string', 'max:2000'], 'consent_to_contact' => ['accepted']]);
+        $message = filled($d['message'] ?? null) ? trim($d['message']) : null;
+        unset($d['message']);
         $id = (string) Str::uuid();
         DB::table('people')->insert(array_merge($d, ['id' => $id, 'status' => 'member', 'consent_to_contact' => true, 'created_at' => now(), 'updated_at' => now()]));
         $task = (string) Str::uuid();
-        DB::table('follow_up_tasks')->insert(['id' => $task, 'person_id' => $id, 'kind' => 'contact_follow_up', 'summary' => 'Follow up with new contact', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('follow_up_tasks')->insert(['id' => $task, 'person_id' => $id, 'kind' => 'contact_follow_up', 'summary' => $message ? 'Contact request: '.str($message)->limit(190) : 'Follow up with new contact', 'created_at' => now(), 'updated_at' => now()]);
 
         if (! $r->expectsJson()) {
             $previous = url()->previous() ?: url('/');
+
             return redirect()->to($previous.(str_contains($previous, '?') ? '&' : '?').'contact=received');
         }
 
@@ -40,12 +44,17 @@ class StaffPeopleController extends Controller
         return response()->json(['data' => $email->concat($phone)->values()]);
     }
 
-    public function profile(string $person): JsonResponse
+    public function profile(Request $request, string $person): JsonResponse
     {
         $record = DB::table('people')->where('id', $person)->first();
         abort_unless($record, 404);
 
-        return response()->json(['data' => ['person' => $record, 'departments' => DB::table('department_memberships')->join('departments', 'departments.id', '=', 'department_memberships.department_id')->where('department_memberships.person_id', $person)->where('department_memberships.status', 'active')->get(['departments.id', 'departments.name', 'department_memberships.role']), 'attendance' => DB::table('attendance_records')->join('service_occurrences', 'service_occurrences.id', '=', 'attendance_records.service_occurrence_id')->where('attendance_records.person_id', $person)->latest('attendance_records.observed_at')->limit(25)->get(['attendance_records.id', 'attendance_records.source', 'attendance_records.status', 'attendance_records.observed_at', 'service_occurrences.title']), 'follow_up' => DB::table('follow_up_tasks')->where('person_id', $person)->latest()->limit(25)->get(['id', 'kind', 'status', 'summary', 'due_at', 'completed_at', 'created_at'])]]);
+        $data = ['person' => $record, 'departments' => DB::table('department_memberships')->join('departments', 'departments.id', '=', 'department_memberships.department_id')->where('department_memberships.person_id', $person)->where('department_memberships.status', 'active')->get(['departments.id', 'departments.name', 'department_memberships.role']), 'follow_up' => DB::table('follow_up_tasks')->where('person_id', $person)->latest()->limit(25)->get(['id', 'kind', 'status', 'summary', 'due_at', 'completed_at', 'created_at'])];
+        if (app(ModuleAvailability::class)->visibleToStaff('attendance', $request->user())) {
+            $data['attendance'] = DB::table('attendance_records')->join('service_occurrences', 'service_occurrences.id', '=', 'attendance_records.service_occurrence_id')->where('attendance_records.person_id', $person)->latest('attendance_records.observed_at')->limit(25)->get(['attendance_records.id', 'attendance_records.source', 'attendance_records.status', 'attendance_records.observed_at', 'service_occurrences.title']);
+        }
+
+        return response()->json(['data' => $data]);
     }
 
     public function updatePerson(Request $r, string $person): JsonResponse

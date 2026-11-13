@@ -3,14 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\MinistrySetting;
-use App\Models\User;
 use App\Services\PasswordRecoveryService;
+use App\Services\MemberRegistrationVerificationService;
 use App\Services\PermissionChecker;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -34,32 +33,60 @@ class BrowserAuthController extends Controller
         return view('auth.register', ['settings' => MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID)]);
     }
 
-    public function registerStore(Request $request): RedirectResponse
+    public function registerStore(Request $request, MemberRegistrationVerificationService $verification): RedirectResponse
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'email' => ['required', 'email', 'max:254', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:12', 'confirmed'],
-            'terms' => ['accepted'],
         ]);
         $email = Str::lower($data['email']);
-        $user = DB::transaction(function () use ($data, $email, $request): User {
-            $user = User::query()->create(['name' => trim($data['name']), 'email' => $email, 'password' => $data['password']]);
-            $names = preg_split('/\s+/', trim($data['name']), 2);
-            $person = DB::table('people')->whereNull('user_id')->where('email', $email)->first();
-            if ($person) {
-                DB::table('people')->where('id', $person->id)->update(['user_id' => $user->id, 'status' => 'member', 'updated_at' => now()]);
-            } else {
-                DB::table('people')->insert(['id' => (string) Str::uuid(), 'user_id' => $user->id, 'first_name' => $names[0] ?: 'Member', 'last_name' => $names[1] ?? null, 'email' => $email, 'status' => 'member', 'consent_to_contact' => false, 'created_at' => now(), 'updated_at' => now()]);
-            }
-            DB::table('audit_events')->insert(['id' => (string) Str::uuid(), 'actor_user_id' => $user->id, 'action' => 'auth.member_registered', 'subject_type' => 'users', 'subject_id' => $user->id, 'changes_json' => json_encode(['channel' => 'public_signup']), 'ip_address' => $request->ip(), 'created_at' => now()]);
+        $id = $verification->request(trim($data['name']), $email);
+        $request->session()->put('member_registration', ['id' => $id, 'name' => trim($data['name']), 'email' => $email]);
+        return to_route('register.verify')->with('status', 'We sent a six-digit code to '.$email.'.');
+    }
 
-            return $user;
-        });
+    public function registerVerifyCreate(Request $request): View|RedirectResponse
+    {
+        $pending = $request->session()->get('member_registration');
+        return $pending ? view('auth.register-verify', ['settings' => MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID), 'pending' => $pending]) : to_route('register');
+    }
+
+    public function registerVerifyStore(Request $request, MemberRegistrationVerificationService $verification): RedirectResponse
+    {
+        $pending = $request->session()->get('member_registration');
+        if (! $pending) return to_route('register');
+        $data = $request->validate(['code' => ['required', 'digits:6']]);
+        $verification->verify($pending['id'], $pending['email'], $data['code']);
+        $request->session()->put('member_registration.verified', true);
+        return to_route('register.complete');
+    }
+
+    public function registerResend(Request $request, MemberRegistrationVerificationService $verification): RedirectResponse
+    {
+        $pending = $request->session()->get('member_registration');
+        if (! $pending) return to_route('register');
+        $id = $verification->request($pending['name'], $pending['email']);
+        $request->session()->put('member_registration.id', $id);
+        $request->session()->forget('member_registration.verified');
+        return back()->with('status', 'A new code has been sent.');
+    }
+
+    public function registerCompleteCreate(Request $request): View|RedirectResponse
+    {
+        $pending = $request->session()->get('member_registration');
+        return ($pending && ($pending['verified'] ?? false)) ? view('auth.register-complete', ['settings' => MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID), 'pending' => $pending]) : to_route('register');
+    }
+
+    public function registerCompleteStore(Request $request, MemberRegistrationVerificationService $verification): RedirectResponse
+    {
+        $pending = $request->session()->get('member_registration');
+        if (! $pending || ! ($pending['verified'] ?? false)) return to_route('register');
+        $data = $request->validate(['password' => ['required', 'string', 'min:12', 'confirmed'], 'terms' => ['accepted']]);
+        $user = $verification->complete($pending['id'], $pending['name'], $pending['email'], $data['password'], $request->ip());
+        $request->session()->forget('member_registration');
         Auth::login($user);
         $request->session()->regenerate();
-
-        return to_route('member.home')->with('status', 'Your member account is ready. Complete your profile whenever you are ready.');
+        return to_route('member.home')->with('status', 'Your verified member account is ready.');
     }
 
     public function forgotCreate(): View|RedirectResponse

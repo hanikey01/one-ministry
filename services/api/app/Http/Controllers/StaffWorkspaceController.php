@@ -4,36 +4,40 @@ namespace App\Http\Controllers;
 
 use App\Actions\UpdateMinistrySettings;
 use App\Models\FeatureSetting;
-use App\Models\MinistrySetting;
 use App\Models\Location;
+use App\Models\MinistrySetting;
 use App\Models\ServiceOccurrence;
 use App\Services\AdministrationService;
 use App\Services\EmailDeliverySettingsService;
 use App\Services\EmailVerificationService;
 use App\Services\LiveStreamService;
 use App\Services\MfaService;
+use App\Services\ModuleAvailability;
 use App\Services\PermissionChecker;
-use App\Services\StaffInvitationService;
 use App\Services\ServiceLifecycle;
+use App\Services\StaffInvitationService;
 use App\Services\ZoomVideoSdkSettingsService;
+use App\Support\RoleCatalog;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
-use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class StaffWorkspaceController extends Controller
 {
     public function overview(Request $request): View
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
-        $modules = app(\App\Services\ModuleAvailability::class);
+        $modules = app(ModuleAvailability::class);
         $visibleModules = [
             'people' => $modules->visibleToStaff('people', $request->user()),
             'digital_church' => $modules->visibleToStaff('digital_church', $request->user()),
@@ -122,6 +126,7 @@ class StaffWorkspaceController extends Controller
         abort_unless($record, 404);
         $departments = DB::table('department_memberships')->join('departments', 'departments.id', '=', 'department_memberships.department_id')->where('department_memberships.person_id', $person)->where('department_memberships.status', 'active')->get(['departments.name', 'department_memberships.role']);
         $followUp = DB::table('follow_up_tasks')->where('person_id', $person)->latest()->limit(25)->get();
+
         return view('staff.person', compact('settings', 'record', 'departments', 'followUp') + ['user' => $request->user()]);
     }
 
@@ -131,6 +136,7 @@ class StaffWorkspaceController extends Controller
         $query = DB::table('people')->where('id', $person);
         abort_unless($query->exists(), 404);
         $query->update([...$data, 'status' => 'member', 'updated_at' => now()]);
+
         return to_route('staff.people.person', $person)->with('status', 'Person updated.');
     }
 
@@ -340,7 +346,7 @@ class StaffWorkspaceController extends Controller
             'title' => ['required', 'string', 'max:200'], 'description' => ['nullable', 'string', 'max:5000'],
             'image_url' => ['nullable', 'url:https', 'max:1000'], 'image_alt' => ['nullable', 'string', 'max:255'],
             'media_asset_id' => ['nullable', 'uuid'], 'image_upload' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:10240'],
-            'category' => ['nullable', 'string', 'max:80'], 'status' => ['required', Rule::in(['draft','published'])],
+            'category' => ['nullable', 'string', 'max:80'], 'status' => ['required', Rule::in(['draft', 'published'])],
             'starts_at' => ['required', 'date'], 'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
             'location' => ['nullable', 'string', 'max:200'], 'online_url' => ['nullable', 'url', 'max:1000'], 'capacity' => ['nullable', 'integer', 'min:1'],
             'registration_deadline' => ['nullable', 'date', 'before_or_equal:starts_at'],
@@ -357,21 +363,22 @@ class StaffWorkspaceController extends Controller
         $record = DB::table('events')->where('id', $event)->first();
         abort_unless($record, 404);
         $data = $request->validate([
-            'title' => ['required','string','max:200'], 'description' => ['nullable','string','max:5000'],
-            'image_url' => ['nullable','url:https','max:1000'], 'image_alt' => ['nullable','string','max:255'],
+            'title' => ['required', 'string', 'max:200'], 'description' => ['nullable', 'string', 'max:5000'],
+            'image_url' => ['nullable', 'url:https', 'max:1000'], 'image_alt' => ['nullable', 'string', 'max:255'],
             'media_asset_id' => ['nullable', 'uuid'], 'image_upload' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:10240'],
-            'category' => ['nullable','string','max:80'], 'status' => ['required',Rule::in(['draft','published'])],
-            'starts_at' => ['required','date'], 'ends_at' => ['nullable','date','after_or_equal:starts_at'],
-            'location' => ['nullable','string','max:200'], 'online_url' => ['nullable','url','max:1000'],
-            'capacity' => ['nullable','integer','min:1'], 'registration_deadline' => ['nullable','date','before_or_equal:starts_at'],
+            'category' => ['nullable', 'string', 'max:80'], 'status' => ['required', Rule::in(['draft', 'published'])],
+            'starts_at' => ['required', 'date'], 'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
+            'location' => ['nullable', 'string', 'max:200'], 'online_url' => ['nullable', 'url', 'max:1000'],
+            'capacity' => ['nullable', 'integer', 'min:1'], 'registration_deadline' => ['nullable', 'date', 'before_or_equal:starts_at'],
         ]);
         $data = $this->resolveEventImage($request, $data);
-        DB::table('events')->where('id', $event)->update([...$data, 'featured'=>$request->boolean('featured'), 'registration_open'=>$request->boolean('registration_open'), 'waitlist_enabled'=>$request->boolean('waitlist_enabled'), 'updated_at'=>now()]);
+        DB::table('events')->where('id', $event)->update([...$data, 'featured' => $request->boolean('featured'), 'registration_open' => $request->boolean('registration_open'), 'waitlist_enabled' => $request->boolean('waitlist_enabled'), 'updated_at' => now()]);
+
         return to_route('staff.events')->with('status', 'Event updated.');
     }
 
-    /** @return \Illuminate\Support\Collection<int, object> */
-    private function eventImageAssets(): \Illuminate\Support\Collection
+    /** @return Collection<int, object> */
+    private function eventImageAssets(): Collection
     {
         return DB::table('media_assets')
             ->where('library', 'media_library')
@@ -388,7 +395,7 @@ class StaffWorkspaceController extends Controller
     }
 
     /** @param array<string, mixed> $data
-     *  @return array<string, mixed>
+     * @return array<string, mixed>
      */
     private function resolveEventImage(Request $request, array $data): array
     {
@@ -450,6 +457,9 @@ class StaffWorkspaceController extends Controller
         if (FeatureSetting::query()->where(['key' => 'interactive_meetings', 'state' => 'enabled'])->exists()) {
             $serviceTypes = ['broadcast', 'meeting', 'hybrid', 'in_person'];
         }
+        if (preg_match('/^\d{2}:\d{2}:\d{2}$/', (string) $request->input('starts_at_local'))) {
+            $request->merge(['starts_at_local' => substr((string) $request->input('starts_at_local'), 0, 5)]);
+        }
         $data = $request->validate([
             'schedule_kind' => ['required', Rule::in(['one_time', 'weekly'])], 'title' => ['required', 'string', 'max:160'],
             'service_type' => ['required', Rule::in($serviceTypes)], 'timezone' => ['required', 'timezone'],
@@ -484,6 +494,10 @@ class StaffWorkspaceController extends Controller
     {
         $existing = DB::table('service_schedules')->where('id', $schedule)->first();
         abort_unless($existing, 404);
+        $request->session()->flash('service_editor', $schedule);
+        if (preg_match('/^\d{2}:\d{2}:\d{2}$/', (string) $request->input('starts_at_local'))) {
+            $request->merge(['starts_at_local' => substr((string) $request->input('starts_at_local'), 0, 5)]);
+        }
 
         $serviceTypes = ['broadcast', 'in_person'];
         if (FeatureSetting::query()->where(['key' => 'interactive_meetings', 'state' => 'enabled'])->exists()) {
@@ -501,6 +515,7 @@ class StaffWorkspaceController extends Controller
             'active' => ['nullable', 'boolean'],
         ]);
         $duration = (int) $data['duration_minutes'];
+        $request->session()->forget('service_editor');
 
         DB::transaction(function () use ($schedule, $data, $duration): void {
             DB::table('service_schedules')->where('id', $schedule)->update([
@@ -542,7 +557,7 @@ class StaffWorkspaceController extends Controller
     public function content(Request $request): View
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
-        $modules = app(\App\Services\ModuleAvailability::class);
+        $modules = app(ModuleAvailability::class);
         $availableLibraries = array_values(array_filter(
             ['books_library', 'audio_sermons', 'video_sermons', 'sermon_series'],
             fn (string $key): bool => $modules->visibleToStaff($key, $request->user())
@@ -587,10 +602,10 @@ class StaffWorkspaceController extends Controller
             $title = ($data['title'] ?? null) ?: str($file->getClientOriginalName())->beforeLast('.')->replace(['-', '_'], ' ')->headline()->toString();
             $id = (string) Str::uuid();
             DB::table('media_assets')->insert([
-            'id' => $id, 'title' => $title, 'description' => null,
-            'provider' => 'local', 'provider_key' => $path, 'library' => 'media_library', 'kind' => str($file->getMimeType())->before('/')->toString(),
-            'status' => 'published', 'published_at' => now(), 'file_disk' => 'local', 'file_path' => $path, 'file_name' => $file->getClientOriginalName(),
-            'file_mime' => $file->getMimeType(), 'file_size_bytes' => $file->getSize(), 'created_at' => now(), 'updated_at' => now(),
+                'id' => $id, 'title' => $title, 'description' => null,
+                'provider' => 'local', 'provider_key' => $path, 'library' => 'media_library', 'kind' => str($file->getMimeType())->before('/')->toString(),
+                'status' => 'published', 'published_at' => now(), 'file_disk' => 'local', 'file_path' => $path, 'file_name' => $file->getClientOriginalName(),
+                'file_mime' => $file->getMimeType(), 'file_size_bytes' => $file->getSize(), 'created_at' => now(), 'updated_at' => now(),
             ]);
             $uploaded[] = ['id' => $id, 'title' => $title, 'url' => route('public.media', $id), 'kind' => str($file->getMimeType())->before('/')->toString()];
         }
@@ -602,12 +617,13 @@ class StaffWorkspaceController extends Controller
         return to_route('staff.media-library')->with('status', 'Media uploaded and published.');
     }
 
-    public function mediaLibraryFile(Request $request, string $asset): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    public function mediaLibraryFile(Request $request, string $asset): BinaryFileResponse
     {
         $record = DB::table('media_assets')->where(['id' => $asset, 'library' => 'media_library', 'status' => 'published'])->first();
         abort_unless($record && $record->provider === 'local' && $record->file_path, 404);
         $path = Storage::disk($record->file_disk ?: 'local')->path($record->file_path);
         abort_unless(is_file($path), 404);
+
         return response()->file($path, ['Content-Disposition' => 'inline; filename="'.addslashes($record->file_name ?: $record->title).'"']);
     }
 
@@ -635,6 +651,7 @@ class StaffWorkspaceController extends Controller
         if ($request->expectsJson()) {
             return response()->json(['message' => 'Media deleted.']);
         }
+
         return to_route('staff.media-library')->with('status', 'Media deleted.');
     }
 
@@ -676,12 +693,12 @@ class StaffWorkspaceController extends Controller
     public function reports(Request $request): View
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
-        $modules = app(\App\Services\ModuleAvailability::class);
+        $modules = app(ModuleAvailability::class);
         $metrics = [];
         if ($modules->visibleToStaff('people', $request->user())) {
             $metrics[] = ['label' => 'Open follow-ups', 'value' => DB::table('follow_up_tasks')->where('status', '!=', 'completed')->count(), 'detail' => 'Awaiting a response'];
         }
-        if ($modules->visibleToStaff('digital_church', $request->user())) {
+        if ($modules->visibleToStaff('digital_church', $request->user()) && $modules->visibleToStaff('attendance', $request->user())) {
             array_unshift($metrics,
                 ['label' => 'Identified attendance', 'value' => DB::table('attendance_records')->where('status', 'present')->count(), 'detail' => 'Confirmed records only'],
                 ['label' => 'Anonymous viewer buckets', 'value' => DB::table('anonymous_viewer_aggregates')->sum('viewer_count'), 'detail' => 'Kept separate from attendance']
@@ -692,14 +709,6 @@ class StaffWorkspaceController extends Controller
         return view('staff.reports', compact('settings', 'metrics') + ['user' => $request->user()]);
     }
 
-    public function communications(Request $request): View
-    {
-        $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
-        $campaigns = DB::table('campaigns')->join('message_templates', 'message_templates.id', '=', 'campaigns.template_id')->select('campaigns.*', 'message_templates.channel')->orderByDesc('campaigns.created_at')->paginate(20);
-
-        return view('staff.communications', compact('settings', 'campaigns') + ['user' => $request->user()]);
-    }
-
     public function giving(Request $request, PermissionChecker $permissions): View
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
@@ -708,12 +717,18 @@ class StaffWorkspaceController extends Controller
             ? DB::table('donations')->join('giving_funds', 'giving_funds.id', '=', 'donations.fund_id')->select('donations.*', 'giving_funds.name as fund_name')->orderByDesc('donations.created_at')->paginate(20)
             : new LengthAwarePaginator([], 0, 20, 1, ['path' => $request->url()]);
         $funds = DB::table('giving_funds')->orderBy('display_order')->orderBy('name')->get();
-        $providers = DB::table('payment_processor_configs')->orderBy('priority')->get()->map(function ($row) { $row->configured = filled($row->credentials_encrypted); unset($row->credentials_encrypted); return $row; });
+        $providers = DB::table('payment_processor_configs')->orderBy('priority')->get()->map(function ($row) {
+            $row->configured = filled($row->credentials_encrypted);
+            unset($row->credentials_encrypted);
+
+            return $row;
+        });
         $offlineMethods = DB::table('offline_giving_methods')->orderBy('display_order')->orderBy('label')->get();
 
         $countries = config('giving.countries', []);
         $currencies = config('giving.currencies', []);
-        return view('staff.giving', compact('settings', 'donations','funds','providers','offlineMethods', 'canViewFinance','countries','currencies') + ['user' => $request->user()]);
+
+        return view('staff.giving', compact('settings', 'donations', 'funds', 'providers', 'offlineMethods', 'canViewFinance', 'countries', 'currencies') + ['user' => $request->user()]);
     }
 
     public function locations(Request $request): View
@@ -731,7 +746,7 @@ class StaffWorkspaceController extends Controller
     public function modules(Request $request, PermissionChecker $permissions): View
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
-        $features = DB::table('feature_settings')->orderBy('key')->get();
+        $features = DB::table('feature_settings')->where('key', '!=', 'attendance')->orderBy('key')->get();
 
         return view('staff.modules', compact('settings', 'features') + ['user' => $request->user(), 'canManageFeatures' => $permissions->allows($request->user(), 'features.manage')]);
     }
@@ -772,7 +787,7 @@ class StaffWorkspaceController extends Controller
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
         $invitations = DB::table('staff_invitations')->join('users', 'users.id', '=', 'staff_invitations.invited_by')->select('staff_invitations.*', 'users.name as invited_by_name')->orderByDesc('staff_invitations.created_at')->paginate(20);
-        $roles = DB::table('roles')->whereIn('key', \App\Support\RoleCatalog::ROUTINE_INVITATION_ROLES)->orderBy('name')->get(['key', 'name']);
+        $roles = DB::table('roles')->whereIn('key', RoleCatalog::ROUTINE_INVITATION_ROLES)->orderBy('name')->get(['key', 'name']);
 
         return view('staff.access', compact('settings', 'invitations', 'roles') + ['user' => $request->user()]);
     }
@@ -853,8 +868,6 @@ class StaffWorkspaceController extends Controller
             'theme_preset' => ['required', Rule::in(['neutral', 'tech_blue', 'warm'])],
             'chrome_mode' => ['required', Rule::in(['preset', 'custom'])],
             'chrome_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
-            'staff_font' => ['required', Rule::in(['modern', 'editorial', 'humanist'])],
-            'staff_density' => ['required', Rule::in(['comfortable', 'compact'])],
         ]);
         if ($validated['chrome_mode'] !== 'custom') {
             $validated['chrome_color'] = null;

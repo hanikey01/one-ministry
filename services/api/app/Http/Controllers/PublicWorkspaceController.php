@@ -7,7 +7,9 @@ use App\Models\Location;
 use App\Models\MinistrySetting;
 use App\Models\ServiceOccurrence;
 use App\Services\LiveStreamService;
+use App\Support\PublicLibraryRoute;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class PublicWorkspaceController extends Controller
@@ -55,7 +57,7 @@ class PublicWorkspaceController extends Controller
 
     public function departments(): View
     {
-        return $this->view('public.departments', ['departments' => DB::table('departments')->where('status', 'active')->where('is_public', true)->orderByDesc('featured')->orderBy('name')->paginate(18)]);
+        return $this->view('public.departments', ['departments' => DB::table('departments')->where('status', 'active')->where('is_public', true)->where('accepting_requests', true)->orderByDesc('featured')->orderBy('name')->paginate(18)]);
     }
 
     public function department(string $slug): View
@@ -86,15 +88,44 @@ class PublicWorkspaceController extends Controller
         ]);
     }
 
-    public function library(string $library): View
+    public function contact(): View
     {
-        abort_unless(in_array($library, ['books_library', 'audio_sermons', 'video_sermons', 'sermon_series'], true), 404);
-        $this->enabled($library);
-        $items = $library === 'sermon_series'
-            ? DB::table('sermon_series')->where('status', 'published')->orderByDesc('created_at')->paginate(18)
-            : DB::table('media_assets')->leftJoin('library_categories', 'library_categories.id', '=', 'media_assets.library_category_id')->where(['media_assets.library' => $library, 'media_assets.status' => 'published'])->orderByDesc('media_assets.published_at')->select('media_assets.*', 'library_categories.name as category_name')->paginate(18);
+        return $this->view('public.contact');
+    }
 
-        return $this->view('public.library', compact('library', 'items'));
+    public function library(Request $request, string $library): View
+    {
+        $libraryKey = PublicLibraryRoute::keyFor($library);
+        abort_unless($libraryKey !== null, 404);
+        $this->enabled($libraryKey);
+        $query = trim((string) $request->query('q'));
+        $category = trim((string) $request->query('category'));
+        if ($libraryKey === 'sermon_series') {
+            $counts = DB::table('media_assets')->where('status', 'published')->selectRaw('sermon_series_id, count(*) as message_count')->groupBy('sermon_series_id');
+            $items = DB::table('sermon_series')->leftJoinSub($counts, 'message_counts', fn ($join) => $join->on('message_counts.sermon_series_id', '=', 'sermon_series.id'))
+                ->where('sermon_series.status', 'published')->when($query !== '', fn ($builder) => $builder->where(fn ($inner) => $inner->where('sermon_series.title', 'like', "%{$query}%")->orWhere('sermon_series.description', 'like', "%{$query}%")))
+                ->orderByDesc('sermon_series.created_at')->select('sermon_series.*', DB::raw('coalesce(message_counts.message_count, 0) as message_count'))->paginate(18)->withQueryString();
+        } else {
+            $items = DB::table('media_assets')->leftJoin('library_categories', 'library_categories.id', '=', 'media_assets.library_category_id')->leftJoin('sermon_series', 'sermon_series.id', '=', 'media_assets.sermon_series_id')
+                ->where(['media_assets.library' => $libraryKey, 'media_assets.status' => 'published'])
+                ->when($query !== '', fn ($builder) => $builder->where(fn ($inner) => $inner->where('media_assets.title', 'like', "%{$query}%")->orWhere('media_assets.description', 'like', "%{$query}%")->orWhere('media_assets.speaker', 'like', "%{$query}%")->orWhere('media_assets.author', 'like', "%{$query}%")))
+                ->when($category !== '', fn ($builder) => $builder->where('library_categories.slug', $category))
+                ->orderByDesc('media_assets.published_at')->select('media_assets.*', 'library_categories.name as category_name', 'library_categories.slug as category_slug', 'sermon_series.title as series_title')->paginate(18)->withQueryString();
+        }
+
+        $categories = $libraryKey === 'sermon_series' ? collect() : DB::table('library_categories')->where(fn ($builder) => $builder->whereNull('library')->orWhere('library', $libraryKey))->orderBy('name')->get();
+        return $this->view('public.library', ['library' => $libraryKey, 'librarySlug' => $library, 'items' => $items, 'categories' => $categories, 'query' => $query, 'category' => $category]);
+    }
+
+    public function sermonSeries(string $series): View
+    {
+        $this->enabled('sermon_series');
+        $item = DB::table('sermon_series')->where(['id' => $series, 'status' => 'published'])->first();
+        abort_unless($item, 404);
+        $enabledLibraries = FeatureSetting::query()->where('state', 'enabled')->whereIn('key', ['audio_sermons', 'video_sermons'])->pluck('key');
+        $messages = DB::table('media_assets')->where('sermon_series_id', $series)->where('status', 'published')->whereIn('library', $enabledLibraries)->orderBy('position')->orderByDesc('published_at')->get();
+
+        return $this->view('public.sermon-series', compact('item', 'messages'));
     }
 
     public function page(string $slug): View

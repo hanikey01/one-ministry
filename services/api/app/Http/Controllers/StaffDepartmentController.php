@@ -9,6 +9,8 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class StaffDepartmentController extends Controller
@@ -29,7 +31,7 @@ class StaffDepartmentController extends Controller
             $items = $items->whereIn('id', $ids);
         }
 
-        return view('staff.departments', ['settings' => $settings, 'departments' => $items, 'user' => $request->user(), 'canManageDepartments' => $permissions->allows($request->user(), 'departments.manage')]);
+        return view('staff.departments', ['settings' => $settings, 'departments' => $items, 'imageAssets' => $this->departmentImageAssets(), 'user' => $request->user(), 'canManageDepartments' => $permissions->allows($request->user(), 'departments.manage')]);
     }
 
     public function store(Request $request, DepartmentService $departments): RedirectResponse
@@ -37,10 +39,12 @@ class StaffDepartmentController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:160', 'unique:departments,name'],
             'description' => ['nullable', 'string', 'max:2000'],
-            'image_url'=>['nullable','string','max:1000'], 'image_alt'=>['nullable','string','max:255'],
+            'image_url'=>['nullable','url:http,https','max:1000'], 'image_alt'=>['nullable','string','max:255'],
+            'media_asset_id'=>['nullable','uuid'], 'image_upload'=>['nullable','image','mimes:jpg,jpeg,png,webp,gif','max:10240'],
             'category'=>['nullable','string','max:80'], 'contact_email'=>['nullable','email','max:191'], 'featured'=>['nullable','boolean'],
             'is_public' => ['nullable', 'boolean'], 'accepting_requests' => ['nullable', 'boolean'], 'discussion_enabled' => ['nullable', 'boolean'],
         ]);
+        $data = $this->resolveDepartmentImage($request, $data);
         $data['is_public'] = $request->has('is_public') ? $request->boolean('is_public') : true;
         $data['accepting_requests'] = $request->boolean('accepting_requests');
         $data['discussion_enabled'] = $request->boolean('discussion_enabled');
@@ -69,7 +73,7 @@ class StaffDepartmentController extends Controller
             ->where('department_messages.department_id', $department)->whereNull('department_messages.moderated_at')
             ->latest('department_messages.created_at')->limit(50)->get(['department_messages.*', 'people.first_name', 'people.last_name']);
 
-        return view('staff.department', compact('settings', 'members', 'people', 'joinRequests', 'messages') + ['department' => $item, 'user' => $request->user(), 'isAdministrator' => $permissions->allows($request->user(), 'departments.manage')]);
+        return view('staff.department', compact('settings', 'members', 'people', 'joinRequests', 'messages') + ['department' => $item, 'imageAssets' => $this->departmentImageAssets(), 'user' => $request->user(), 'isAdministrator' => $permissions->allows($request->user(), 'departments.manage')]);
     }
 
     public function addMember(Request $request, string $department, DepartmentService $departments): RedirectResponse
@@ -92,10 +96,12 @@ class StaffDepartmentController extends Controller
         $data = $request->validate([
             'name'=>['sometimes','required','string','max:160','unique:departments,name,'.$department],
             'description' => ['nullable', 'string', 'max:2000'],
-            'image_url'=>['nullable','string','max:1000'], 'image_alt'=>['nullable','string','max:255'],
+            'image_url'=>['nullable','url:http,https','max:1000'], 'image_alt'=>['nullable','string','max:255'],
+            'media_asset_id'=>['nullable','uuid'], 'image_upload'=>['nullable','image','mimes:jpg,jpeg,png,webp,gif','max:10240'],
             'category'=>['nullable','string','max:80'], 'contact_email'=>['nullable','email','max:191'], 'featured'=>['nullable','boolean'],
             'is_public' => ['nullable', 'boolean'], 'accepting_requests' => ['nullable', 'boolean'], 'discussion_enabled' => ['nullable', 'boolean'],
         ]);
+        $data = $this->resolveDepartmentImage($request, $data);
         $departments->updateDepartment($department, [...$data, 'featured'=>$request->boolean('featured'), 'is_public' => $request->boolean('is_public'), 'accepting_requests' => $request->boolean('accepting_requests'), 'discussion_enabled' => $request->boolean('discussion_enabled')], $request->user(), $request->ip());
         return to_route('staff.departments.show', $department)->with('status', 'Department settings saved.');
     }
@@ -112,6 +118,47 @@ class StaffDepartmentController extends Controller
         $data = $request->validate(['reason' => ['required', 'string', 'max:240']]);
         $departments->removeMessage($department, $message, $request->user(), $data['reason'], $request->ip());
         return to_route('staff.departments.show', $department)->with('status', 'Discussion message removed.');
+    }
+
+    /** @return Collection<int, object> */
+    private function departmentImageAssets(): Collection
+    {
+        return DB::table('media_assets')->where('library', 'media_library')->where('status', 'published')
+            ->where('file_mime', 'like', 'image/%')->orderByDesc('published_at')->orderByDesc('created_at')
+            ->get(['id', 'title', 'alt_text'])->map(function (object $asset): object {
+                $asset->url = route('public.media', $asset->id);
+                return $asset;
+            });
+    }
+
+    /** @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    private function resolveDepartmentImage(Request $request, array $data): array
+    {
+        $assetId = $data['media_asset_id'] ?? null;
+        unset($data['media_asset_id'], $data['image_upload']);
+        if ($request->hasFile('image_upload')) {
+            $file = $request->file('image_upload');
+            $assetId = (string) Str::uuid();
+            $path = $file->store('media-library', 'local');
+            $title = str($file->getClientOriginalName())->beforeLast('.')->replace(['-', '_'], ' ')->headline()->toString();
+            DB::table('media_assets')->insert([
+                'id'=>$assetId, 'title'=>$title, 'description'=>null, 'provider'=>'local', 'provider_key'=>$path,
+                'library'=>'media_library', 'kind'=>'image', 'status'=>'published', 'published_at'=>now(),
+                'file_disk'=>'local', 'file_path'=>$path, 'file_name'=>$file->getClientOriginalName(),
+                'file_mime'=>$file->getMimeType(), 'file_size_bytes'=>$file->getSize(),
+                'alt_text'=>$data['image_alt'] ?: null, 'created_at'=>now(), 'updated_at'=>now(),
+            ]);
+        }
+        if ($assetId) {
+            $asset = DB::table('media_assets')->where(['id'=>$assetId, 'library'=>'media_library', 'status'=>'published'])
+                ->where('file_mime', 'like', 'image/%')->first();
+            abort_unless($asset, 422, 'Choose a published image from the ministry Media Library.');
+            $data['image_url'] = route('public.media', $asset->id);
+            if (blank($data['image_alt']) && filled($asset->alt_text)) $data['image_alt'] = $asset->alt_text;
+        }
+        return $data;
     }
 }
 

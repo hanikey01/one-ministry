@@ -24,8 +24,6 @@ class StaffSettingsController extends Controller
             'theme_preset' => ['sometimes', Rule::in(['neutral', 'tech_blue', 'warm'])],
             'chrome_mode' => ['sometimes', Rule::in(['preset', 'custom'])],
             'chrome_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
-            'staff_font' => ['sometimes', Rule::in(['modern', 'editorial', 'humanist'])],
-            'staff_density' => ['sometimes', Rule::in(['comfortable', 'compact'])],
         ]);
 
         $setting = app(UpdateMinistrySettings::class)->execute($validated, $request->user(), $request->ip());
@@ -35,6 +33,6 @@ class StaffSettingsController extends Controller
 
     private function publicFields(MinistrySetting $setting): array
     {
-        return $setting->only(['name', 'tagline', 'contact_email', 'theme_preset', 'chrome_mode', 'chrome_color', 'staff_font', 'staff_density']);
+        return $setting->only(['name', 'tagline', 'contact_email', 'theme_preset', 'chrome_mode', 'chrome_color']);
     }
 }

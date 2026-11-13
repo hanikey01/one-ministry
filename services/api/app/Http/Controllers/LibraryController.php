@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use App\Support\PublicLibraryRoute;
 
 class LibraryController extends Controller
 {
@@ -36,6 +37,40 @@ class LibraryController extends Controller
 
     public function download(string $library, string $asset)
     {
+        return $this->downloadPublished($library, $asset);
+    }
+
+    public function publicDownload(string $library, string $asset)
+    {
+        $libraryKey = PublicLibraryRoute::keyFor($library);
+        abort_unless($libraryKey !== null, 404);
+
+        return $this->downloadPublished($libraryKey, $asset, false);
+    }
+
+    public function publicStream(string $library, string $asset)
+    {
+        $libraryKey = PublicLibraryRoute::keyFor($library);
+        abort_unless(in_array($libraryKey, ['audio_sermons', 'video_sermons'], true), 404);
+
+        return $this->downloadPublished($libraryKey, $asset, true);
+    }
+
+    public function publicCover(string $library, string $asset)
+    {
+        $libraryKey = PublicLibraryRoute::keyFor($library);
+        abort_unless($libraryKey !== null, 404);
+        $this->requireEnabled($libraryKey);
+        $item = $libraryKey === 'sermon_series'
+            ? DB::table('sermon_series')->where(['id' => $asset, 'status' => 'published'])->first()
+            : DB::table('media_assets')->where(['id' => $asset, 'library' => $libraryKey, 'status' => 'published'])->first();
+        abort_unless($item?->cover_image_path && Storage::disk('local')->exists($item->cover_image_path), 404);
+
+        return Storage::disk('local')->response($item->cover_image_path, null, ['Cache-Control' => 'public, max-age=86400'], 'inline');
+    }
+
+    private function downloadPublished(string $library, string $asset, bool $inline = false)
+    {
         $this->requireEnabled($library);
         $item = DB::table('media_assets')->where(['id' => $asset, 'library' => $library, 'status' => 'published'])->first();
         abort_unless($item && $item->file_disk && $item->file_path, 404);
@@ -43,7 +78,9 @@ class LibraryController extends Controller
         abort_unless($disk->exists($item->file_path), 404);
         $headers = $item->file_mime ? ['Content-Type' => $item->file_mime] : [];
 
-        return $library === 'books_library' ? $disk->download($item->file_path, $item->file_name ?: 'resource', $headers) : $disk->response($item->file_path, $item->file_name, $headers, 'inline');
+        return $inline
+            ? $disk->response($item->file_path, $item->file_name, $headers, 'inline')
+            : $disk->download($item->file_path, $item->file_name ?: 'resource', $headers);
     }
 
     public function staffIndex(string $library): JsonResponse

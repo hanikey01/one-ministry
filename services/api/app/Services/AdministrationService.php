@@ -84,6 +84,8 @@ class AdministrationService
 
     public function changeFeature(FeatureSetting $feature, string $state, User $actor, ?string $ip): FeatureSetting
     {
+        abort_if($feature->key === 'attendance', 404);
+
         return DB::transaction(function () use ($feature, $state, $actor, $ip): FeatureSetting {
             $feature = FeatureSetting::query()->lockForUpdate()->findOrFail($feature->key);
             if ($feature->state !== $state) {
@@ -103,6 +105,8 @@ class AdministrationService
      */
     public function changeFeatures(array $keys, string $state, User $actor, ?string $ip): int
     {
+        abort_if(in_array('attendance', $keys, true), 404);
+
         return DB::transaction(function () use ($keys, $state, $actor, $ip): int {
             $this->lockInstallation();
             $features = FeatureSetting::query()->whereIn('key', $keys)->lockForUpdate()->get();

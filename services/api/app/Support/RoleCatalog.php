@@ -32,7 +32,7 @@ final class RoleCatalog
 
     /** @var array<string, list<string>> */
     public const PERMISSIONS = [
-        'content_media_editor' => ['content.manage', 'content.publish', 'communications.manage'],
+        'content_media_editor' => ['content.manage', 'content.publish'],
         'ministry_operations_coordinator' => ['community.manage', 'departments.manage', 'services.manage', 'reports.view', 'school.manage', 'school.instruct'],
         'care_staff' => ['care.manage', 'care.notes.write'],
         'finance_staff' => ['finance.view', 'finance.reconcile', 'giving.manage'],

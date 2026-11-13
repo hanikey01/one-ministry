@@ -16,7 +16,6 @@ return new class extends Migration
                 'primary_color', 'accent_color',
                 'light_canvas_color', 'light_surface_color', 'light_sidebar_color',
                 'dark_canvas_color', 'dark_surface_color', 'dark_sidebar_color',
-                'staff_sidebar',
             ]);
         });
     }
@@ -33,7 +32,6 @@ return new class extends Migration
             $table->char('dark_canvas_color', 7)->default('#121315');
             $table->char('dark_surface_color', 7)->default('#1C1D20');
             $table->char('dark_sidebar_color', 7)->default('#0B0C0E');
-            $table->string('staff_sidebar', 24)->default('light');
         });
     }
 };

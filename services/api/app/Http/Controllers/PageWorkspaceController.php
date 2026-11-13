@@ -26,7 +26,7 @@ class PageWorkspaceController extends Controller
         'beliefs' => ['label' => 'Beliefs', 'slug' => 'beliefs', 'summary' => 'Present convictions in an approachable, readable structure.'],
         'leadership' => ['label' => 'Leadership', 'slug' => 'leadership', 'summary' => 'Introduce ministry leaders with flexible profile cards.'],
         'contact' => ['label' => 'Contact', 'slug' => 'contact', 'summary' => 'Combine contact guidance, directions, and a clear response path.'],
-        'blank' => ['label' => 'Blank canvas', 'slug' => '', 'summary' => 'Begin with one clean section and build a custom layout.'],
+        'blank' => ['label' => 'Blank canvas', 'slug' => '', 'summary' => 'Begin with an empty canvas and build a custom layout.'],
     ];
 
     public function index(Request $request): View
@@ -320,32 +320,11 @@ class PageWorkspaceController extends Controller
         $standardSettings = ['content_width' => 'standard', 'padding' => 'none', 'column_gap' => 'regular'];
         $compactSettings = ['content_width' => 'standard', 'padding' => 'none', 'column_gap' => 'regular'];
 
+        if ($template === 'homepage') {
+            return app(\App\Services\HomepageStarterService::class)->document($this->enabledFeatures());
+        }
+
         $documents = [
-            'homepage' => [
-                $this->starterSection([$this->starterColumn([$hero('WELCOME HOME', 'Faith grows best in community.', 'A warm, confident introduction to your ministry—created to help every visitor feel seen, find a gathering, and take a meaningful next step.', 'Plan your visit', '/visit')])], [...$leadSettings, 'background_color' => '#f4f0e8'], ['desktop' => ['padding' => ['top' => '34px', 'right' => '34px', 'bottom' => '34px', 'left' => '34px']], 'mobile' => ['padding' => ['top' => '12px', 'right' => '12px', 'bottom' => '12px', 'left' => '12px']]]),
-                $this->starterSection([
-                    $this->starterColumn([$feature('people', 'Find your people', 'Discover relationships, departments, and ministry spaces where you can belong and grow.')]),
-                    $this->starterColumn([$feature('calendar', 'Join us this week', 'Choose a gathering and arrive with everything you need for a relaxed first visit.')]),
-                    $this->starterColumn([$feature('hand-heart', 'Take your next step', 'Explore simple ways to connect, serve, ask for prayer, or learn more about faith.')]),
-                ], $standardSettings + ['title' => 'There is a place for you here', 'body' => 'Three clear paths help newcomers move from browsing to belonging.', 'background_color' => '#f7f9fb', 'custom_css' => 'selector .public-page-structured-heading { margin-bottom: 18px; } selector .public-page-structured-heading h2 { max-width: 15ch; font-family: Georgia, serif; font-size: clamp(2rem, 4vw, 3.4rem); color: #102a43; } selector .public-page-structured-heading p { max-width: 54ch; font-size: 1.05rem; }'], ['tablet' => ['column_count' => '2'], 'mobile' => ['stack' => 'stack']]),
-                $this->starterSection([
-                    $this->starterColumn([
-                        $this->starterElement('rich_text', ['title' => 'More than a service. A community for everyday life.', 'text' => "Use this finished section to introduce the heart of your ministry. Share what people can expect: thoughtful worship, practical teaching, genuine relationships, and room to grow at their own pace.\n\nReplace this copy with your ministry’s real voice before publishing."], ['font_family' => 'georgia', 'text_color' => '#102a43', 'custom_css' => 'selector .public-page-rich-text h2 { max-width: 15ch; font-size: clamp(2rem, 4vw, 3.6rem); line-height: 1.06; letter-spacing: -.045em; } selector .public-page-rich-text p { max-width: 60ch; font-family: system-ui, sans-serif; font-size: 1rem; line-height: 1.85; color: #425466; }'], ['desktop' => ['padding' => ['top' => '10px', 'right' => '20px', 'bottom' => '10px', 'left' => '0px']]])
-                    ], ['vertical_alignment' => 'center']),
-                    $this->starterColumn([
-                        $this->starterElement('statistics', ['title' => 'Life together', 'stat_one_value' => '01', 'stat_one_label' => 'Gather in worship', 'stat_two_value' => '02', 'stat_two_label' => 'Grow in community', 'stat_three_value' => '03', 'stat_three_label' => 'Serve with purpose'], ['background_color' => '#173f5f', 'text_color' => '#ffffff', 'radius_top_left' => '26px', 'radius_top_right' => '26px', 'radius_bottom_right' => '26px', 'radius_bottom_left' => '26px', 'custom_css' => 'selector .public-page-statistics { border: 0; border-radius: 26px; padding: clamp(30px, 5vw, 58px); background: linear-gradient(145deg, #173f5f, #102a43); color: white; box-shadow: 0 24px 54px rgb(16 42 67 / 22%); } selector .public-page-statistics h2 { color: #b9ddd2; letter-spacing: .1em; text-transform: uppercase; font-size: .78rem; } selector .public-page-statistics article { border-color: rgb(255 255 255 / 16%); } selector .public-page-statistics strong { color: white; font-family: Georgia, serif; } selector .public-page-statistics span { color: rgb(255 255 255 / 72%); }'], ['desktop' => ['padding' => ['top' => '0px', 'right' => '0px', 'bottom' => '0px', 'left' => '0px']]])
-                    ], ['vertical_alignment' => 'center']),
-                ], $standardSettings + ['background_color' => '#ffffff', 'column_gap' => 'spacious'], ['mobile' => ['stack' => 'stack']]),
-                $this->starterSection([
-                    $this->starterColumn([$this->starterElement('service_times', ['title' => 'Gather with us', 'body' => 'Current public service times and locations appear here automatically.'], ['custom_css' => 'selector .public-page-dynamic-list { height: 100%; box-sizing: border-box; border: 0; border-radius: 24px; padding: clamp(28px, 4vw, 44px); background: #ffffff; box-shadow: 0 16px 44px rgb(16 42 67 / 9%); } selector .public-page-dynamic-list small { color: #2f6f73; }'])]),
-                    $this->starterColumn([$this->starterElement('events', ['title' => 'Something to look forward to', 'body' => 'Published upcoming events appear here automatically.'], ['custom_css' => 'selector .public-page-dynamic-list { height: 100%; box-sizing: border-box; border: 0; border-radius: 24px; padding: clamp(28px, 4vw, 44px); background: #173f5f; color: #ffffff; box-shadow: 0 16px 44px rgb(16 42 67 / 18%); } selector .public-page-dynamic-list :is(h2, p, small, strong, span, a) { color: inherit; } selector .public-page-dynamic-list p, selector .public-page-dynamic-list span { opacity: .76; }'])]),
-                ], $standardSettings + ['title' => 'This week at the ministry', 'body' => 'Live ministry information keeps the homepage useful without manual duplication.', 'background_color' => '#edf4f2', 'custom_css' => 'selector .public-page-structured-heading h2 { font-family: Georgia, serif; font-size: clamp(2rem, 4vw, 3.2rem); color: #102a43; }'], ['mobile' => ['stack' => 'stack']]),
-                $this->starterSection([
-                    $this->starterColumn([$this->starterElement('welcome', ['title' => 'Come as you are', 'body' => 'You do not need to have everything figured out. Begin with a visit and meet people who will be glad to welcome you.'], ['custom_css' => 'selector .public-page-callout { height: 100%; box-sizing: border-box; border: 1px solid #d7e4df; border-radius: 24px; padding: clamp(28px, 4vw, 46px); background: #f4f8f6; } selector .public-page-callout h2 { font-family: Georgia, serif; font-size: clamp(1.8rem, 3vw, 2.6rem); color: #102a43; }'])]),
-                    $this->starterColumn([$this->starterElement('next_steps', ['title' => 'Ready for what is next?', 'body' => 'Connect with a team, join a department, discover faith, or find a place to serve.'], ['custom_css' => 'selector .public-page-callout { height: 100%; box-sizing: border-box; border: 0; border-radius: 24px; padding: clamp(28px, 4vw, 46px); background: #f4f0e8; } selector .public-page-callout h2 { font-family: Georgia, serif; font-size: clamp(1.8rem, 3vw, 2.6rem); color: #102a43; }'])]),
-                ], $standardSettings + ['title' => 'Start where you are', 'background_color' => '#ffffff', 'custom_css' => 'selector .public-page-structured-heading h2 { font-family: Georgia, serif; font-size: clamp(2rem, 4vw, 3.2rem); color: #102a43; }'], ['mobile' => ['stack' => 'stack']]),
-                $this->starterSection([$this->starterColumn([$this->starterElement('call_to_action', ['title' => 'Your story can begin here.', 'body' => 'Join us this week and discover a community where faith, hope, and everyday life come together.', 'button_label' => 'Plan your visit', 'button_url' => '/visit'], ['button_background' => 'surface', 'button_hover_background' => 'surface_muted', 'button_text_color' => '#17324d', 'button_radius' => '999px', 'button_padding_x' => '28px', 'button_padding_y' => '14px', 'custom_css' => 'selector .public-page-cta { min-height: 360px; align-content: center; border-radius: 28px; padding: clamp(38px, 7vw, 86px); background: radial-gradient(circle at 90% 10%, rgb(255 255 255 / 18%), transparent 30%), linear-gradient(135deg, #2f6f73, #173f5f); box-shadow: 0 26px 64px rgb(16 42 67 / 20%); } selector .public-page-cta h2 { max-width: 14ch; font-family: Georgia, serif; font-size: clamp(2.2rem, 5vw, 4.4rem); line-height: 1; } selector .public-page-cta p { font-size: 1.05rem; }'])])], $compactSettings + ['background_color' => '#f4f0e8'], ['desktop' => ['padding' => ['top' => '64px', 'right' => '34px', 'bottom' => '64px', 'left' => '34px']], 'mobile' => ['padding' => ['top' => '32px', 'right' => '12px', 'bottom' => '32px', 'left' => '12px']]]),
-            ],
             'about' => [
                 $this->starterSection([$this->starterColumn([$hero('ABOUT', 'Tell the story behind your ministry.', 'Introduce the calling, people, and purpose that shape this community.')])], $leadSettings),
                 $this->starterSection([$this->starterColumn([$this->starterElement('rich_text', ['title' => 'Our story', 'text' => 'Replace this text with an honest account of how the ministry began, who it serves, and what God has done through the community.'])])], $standardSettings),
@@ -391,7 +370,7 @@ class PageWorkspaceController extends Controller
                     $this->starterColumn([$this->starterElement('map_directions', ['title' => 'Visit in person', 'address' => 'Add the public ministry address.', 'directions_url' => '', 'button_label' => 'Get directions'])]),
                 ], $standardSettings + ['title' => 'We would be glad to hear from you'], ['mobile' => ['stack' => 'stack']]),
             ],
-            'blank' => [$this->starterSection([$this->starterColumn([])], ['content_width' => 'standard', 'padding' => 'none'])],
+            'blank' => [],
         ];
 
         $document = ['version' => 2, 'sections' => $documents[$template] ?? $documents['blank']];
