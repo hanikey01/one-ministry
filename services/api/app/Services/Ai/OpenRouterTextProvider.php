@@ -7,6 +7,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Throwable;
 
 final class OpenRouterTextProvider implements AiTextProvider
 {
@@ -47,58 +48,97 @@ final class OpenRouterTextProvider implements AiTextProvider
         return AiProviderException::fromHttp($exception);
     }
 
-    public function validateStructuredOutput(string $apiKey, string $modelId): array
+    public function validateConnection(string $apiKey): array
     {
-        $schema = ['type' => 'object', 'properties' => ['ok' => ['type' => 'boolean']], 'required' => ['ok'], 'additionalProperties' => false];
         $started = microtime(true);
         try {
-            $payload = Http::baseUrl(self::BASE_URL)->withToken($apiKey)->acceptJson()->connectTimeout(10)->timeout(45)->post('/chat/completions', [
-                'model' => $modelId,
-                'messages' => [['role' => 'user', 'content' => 'Return a JSON object with ok set to true.']],
-                'max_tokens' => 128,
-                'temperature' => 0,
-                'provider' => ['require_parameters' => true],
-                'response_format' => ['type' => 'json_schema', 'json_schema' => ['name' => 'ai_connection_check', 'strict' => true, 'schema' => $schema]],
-            ])->throw()->json();
+            Http::baseUrl(self::BASE_URL)->withToken($apiKey)->acceptJson()->connectTimeout(5)->timeout(15)
+                ->get('/models')->throw();
         } catch (RequestException $exception) {
             throw $this->catalogException($exception);
         } catch (ConnectionException $exception) {
             throw AiProviderException::fromConnection($exception);
         }
-        $content = $payload['choices'][0]['message']['content'] ?? null;
-        $output = is_string($content) ? json_decode($content, true) : null;
-        if (! is_array($output) || ($output['ok'] ?? null) !== true) throw new AiProviderException('structured_output_failed');
 
-        return ['model' => (string) ($payload['model'] ?? $modelId), 'latency_ms' => (int) ((microtime(true) - $started) * 1000), 'output' => ['ok' => true]];
+        return ['latency_ms' => (int) ((microtime(true) - $started) * 1000)];
+    }
+
+    public function validateStructuredOutput(string $apiKey, string $modelId): array
+    {
+        $schema = AiCompositionProbe::schema();
+        $result = $this->requestStructured($apiKey, $modelId, 'You verify HTML and CSS section generation for a page editor.',
+            'Return one section named Welcome with a semantic root section, a heading and paragraph in HTML, responsive self-contained CSS, empty javascript, and a plain-text fallback. Give the heading and paragraph unique kebab-case data-ai-editable attributes and clear data-ai-label attributes. Use no remote resources.',
+            $schema, 'ai_page_composition_check', 1600, 0);
+        AiCompositionProbe::validate($result['output']);
+
+        return $result;
     }
 
     public function generateStructuredOutput(string $apiKey, string $modelId, string $systemPrompt, string $userPrompt, array $schema, string $schemaName, int $maxOutputTokens): array
     {
-        $started = microtime(true);
-        try {
-            $payload = Http::baseUrl(self::BASE_URL)->withToken($apiKey)->acceptJson()->connectTimeout(10)->timeout(120)->post('/chat/completions', [
-                'model' => $modelId,
-                'messages' => [['role' => 'system', 'content' => $systemPrompt], ['role' => 'user', 'content' => $userPrompt]],
-                'max_tokens' => $maxOutputTokens,
-                'temperature' => 0.35,
-                // Do not allow OpenRouter to silently select an upstream provider
-                // that ignores this request's structured-output contract.
-                'provider' => ['require_parameters' => true],
-                'response_format' => ['type' => 'json_schema', 'json_schema' => ['name' => $schemaName, 'strict' => true, 'schema' => $this->structuredOutputSchema($schema)]],
-            ])->throw()->json();
-        } catch (RequestException $exception) {
-            throw $this->catalogException($exception);
-        } catch (ConnectionException $exception) {
-            throw AiProviderException::fromConnection($exception);
-        }
-        if (($payload['choices'][0]['finish_reason'] ?? null) === 'length') {
-            throw new AiProviderException('output_truncated');
-        }
-        $content = $payload['choices'][0]['message']['content'] ?? null;
-        $output = is_string($content) ? json_decode($content, true) : null;
-        if (! is_array($output)) throw new AiProviderException('structured_output_failed');
+        return $this->requestStructured($apiKey, $modelId, $systemPrompt, $userPrompt, $schema, $schemaName, $maxOutputTokens, 0.35);
+    }
 
-        return ['model' => (string) ($payload['model'] ?? $modelId), 'latency_ms' => (int) ((microtime(true) - $started) * 1000), 'output' => $output];
+    private function requestStructured(string $apiKey, string $modelId, string $systemPrompt, string $userPrompt, array $schema, string $schemaName, int $maxTokens, float $temperature): array
+    {
+        $started = microtime(true);
+        $last = null;
+        foreach (['json_schema', 'json_object'] as $mode) {
+            try {
+                $portable = $this->structuredOutputSchema($schema);
+                $messages = [['role' => 'system', 'content' => $systemPrompt], ['role' => 'user', 'content' => $userPrompt]];
+                $format = ['type' => 'json_schema', 'json_schema' => ['name' => $schemaName, 'strict' => true, 'schema' => $portable]];
+                if ($mode === 'json_object') {
+                    $format = ['type' => 'json_object'];
+                    $messages[0]['content'] .= "\nReturn exactly one JSON object and no prose. It must match this contract: ".json_encode($portable, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+                }
+                $payload = Http::baseUrl(self::BASE_URL)->withToken($apiKey)->acceptJson()->connectTimeout(10)->timeout(120)
+                    ->post('/chat/completions', [
+                        'model' => $modelId, 'messages' => $messages, 'max_tokens' => $maxTokens, 'temperature' => $temperature,
+                        'provider' => ['require_parameters' => true, 'allow_fallbacks' => false, 'data_collection' => 'deny'],
+                        'response_format' => $format,
+                    ])->throw()->json();
+                if (($payload['choices'][0]['finish_reason'] ?? null) === 'length') throw new AiProviderException('output_truncated');
+                $output = $this->decodeObject($payload['choices'][0]['message']['content'] ?? null);
+
+                return ['model' => (string) ($payload['model'] ?? $modelId), 'latency_ms' => (int) ((microtime(true) - $started) * 1000), 'response_mode' => $mode, 'output' => $output];
+            } catch (RequestException $exception) {
+                $last = $this->catalogException($exception);
+            } catch (ConnectionException $exception) {
+                $last = AiProviderException::fromConnection($exception);
+            } catch (AiProviderException $exception) {
+                $last = $exception;
+            } catch (Throwable) {
+                throw new AiProviderException('internal_response_processing_error');
+            }
+            if ($mode === 'json_object' || ! $this->mayFallback($last)) throw $last;
+        }
+        throw $last ?? new AiProviderException('structured_output_failed');
+    }
+
+    private function mayFallback(AiProviderException $exception): bool
+    {
+        return in_array($exception->diagnosticCode, ['provider_schema_rejected', 'provider_request_rejected', 'provider_malformed_json', 'structured_output_failed'], true);
+    }
+
+    private function decodeObject(mixed $content): array
+    {
+        if (is_array($content)) {
+            $content = collect($content)->filter(fn ($part): bool => is_array($part) && in_array($part['type'] ?? null, ['text', 'output_text'], true))
+                ->map(fn (array $part): string => (string) ($part['text'] ?? ''))->implode('');
+        }
+        if (! is_string($content) || trim($content) === '') throw new AiProviderException('structured_output_failed');
+        $text = trim(preg_replace('/^```(?:json)?\s*|\s*```$/i', '', trim($content)) ?? '');
+        try {
+            $decoded = json_decode($text, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            $start = strpos($text, '{'); $end = strrpos($text, '}');
+            if ($start === false || $end === false || $end <= $start) throw new AiProviderException('provider_malformed_json');
+            try { $decoded = json_decode(substr($text, $start, $end - $start + 1), true, 512, JSON_THROW_ON_ERROR); }
+            catch (\JsonException) { throw new AiProviderException('provider_malformed_json'); }
+        }
+        if (! is_array($decoded) || array_is_list($decoded)) throw new AiProviderException('structured_output_failed');
+        return $decoded;
     }
 
     /** @param array<string,mixed> $schema @return array<string,mixed> */
@@ -109,7 +149,10 @@ final class OpenRouterTextProvider implements AiTextProvider
         // including pattern and maxLength. Laravel performs the complete,
         // authoritative document validation after generation, so the provider
         // receives only the portable structural subset.
-        $supported = ['type', 'format', 'title', 'description', 'enum', 'items', 'prefixItems', 'minItems', 'maxItems', 'minimum', 'maximum', 'anyOf', 'oneOf', 'properties', 'additionalProperties', 'required', '$id', '$defs', '$ref', '$anchor'];
+        // OpenRouter forwards this contract to heterogeneous upstreams.
+        // Laravel owns cardinality enforcement because nested minItems and
+        // maxItems are rejected by some otherwise compatible providers.
+        $supported = ['type', 'format', 'title', 'description', 'enum', 'items', 'prefixItems', 'minimum', 'maximum', 'anyOf', 'oneOf', 'properties', 'additionalProperties', 'required', '$id', '$defs', '$ref', '$anchor'];
         $clean = [];
         foreach ($schema as $key => $value) {
             if (! in_array($key, $supported, true)) continue;

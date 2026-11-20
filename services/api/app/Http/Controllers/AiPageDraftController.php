@@ -16,19 +16,18 @@ class AiPageDraftController extends Controller
     public function __invoke(Request $request): JsonResponse
     {
         $input = $request->validate([
-            'brief' => ['required', 'string', 'min:20', 'max:3000'],
-            'review' => ['sometimes', 'boolean'],
+            'brief' => ['required', 'string', 'min:20', 'max:12000'],
             'title' => ['nullable', 'string', 'max:200'],
-            'public_details' => ['nullable', 'string', 'max:5000'],
-            'page_goal' => ['nullable', 'string', 'max:1000'],
-            'audience' => ['nullable', 'string', 'max:500'],
-            'tone' => ['nullable', 'string', 'max:300'],
-            'visual_direction' => ['nullable', 'string', 'max:1000'],
+            'public_details' => ['nullable', 'string', 'max:15000'],
+            'page_goal' => ['nullable', 'string', 'max:3000'],
+            'audience' => ['nullable', 'string', 'max:1500'],
+            'tone' => ['nullable', 'string', 'max:1000'],
+            'visual_direction' => ['nullable', 'string', 'max:4000'],
             'content_density' => ['nullable', 'in:concise,balanced,detailed'],
-            'primary_action' => ['nullable', 'string', 'max:500'],
-            'required_sections' => ['nullable', 'string', 'max:1500'],
-            'forbidden_patterns' => ['nullable', 'string', 'max:1500'],
-            'brand_constraints' => ['nullable', 'string', 'max:1500'],
+            'primary_action' => ['nullable', 'string', 'max:1500'],
+            'required_sections' => ['nullable', 'string', 'max:6000'],
+            'forbidden_patterns' => ['nullable', 'string', 'max:4000'],
+            'brand_constraints' => ['nullable', 'string', 'max:4000'],
         ]);
 
         $key = $request->header('Idempotency-Key', (string) Str::uuid());
@@ -62,13 +61,13 @@ class AiPageDraftController extends Controller
     {
         $input = $request->validate([
             'title' => ['required', 'string', 'max:200'],
-            'instruction' => ['required', 'string', 'min:10', 'max:1500'],
-            'page_purpose' => ['nullable', 'string', 'max:3000'],
+            'instruction' => ['required', 'string', 'min:10', 'max:5000'],
+            'page_purpose' => ['nullable', 'string', 'max:6000'],
             'kind' => ['required', 'in:section,column,element'],
             'section' => ['required', 'integer', 'min:0', 'max:59'],
             'column' => ['nullable', 'required_unless:kind,section', 'integer', 'min:0', 'max:11'],
             'element' => ['nullable', 'required_if:kind,element', 'integer', 'min:0', 'max:59'],
-            'document' => ['required', 'string', 'max:100000'],
+            'document' => ['required', 'string', 'max:750000'],
         ]);
 
         try {

@@ -17,41 +17,33 @@ use Illuminate\View\View;
 
 class PageWorkspaceController extends Controller
 {
-    private const RESERVED = ['admin', 'api', 'departments', 'events', 'give', 'login', 'member', 'pages', 'resources', 'setup', 'staff', 'worship', 'books', 'sermons', 'media', 'dashboard-preview'];
+    private const MAX_DOCUMENT_BYTES = 750000;
 
-    private const STARTERS = [
-        'homepage' => ['label' => 'Homepage', 'slug' => 'home', 'summary' => 'A polished ministry homepage with welcome, gatherings, connection, and next steps.'],
-        'about' => ['label' => 'About', 'slug' => 'about-us', 'summary' => 'Tell the ministry story, explain its mission, and introduce its values.'],
-        'visit' => ['label' => 'Plan a visit', 'slug' => 'visit', 'summary' => 'Help newcomers find a gathering and know what to expect.'],
-        'beliefs' => ['label' => 'Beliefs', 'slug' => 'beliefs', 'summary' => 'Present convictions in an approachable, readable structure.'],
-        'leadership' => ['label' => 'Leadership', 'slug' => 'leadership', 'summary' => 'Introduce ministry leaders with flexible profile cards.'],
-        'contact' => ['label' => 'Contact', 'slug' => 'contact', 'summary' => 'Combine contact guidance, directions, and a clear response path.'],
-        'blank' => ['label' => 'Blank canvas', 'slug' => '', 'summary' => 'Begin with an empty canvas and build a custom layout.'],
-    ];
+    private const RESERVED = ['admin', 'api', 'departments', 'events', 'give', 'login', 'member', 'pages', 'resources', 'setup', 'staff', 'worship', 'books', 'sermons', 'media', 'dashboard-preview'];
 
     public function index(Request $request): View
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
         $pages = DB::table('pages')->orderByDesc('updated_at')->get();
 
-        return view('staff.pages.index', compact('settings', 'pages') + ['user' => $request->user(), 'starters' => self::STARTERS]);
+        return view('staff.pages.index', compact('settings', 'pages') + ['user' => $request->user()]);
     }
 
     public function create(Request $request): View
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
-        $starter = self::STARTERS[$request->string('template')->toString()] ?? self::STARTERS['blank'];
+        $starter = ['label' => 'New page', 'slug' => ''];
 
         $features = $this->enabledFeatures();
         $elementRegistry = app(\App\Services\PageElementRegistry::class);
-        return view('staff.pages.form', compact('settings', 'starter', 'features') + ['user' => $request->user(), 'page' => null, 'canPublish' => app(PermissionChecker::class)->allows($request->user(), 'content.publish'), 'blocks' => $this->starterDocument($request->string('template')->toString()), 'elementCatalog' => $elementRegistry->available($features), 'elementCategories' => $elementRegistry->categories(), 'aiDraftAvailable' => app(ModuleAvailability::class)->visibleToStaff('ai_page_editor', $request->user()), 'aiDraftRoute' => DB::table('ai_task_routes')->where('task_key', 'page_editor')->first()]);
+        return view('staff.pages.form', compact('settings', 'starter', 'features') + ['user' => $request->user(), 'page' => null, 'canPublish' => app(PermissionChecker::class)->allows($request->user(), 'content.publish'), 'blocks' => $this->starterDocument('blank'), 'elementCatalog' => $elementRegistry->available($features), 'elementCategories' => $elementRegistry->categories(), 'aiDraftAvailable' => app(ModuleAvailability::class)->visibleToStaff('ai_page_editor', $request->user()), 'aiDraftRoute' => DB::table('ai_task_routes')->where('task_key', 'page_editor')->first()]);
     }
 
     public function preview(Request $request): View
     {
         $input = $request->validate([
             'title' => ['required', 'string', 'max:200'],
-            'blocks' => ['required', 'string', 'max:100000'],
+            'blocks' => ['required', 'string', 'max:'.self::MAX_DOCUMENT_BYTES],
         ]);
         $document = $this->document($input['blocks']);
         $page = (object) [
@@ -107,7 +99,27 @@ class PageWorkspaceController extends Controller
 
         $features = $this->enabledFeatures();
         $elementRegistry = app(\App\Services\PageElementRegistry::class);
-        return view('staff.pages.form', compact('settings', 'page', 'revisions', 'canPublish', 'features') + ['user' => $request->user(), 'starter' => null, 'blocks' => $this->editorDocument($page->blocks ?? null), 'elementCatalog' => $elementRegistry->available($features), 'elementCategories' => $elementRegistry->categories(), 'aiDraftAvailable' => app(ModuleAvailability::class)->visibleToStaff('ai_page_editor', $request->user()), 'aiDraftRoute' => DB::table('ai_task_routes')->where('task_key', 'page_editor')->first()]);
+        return view('staff.pages.form', compact('settings', 'page', 'revisions', 'canPublish', 'features') + ['user' => $request->user(), 'starter' => null, 'blocks' => $this->editorDocument($page->blocks ?? null), 'isHomepage' => $settings->homepage_page_id === $page->id, 'elementCatalog' => $elementRegistry->available($features), 'elementCategories' => $elementRegistry->categories(), 'aiDraftAvailable' => app(ModuleAvailability::class)->visibleToStaff('ai_page_editor', $request->user()), 'aiDraftRoute' => DB::table('ai_task_routes')->where('task_key', 'page_editor')->first()]);
+    }
+
+    /** Replace the active homepage canvas with the current native homepage design. */
+    public function applyHomepageDesign(Request $request, string $page): RedirectResponse
+    {
+        $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
+        abort_unless($settings->homepage_page_id === $page, 404);
+        $record = DB::table('pages')->where('id', $page)->firstOrFail();
+        $document = app(\App\Services\HomepageStarterService::class)->document($this->enabledFeatures());
+        $blocks = json_encode($document, JSON_THROW_ON_ERROR);
+        $data = ['blocks' => $blocks, 'body' => app(\App\Services\PageDocumentService::class)->plainText($document, $this->enabledFeatures())];
+        $revision = (int) DB::table('content_revisions')->where('page_id', $page)->max('revision') + 1;
+
+        DB::transaction(function () use ($request, $page, $record, $data, $revision): void {
+            DB::table('pages')->where('id', $page)->update([...$data, 'status' => 'draft', 'published_at' => null, 'published_by' => null, 'review_notes' => null, 'updated_by' => $request->user()->id, 'updated_at' => now()]);
+            $this->revision($page, $revision, ['title' => $record->title, 'slug' => $record->slug, 'seo_title' => $record->seo_title, 'seo_description' => $record->seo_description, ...$data], $request->user()->id);
+            $this->audit($request, 'content.homepage_design_applied', $page, ['revision' => $revision, 'design' => 'three_slide_theme_aware_carousel']);
+        });
+
+        return to_route('staff.pages.edit', $page)->with('status', 'The revised homepage design is now on the canvas as a draft. Review it and publish when ready.');
     }
 
     public function mediaCatalog(): JsonResponse
@@ -238,7 +250,7 @@ class PageWorkspaceController extends Controller
         $data = $request->validate([
             'title' => ['required', 'string', 'max:200'],
             'slug' => ['required', 'string', 'max:160', Rule::unique('pages', 'slug')->ignore($page)],
-            'blocks' => ['required', 'string', 'max:100000'],
+            'blocks' => ['required', 'string', 'max:'.self::MAX_DOCUMENT_BYTES],
             'seo_title' => ['nullable', 'string', 'max:70'],
             'seo_description' => ['nullable', 'string', 'max:160'],
         ]);

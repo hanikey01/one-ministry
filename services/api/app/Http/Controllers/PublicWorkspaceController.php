@@ -90,7 +90,7 @@ class PublicWorkspaceController extends Controller
 
     public function contact(): View
     {
-        return $this->view('public.contact');
+        return $this->view('public.contact', []);
     }
 
     public function library(Request $request, string $library): View

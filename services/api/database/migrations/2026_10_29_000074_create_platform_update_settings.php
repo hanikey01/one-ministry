@@ -12,10 +12,6 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->string('channel', 20)->default('stable');
             $table->string('mode', 30)->default('manual');
-            $table->string('repository', 255)->nullable();
-            $table->text('access_token_encrypted')->nullable();
-            $table->string('signing_key_id', 120)->nullable();
-            $table->text('public_key_pem')->nullable();
             $table->string('current_version', 80)->default('dev');
             $table->string('available_version', 80)->nullable();
             $table->string('available_channel', 20)->nullable();

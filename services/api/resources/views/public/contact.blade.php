@@ -13,7 +13,8 @@
         @if(request()->query('contact') === 'received')
             <p class="public-page-form-success" role="status">Thank you. Your message has been received.</p>
         @endif
-        <form class="public-contact-form" method="POST" action="{{ url('/api/v1/public/contact') }}">
+        <form class="public-contact-form" method="POST" action="{{ route('public.contact.submit') }}">
+            @csrf
             <label>First name <input name="first_name" required maxlength="100" autocomplete="given-name"></label>
             <label>Last name <input name="last_name" maxlength="100" autocomplete="family-name"></label>
             <label>Email address <input name="email" type="email" maxlength="254" autocomplete="email"></label>

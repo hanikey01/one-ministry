@@ -27,7 +27,7 @@ Sections and columns are editable layout objects. Elements are editable content 
 - The public renderer uses an approved recursive renderer, not editor-generated markup.
 - Ministry branding uses shared semantic theme tokens. Editor controls remain neutral unless a ministry-selected accent is required for an action state.
 - Manual editing remains complete when AI is unavailable.
-- Every AI proposal is reviewable, scoped, undoable, and separate from saving or publishing.
+- Completed full-page AI designs apply directly to the editable canvas as one undoable replacement. They remain separate from saving or publishing.
 
 ## 3. Page document contract
 
@@ -144,7 +144,7 @@ Elements are placed inside columns. The first supported categories are:
 - Actions: standalone button and call to action.
 - Media: image, gallery, video, audio, file download, media and text.
 - Ministry content: events, service times, departments, locations, giving, prayer, next steps, announcements, volunteer, sermon spotlight, books, newsletter, and welcome.
-- Feature content: a native carousel with staff-provided slides and an explicit content card.
+- Feature content: a native carousel with up to three primary homepage slides. Each slide independently selects a flyer image, uploaded ministry video, or YouTube/Vimeo link, then provides its own heading, supporting copy, and action. Carousel surfaces inherit the active semantic theme tokens.
 - Advanced content: a distinct HTML widget plus a custom-code element with bounded HTML, CSS, and JavaScript. Their code runs only in the documented opaque-origin sandbox, never in the ministry application document. Every ordinary section, column, and element may carry bounded scoped Custom CSS in Advanced; executable JavaScript is rejected outside the sandboxed widgets.
 - Layout helpers: divider, spacer, and one-, two-, three-, or four-column grid presets.
 
@@ -214,7 +214,7 @@ The inspector never displays unrelated controls from another hierarchy level.
 
 ## 9. AI behavior
 
-Page planning may propose sections, columns, approved elements, every validated setting available to those elements, and bounded custom code when no native element fits. It cannot invent media URLs, destinations, or ministry facts. The application validates every plan through the same versioned document boundary used by the manual editor before staff can review or apply it; AI output never becomes application markup directly.
+Full-page AI planning is domain-neutral and brief-driven. It may plan any legitimate public page without forcing it into ministry-specific templates, predefined page types, or a fixed visual pattern. Before composing sections it defines one page-wide art direction covering typography roles, colour logic, imagery treatment, spacing rhythm, motion, a signature motif, section transitions, and explicit anti-patterns. Consecutive generation batches receive the approved art direction and bounded HTML/CSS continuity from preceding sections so the page reads as one authored composition rather than disconnected templates. Generated visual sections use bounded semantic HTML and self-contained CSS inside the documented sandbox. The model may place only exact published internal Media Library paths supplied by the server; invented, remote, unpublished, or unapproved paths are rejected. After assembly, one independent quality pass scores coherence, originality, hierarchy, and craft. A failed review may trigger one bounded repair of the weakest section; review failure never destroys an otherwise valid composition. The application validates every section and the assembled plan through the same versioned document boundary used by the manual editor before applying the completed design directly to the canvas; AI output never becomes trusted application markup directly.
 
 Section AI receives the page purpose, neighboring sections, the selected section, and the current theme context. It may return a complete redesigned section, including columns and child elements, but may change only that selected section after staff approval.
 
@@ -222,7 +222,7 @@ Column AI receives the selected column and its surrounding section context. It m
 
 Element AI receives the selected element and page context. It may change the element type, content, and approved settings while preserving the selected object identity and scope.
 
-Applying a proposal creates an undo point. Applying is not saving, and saving is not publishing.
+Full-page AI application creates an undo point immediately after generation. It is not saving, and saving is not publishing.
 
 ## 10. Validation and security
 

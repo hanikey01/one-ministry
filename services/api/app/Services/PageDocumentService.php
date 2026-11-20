@@ -106,8 +106,6 @@ final class PageDocumentService
 
     private function validateSandboxCode(string $html, string $css, string $javascript): void
     {
-        $combined=$html."\n".$css."\n".$javascript;
-        if(preg_match('/(?:https?:|\/\/|@import|url\s*\(\s*[\'\"]?(?!data:))/i',$combined)) $this->invalid('Custom code cannot load external resources.');
         if(preg_match('/\b(?:eval|Function|WebAssembly|Worker|SharedWorker|ServiceWorker|fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon|localStorage|sessionStorage|indexedDB|cookieStore|setInterval)\b/i',$javascript)) $this->invalid('Custom JavaScript uses a blocked execution or storage API.');
         if(preg_match('/\b(?:window\s*\.\s*)?(?:parent|top|opener)\b/i',$javascript)) $this->invalid('Custom JavaScript cannot access another browsing context.');
         if(preg_match('/\b(?:while|do|for)\s*(?:\(|\{)/i',$javascript)) $this->invalid('Custom JavaScript cannot contain loop statements; use bounded array operations instead.');

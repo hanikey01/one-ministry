@@ -77,12 +77,22 @@ class AiPageCompositionCompilerTest extends TestCase
         $this->assertStringNotContainsString('uuid', $schema);
     }
 
+    public function test_section_transport_is_smaller_than_the_complete_page_contract(): void
+    {
+        $types = array_keys(app(AiElementCatalogue::class)->forFeatures([]));
+        $pageSchema = AiPageCompositionContract::schema($types);
+        $sectionSchema = AiPageCompositionContract::sectionSchema($types);
+
+        $this->assertSame($pageSchema['properties']['sections']['items'], $sectionSchema);
+        $this->assertLessThan(strlen(json_encode($pageSchema)), strlen(json_encode($sectionSchema)));
+    }
+
     public function test_homepage_is_a_complete_native_version_two_document(): void
     {
         $document = app(HomepageStarterService::class)->document([]);
         $this->assertSame(2, $document['version']);
         $this->assertCount(5, $document['sections']);
-        $this->assertCount(2, $document['sections'][0]['columns']);
-        $this->assertSame('hero', $document['sections'][0]['columns'][0]['elements'][0]['type']);
+        $this->assertCount(1, $document['sections'][0]['columns']);
+        $this->assertSame('carousel', $document['sections'][0]['columns'][0]['elements'][0]['type']);
     }
 }

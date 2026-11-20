@@ -2,7 +2,7 @@
     <section class="testimony-archive" aria-labelledby="testimony-archive-title">
         <header class="testimony-archive-heading">
             <div><p>Stories of grace</p><h1 id="testimony-archive-title">Testimonies</h1><span>Stories of faith, restoration, provision, and hope shared by our community.</span></div>
-            <a class="testimony-share-link" href="{{ route('member.testimonies') }}">Share your story <span aria-hidden="true">→</span></a>
+            <a class="testimony-share-link" href="{{ route('member.testimonies') }}">Share your story</a>
         </header>
         <nav class="testimony-filters" aria-label="Testimony categories">
             <a href="{{ route('public.testimonies') }}" @class(['active' => $activeCategory === ''])>All stories</a>

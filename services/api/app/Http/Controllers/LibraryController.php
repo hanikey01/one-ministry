@@ -64,9 +64,15 @@ class LibraryController extends Controller
         $item = $libraryKey === 'sermon_series'
             ? DB::table('sermon_series')->where(['id' => $asset, 'status' => 'published'])->first()
             : DB::table('media_assets')->where(['id' => $asset, 'library' => $libraryKey, 'status' => 'published'])->first();
-        abort_unless($item?->cover_image_path && Storage::disk('local')->exists($item->cover_image_path), 404);
+        abort_unless($item, 404);
+        if ($item->cover_image_path && Storage::disk('local')->exists($item->cover_image_path)) {
+            return Storage::disk('local')->response($item->cover_image_path, null, ['Cache-Control' => 'public, max-age=86400'], 'inline');
+        }
+        abort_unless($libraryKey === 'books_library' && $item->file_mime === 'application/pdf' && $item->file_disk && $item->file_path, 404);
+        $disk = Storage::disk($item->file_disk);
+        abort_unless($disk->exists($item->file_path), 404);
 
-        return Storage::disk('local')->response($item->cover_image_path, null, ['Cache-Control' => 'public, max-age=86400'], 'inline');
+        return $disk->response($item->file_path, $item->file_name, ['Content-Type' => 'application/pdf', 'Cache-Control' => 'public, max-age=86400'], 'inline');
     }
 
     private function downloadPublished(string $library, string $asset, bool $inline = false)

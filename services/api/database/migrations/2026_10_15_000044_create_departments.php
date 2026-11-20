@@ -23,7 +23,6 @@ return new class extends Migration
             $table->string('status', 20)->default('active');
             $table->boolean('is_public')->default(true);
             $table->boolean('accepting_requests')->default(false);
-            $table->boolean('discussion_enabled')->default(true);
             $table->foreignUuid('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
             $table->timestamp('archived_at')->nullable();
@@ -76,30 +75,6 @@ return new class extends Migration
             $table->unique(['department_gathering_id', 'person_id'], 'department_attendance_unique');
         });
 
-        Schema::create('department_messages', function (Blueprint $table): void {
-            $table->uuid('id')->primary();
-            $table->foreignUuid('department_id')->constrained('departments')->cascadeOnDelete();
-            $table->foreignUuid('person_id')->constrained('people')->cascadeOnDelete();
-            $table->uuid('parent_message_id')->nullable();
-            $table->text('content');
-            $table->timestamp('edited_at')->nullable();
-            $table->foreignUuid('moderated_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->timestamp('moderated_at')->nullable();
-            $table->string('moderation_reason', 240)->nullable();
-            $table->timestamps();
-            $table->index(['department_id', 'created_at'], 'department_messages_date_idx');
-        });
-        Schema::table('department_messages', function (Blueprint $table): void {
-            $table->foreign('parent_message_id')->references('id')->on('department_messages')->nullOnDelete();
-        });
-        Schema::create('department_message_reads', function (Blueprint $table): void {
-            $table->foreignUuid('department_id')->constrained('departments')->cascadeOnDelete();
-            $table->foreignUuid('person_id')->constrained('people')->cascadeOnDelete();
-            $table->timestamp('last_read_at')->nullable();
-            $table->timestamps();
-            $table->primary(['department_id','person_id']);
-        });
-
         DB::table('permissions')->insertOrIgnore([
             ['key' => 'departments.manage', 'description' => 'Create departments and appoint department leaders', 'created_at' => now(), 'updated_at' => now()],
         ]);
@@ -126,8 +101,6 @@ return new class extends Migration
     {
         DB::table('role_permissions')->where('permission_key', 'departments.manage')->delete();
         DB::table('permissions')->where('key', 'departments.manage')->delete();
-        Schema::dropIfExists('department_message_reads');
-        Schema::dropIfExists('department_messages');
         Schema::dropIfExists('department_attendance_records');
         Schema::dropIfExists('department_gatherings');
         Schema::dropIfExists('department_join_requests');

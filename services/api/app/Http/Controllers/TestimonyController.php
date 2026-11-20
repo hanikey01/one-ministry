@@ -37,7 +37,14 @@ class TestimonyController extends Controller
     {
         $this->enabled(); $testimony=DB::table('testimonies')->leftJoin('people','people.id','=','testimonies.person_id')->where('testimonies.slug',$slug)->where('testimonies.status','published')->where('testimonies.consent_public',true)->where('testimonies.published_at','<=',now())->select('testimonies.*','people.profile_image_path')->first(); abort_if(!$testimony,404);
         $testimony=$this->withProfileImages(collect([$testimony]))->first();
-        return $this->publicView('public.testimony',['testimony'=>$testimony]);
+        $related = DB::table('testimonies')
+            ->where('status', 'published')->where('consent_public', true)->where('published_at', '<=', now())
+            ->where('id', '!=', $testimony->id)
+            ->orderByRaw('case when category = ? then 0 else 1 end', [$testimony->category])
+            ->orderByDesc('featured')->orderByDesc('published_at')->limit(3)
+            ->get(['title', 'slug', 'category', 'body', 'published_at']);
+
+        return $this->publicView('public.testimony',['testimony'=>$testimony, 'relatedTestimonies'=>$related]);
     }
 
     public function memberIndex(Request $request): View

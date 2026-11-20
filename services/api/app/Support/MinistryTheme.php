@@ -36,6 +36,12 @@ class MinistryTheme
         ],
     ];
 
+    private const STATUS_COLORS = [
+        'success' => '#15803D',
+        'warning' => '#B45309',
+        'danger' => '#B91C1C',
+    ];
+
     public static function cssVariables(?MinistrySetting $settings): string
     {
         $values = self::tokens($settings);
@@ -78,9 +84,15 @@ class MinistryTheme
     private static function tokens(?MinistrySetting $settings): array
     {
         $preset = self::PRESETS[$settings?->theme_preset ?? 'tech_blue'] ?? self::PRESETS['tech_blue'];
-        $chrome = $settings?->chrome_mode === 'custom' && $settings?->chrome_color
+        $customSeed = $settings?->chrome_mode === 'custom' && $settings?->chrome_color
             ? strtoupper($settings->chrome_color)
-            : $preset['chrome'];
+            : null;
+
+        if ($customSeed !== null) {
+            $preset = self::paletteFromSeed($customSeed);
+        }
+
+        $chrome = $customSeed ?? $preset['chrome'];
 
         $values = [
             '--theme-preset' => $settings?->theme_preset ?? 'tech_blue',
@@ -102,11 +114,15 @@ class MinistryTheme
             // Status states are platform-owned semantic tokens. They are not
             // editable ministry colours, and keeping them here prevents UI
             // components from carrying their own literal colour fallbacks.
-            '--theme-success-color' => $preset['action'],
-            '--theme-warning-color' => $preset['action'],
-            '--theme-danger-color' => $preset['action'],
+            '--theme-success-color' => self::STATUS_COLORS['success'],
+            '--theme-warning-color' => self::STATUS_COLORS['warning'],
+            '--theme-danger-color' => self::STATUS_COLORS['danger'],
             '--theme-chrome-color' => $chrome,
             '--theme-chrome-foreground' => self::bestTextColor($chrome),
+            '--theme-chrome-hover-color' => self::mix($chrome, self::bestTextColor($chrome), 0.12),
+            '--theme-chrome-active-color' => self::mix($chrome, self::bestTextColor($chrome), 0.2),
+            '--theme-focus-color' => $preset['action'],
+            '--theme-selected-color' => self::mix($preset['action'], $preset['light_surface'], 0.88),
         ];
 
         // Legacy aliases keep existing components on the shared token path while
@@ -129,6 +145,35 @@ class MinistryTheme
         $values['--theme-action-text-dark'] = $values['--theme-brand-text-dark'];
 
         return $values;
+    }
+
+    /** @return array<string, string> */
+    private static function paletteFromSeed(string $seed): array
+    {
+        $lightSurface = self::mix($seed, '#FFFFFF', 0.992);
+        $lightCanvas = self::mix($seed, '#FFFFFF', 0.965);
+        $lightInk = self::adjustForContrast(self::mix($seed, '#000000', 0.78), $lightSurface, 7.0);
+        $darkCanvas = self::mix($seed, '#000000', 0.92);
+        $darkSurface = self::mix($seed, '#000000', 0.86);
+        $darkRaised = self::mix($seed, '#000000', 0.79);
+        $darkInk = self::adjustForContrast(self::mix($seed, '#FFFFFF', 0.82), $darkSurface, 7.0);
+
+        return [
+            'light_canvas' => $lightCanvas,
+            'light_surface' => $lightSurface,
+            'light_raised' => '#FFFFFF',
+            'light_ink' => $lightInk,
+            'light_muted' => self::adjustForContrast(self::mix($lightInk, $lightSurface, 0.42), $lightSurface, 4.5),
+            'light_line' => self::mix($lightInk, $lightSurface, 0.86),
+            'dark_canvas' => $darkCanvas,
+            'dark_surface' => $darkSurface,
+            'dark_raised' => $darkRaised,
+            'dark_ink' => $darkInk,
+            'dark_muted' => self::adjustForContrast(self::mix($darkInk, $darkSurface, 0.42), $darkSurface, 4.5),
+            'dark_line' => self::mix($darkInk, $darkSurface, 0.82),
+            'action' => $seed,
+            'chrome' => $seed,
+        ];
     }
 
     private static function bestTextColor(string $hex): string
@@ -178,6 +223,47 @@ class MinistryTheme
         usort($candidates, fn (array $left, array $right): int => $left[1] <=> $right[1]);
 
         return $candidates[0][0];
+    }
+
+    private static function adjustForContrast(string $color, string $background, float $minimum): string
+    {
+        if (self::contrastRatio($color, $background) >= $minimum) {
+            return $color;
+        }
+
+        $candidates = [];
+        foreach (['#000000', '#FFFFFF'] as $target) {
+            $low = 0.0;
+            $high = 1.0;
+            for ($i = 0; $i < 16; $i++) {
+                $amount = ($low + $high) / 2;
+                $candidate = self::mix($color, $target, $amount);
+                if (self::contrastRatio($candidate, $background) >= $minimum) {
+                    $high = $amount;
+                } else {
+                    $low = $amount;
+                }
+            }
+
+            $candidate = self::mix($color, $target, $high);
+            if (self::contrastRatio($candidate, $background) >= $minimum) {
+                $candidates[] = [$candidate, $high];
+            }
+        }
+
+        usort($candidates, fn (array $left, array $right): int => $left[1] <=> $right[1]);
+
+        return $candidates[0][0] ?? self::bestTextColor($background);
+    }
+
+    private static function mix(string $from, string $to, float $amount): string
+    {
+        $amount = min(1, max(0, $amount));
+        $start = array_map('hexdec', str_split(ltrim($from, '#'), 2));
+        $end = array_map('hexdec', str_split(ltrim($to, '#'), 2));
+        $mixed = array_map(fn (int $channel, int $target): int => (int) round($channel + (($target - $channel) * $amount)), $start, $end);
+
+        return sprintf('#%02X%02X%02X', ...$mixed);
     }
 
     private static function contrastRatio(string $foreground, string $background): float

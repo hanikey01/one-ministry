@@ -14,7 +14,7 @@ use Throwable;
 
 final class AiPageGenerationService
 {
-    private const ACTIVE = ['queued', 'planning', 'composing', 'compiling'];
+    private const ACTIVE = ['queued', 'planning', 'composing', 'reviewing', 'repairing', 'compiling'];
 
     public function enqueue(array $input, User $actor, string $key): object
     {
@@ -48,6 +48,13 @@ final class AiPageGenerationService
         $data['process_url'] = route('staff.pages.ai-generation.process', $row->id);
         $availableAt = isset($row->available_at) ? strtotime((string) $row->available_at) : false;
         $data['retry_after_ms'] = $availableAt === false ? 0 : max(0, ($availableAt - time()) * 1000);
+        if (in_array($row->state, self::ACTIVE, true) || $row->state === 'failed') {
+            $payload = json_decode(Crypt::decryptString($row->payload_encrypted), true, 512, JSON_THROW_ON_ERROR);
+            $planned = count($payload['plan']['output']['sections'] ?? []);
+            $completed = count($payload['sections'] ?? []);
+            $data['progress'] = ['completed_sections' => $completed, 'total_sections' => $planned];
+            if ($row->state === 'failed') $data['failure'] = array_slice($payload['diagnostics'] ?? [], -3);
+        }
         if ($row->state === 'completed') {
             $payload = json_decode(Crypt::decryptString($row->payload_encrypted), true, 512, JSON_THROW_ON_ERROR);
             $data['proposal'] = $payload['result'];
@@ -107,42 +114,110 @@ final class AiPageGenerationService
             $stage = $row->state === 'queued' ? 'planning' : $row->state;
             if ($stage === 'compiling') {
                 $composition = $payload['composition'];
-                $review = ! empty($payload['input']['review'])
-                    ? $drafts->reviewComposition($composition['output'], $payload['plan']['output'], $actor, $composition, $row->id)
-                    : ['composition' => $composition['output'], 'findings' => [], 'status' => 'skipped'];
-                $payload['result'] = $drafts->compileComposition($review['composition'], $actor) + [
-                    'design_plan' => $payload['plan']['output'], 'design_review' => $review['findings'], 'review_status' => $review['status'], 'provider' => $composition['provider'], 'model' => $composition['model'],
+                $payload['result'] = $drafts->compileComposition($composition['output'], $actor, $payload['plan']['output'] ?? []) + [
+                    'design_plan' => $payload['plan']['output'], 'design_review' => $payload['design_review']['issues'] ?? [],
+                    'review_status' => $payload['design_review']['status'] ?? (isset($payload['design_review']) ? (($payload['design_review']['approved'] ?? false) ? 'approved' : 'repaired') : 'not_required'),
+                    'provider' => $composition['provider'], 'model' => $composition['model'],
                     'fallback_used' => $composition['fallback_used'] || $payload['plan']['fallback_used'], 'trace_id' => $row->id,
                 ];
                 $payload = ['result' => $payload['result']];
                 $update = ['state' => 'completed', 'completed_at' => now()];
+            } elseif ($stage === 'reviewing') {
+                DB::table('ai_page_generations')->where('id', $row->id)->where('lease_token', $row->lease_token)->update(['state' => $stage]);
+                $review = $drafts->executeDesignReview($payload['input'], $actor, $payload['plan']['output'], $payload['sections'], intdiv($row->stage_attempt, 2), $row->id);
+                $payload['design_review'] = $review['output'];
+                $payload['design_review']['status'] = ($review['output']['approved'] ?? false) ? 'approved' : 'repair_requested';
+                $payload['composition_meta']['fallback_used'] = ($payload['composition_meta']['fallback_used'] ?? false) || $review['fallback_used'];
+                $repair = $review['output']['repair_section'] ?? null;
+                $update = is_int($repair) && $repair >= 1 && $repair <= count($payload['sections']) && ! ($review['output']['approved'] ?? false)
+                    ? ['state' => 'repairing', 'stage_attempt' => 0, 'available_at' => now()]
+                    : ['state' => 'compiling', 'stage_attempt' => 0, 'available_at' => now()];
+            } elseif ($stage === 'repairing') {
+                DB::table('ai_page_generations')->where('id', $row->id)->where('lease_token', $row->lease_token)->update(['state' => $stage]);
+                $sectionIndex = max(0, (int) ($payload['design_review']['repair_section'] ?? 1) - 1);
+                $result = $drafts->executeSection($payload['input'], $actor, $payload['plan']['output'], $sectionIndex, $payload['sections'], intdiv($row->stage_attempt, 2), $row->id, (string) ($payload['design_review']['repair_instructions'] ?? 'Strengthen visual distinction and coherence.'));
+                $payload['sections'][$sectionIndex] = $result['output'];
+                $payload['design_review']['status'] = 'repaired';
+                $payload['composition_meta'] = [
+                    'provider' => $result['provider'], 'model' => $result['model'],
+                    'fallback_used' => ($payload['composition_meta']['fallback_used'] ?? false) || $result['fallback_used'],
+                ];
+                $payload['composition'] = ['output' => $drafts->compositionFromSections($payload['input'], $payload['plan']['output'], $payload['sections']), ...$payload['composition_meta']];
+                $update = ['state' => 'compiling', 'stage_attempt' => 0, 'available_at' => now()];
+            } elseif ($stage === 'composing') {
+                DB::table('ai_page_generations')->where('id', $row->id)->where('lease_token', $row->lease_token)->update(['state' => $stage]);
+                $sections = is_array($payload['sections'] ?? null) ? $payload['sections'] : [];
+                $sectionIndex = count($sections);
+                // Generate and validate one section per durable request. Combining
+                // multiple HTML/CSS sections into one strict JSON response caused
+                // otherwise compatible models to return malformed JSON or a batch
+                // that failed canonical canvas validation.
+                $result = $drafts->executeSection($payload['input'], $actor, $payload['plan']['output'], $sectionIndex, $sections, intdiv($row->stage_attempt, 2), $row->id);
+                $sections[] = $result['output'];
+                $payload['sections'] = $sections;
+                $payload['composition_meta'] = [
+                    'provider' => $result['provider'], 'model' => $result['model'],
+                    'fallback_used' => ($payload['composition_meta']['fallback_used'] ?? false) || $result['fallback_used'],
+                ];
+                if (count($sections) >= count($payload['plan']['output']['sections'])) {
+                    $payload['composition'] = ['output' => $drafts->compositionFromSections($payload['input'], $payload['plan']['output'], $sections), ...$payload['composition_meta']];
+                    $update = ['state' => 'reviewing', 'stage_attempt' => 0, 'available_at' => now()];
+                } else {
+                    $update = ['state' => 'composing', 'stage_attempt' => 0, 'available_at' => now()];
+                }
             } else {
                 DB::table('ai_page_generations')->where('id', $row->id)->where('lease_token', $row->lease_token)->update(['state' => $stage]);
-                $result = $drafts->executeStage($stage, $payload['input'], $actor, null, $payload['plan']['output'] ?? [], intdiv($row->stage_attempt, 2), $row->id);
-                $payload[$stage === 'planning' ? 'plan' : 'composition'] = $result;
-                $update = ['state' => $stage === 'planning' ? 'composing' : 'compiling', 'stage_attempt' => 0];
+                $result = $drafts->executeStage($stage, $payload['input'], $actor, null, [], intdiv($row->stage_attempt, 2), $row->id);
+                $payload['plan'] = $result;
+                $payload['sections'] = [];
+                $update = ['state' => 'composing', 'stage_attempt' => 0, 'available_at' => now()];
             }
             $update['payload_encrypted'] = Crypt::encryptString(json_encode($payload, JSON_THROW_ON_ERROR));
             $update['failure_code'] = null;
         } catch (Throwable $exception) {
+            if ($row->state === 'reviewing') {
+                $payload['design_review'] = ['status' => 'unavailable', 'approved' => true, 'issues' => []];
+                $update = [
+                    'state' => 'compiling', 'stage_attempt' => 0, 'available_at' => now(), 'failure_code' => null,
+                    'payload_encrypted' => Crypt::encryptString(json_encode($payload, JSON_THROW_ON_ERROR)),
+                ];
+            } else {
             $code = $exception instanceof AiProviderException ? $exception->diagnosticCode : ($exception instanceof ValidationException ? 'invalid_composition' : 'generation_failed');
             $attempt = $row->stage_attempt + 1;
+            // A 120-second provider timeout is not a useful retry signal for the same
+            // model. Advance to the configured fallback on the next durable attempt.
+            if ($code === 'provider_timeout') {
+                $attempt = max($attempt, 2);
+            }
             if (! in_array($code, ['provider_timeout', 'provider_connection_failed', 'provider_rate_limited', 'provider_unavailable'], true) && $attempt % 2 === 1) {
                 $attempt++;
             }
-            $terminal = $attempt >= 6 || $row->state === 'compiling' || ! ($exception instanceof AiProviderException);
+            $configuredAttempts = $this->configuredModelCount();
+            $terminal = intdiv($attempt, 2) >= $configuredAttempts || $row->state === 'compiling' || ! ($exception instanceof AiProviderException);
             $retryAfter = $exception instanceof AiProviderException && $exception->retryAfterSeconds !== null
                 ? $exception->retryAfterSeconds
                 : min(120, 15 * (2 ** min(3, max(0, $attempt - 1))));
             $update = ['stage_attempt' => $attempt, 'failure_code' => $code, 'available_at' => now()->addSeconds($retryAfter)];
-            if ($terminal) {
-                $update += ['state' => 'failed', 'completed_at' => now(), 'payload_encrypted' => Crypt::encryptString('{}')];
+            $payload['diagnostics'][] = ['stage' => $row->state, 'code' => $code, 'attempt' => $attempt, 'recorded_at' => now()->toIso8601String()];
+            if ($terminal) $update += ['state' => 'failed', 'completed_at' => now(), 'payload_encrypted' => Crypt::encryptString(json_encode($payload, JSON_THROW_ON_ERROR))];
+            else $update['payload_encrypted'] = Crypt::encryptString(json_encode($payload, JSON_THROW_ON_ERROR));
             }
         }
         DB::table('ai_page_generations')->where('id', $row->id)->where('lease_token', $row->lease_token)->whereIn('state', self::ACTIVE)
             ->update($update + ['lease_token' => null, 'lease_expires_at' => null, 'updated_at' => now()]);
 
         return true;
+    }
+
+    private function configuredModelCount(): int
+    {
+        $route = DB::table('ai_task_routes')->where('task_key', 'page_editor')->first();
+        if (! $route) {
+            return 1;
+        }
+        $fallbacks = json_decode($route->fallback_models ?: '[]', true);
+
+        return 1 + count(is_array($fallbacks) ? $fallbacks : []);
     }
 
     public function processOwned(string $id, User $actor): object

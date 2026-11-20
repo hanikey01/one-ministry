@@ -31,7 +31,7 @@ Within `services/api/app/Modules/<Module>/`, keep `Models`, `Data`, `Policies`, 
 | Attendance | Presence, check-in, computed records, corrections | Attendance confirmed/corrected |
 | Care | Prayer, case assignment, restricted notes | Care request and status events |
 | FollowUp | Rules, tasks, assignments, reminders | Task assigned/completed/escalated |
-| Community | Departments, membership requests, moderated discussion, gatherings, events, registrations | Department/event participation |
+| Community | Departments, membership requests, membership rosters, gatherings, events, registrations | Department/event participation |
 | Follow-up | Member requests, assignment, due dates, completion | Request updated |
 | Messaging | Templates, campaigns, preferences, deliveries | Delivery result |
 | Giving | Funds, donation attempts, verified gifts, receipts, reconciliation | Donation verified/reversed |

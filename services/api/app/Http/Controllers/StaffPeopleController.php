@@ -2,17 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\MinistrySetting;
+use App\Services\EmailDeliverySettingsService;
 use App\Services\ModuleAvailability;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Throwable;
 
 class StaffPeopleController extends Controller
 {
-    public function contact(Request $r): JsonResponse|RedirectResponse
+    public function contact(Request $r, EmailDeliverySettingsService $delivery): JsonResponse|RedirectResponse
     {
         $d = $r->validate(['first_name' => ['required', 'string', 'max:100'], 'last_name' => ['nullable', 'string', 'max:100'], 'email' => ['nullable', 'email', 'max:254'], 'phone' => ['nullable', 'string', 'max:40'], 'message' => ['nullable', 'string', 'max:2000'], 'consent_to_contact' => ['accepted']]);
         $message = filled($d['message'] ?? null) ? trim($d['message']) : null;
@@ -21,6 +25,32 @@ class StaffPeopleController extends Controller
         DB::table('people')->insert(array_merge($d, ['id' => $id, 'status' => 'member', 'consent_to_contact' => true, 'created_at' => now(), 'updated_at' => now()]));
         $task = (string) Str::uuid();
         DB::table('follow_up_tasks')->insert(['id' => $task, 'person_id' => $id, 'kind' => 'contact_follow_up', 'summary' => $message ? 'Contact request: '.str($message)->limit(190) : 'Follow up with new contact', 'created_at' => now(), 'updated_at' => now()]);
+
+        $recipient = MinistrySetting::query()->value('contact_email');
+        if (is_string($recipient) && filter_var($recipient, FILTER_VALIDATE_EMAIL) && $delivery->active()) {
+            $name = trim(($d['first_name'] ?? '').' '.($d['last_name'] ?? ''));
+            $subject = 'New website contact request from '.($name !== '' ? $name : 'a visitor');
+            $lines = [
+                'A new contact request was submitted through the ministry website.',
+                '', 'Name: '.($name !== '' ? $name : 'Not provided'),
+                'Email: '.($d['email'] ?? 'Not provided'),
+                'Phone: '.($d['phone'] ?? 'Not provided'),
+                '', 'Message:', $message ?: 'No message provided.',
+                '', 'The request is also available in People and Follow-up.',
+            ];
+            $text = implode("\n", $lines);
+            $html = '<p>A new contact request was submitted through the ministry website.</p>'
+                .'<p><strong>Name:</strong> '.e($name !== '' ? $name : 'Not provided').'<br>'
+                .'<strong>Email:</strong> '.e($d['email'] ?? 'Not provided').'<br>'
+                .'<strong>Phone:</strong> '.e($d['phone'] ?? 'Not provided').'</p>'
+                .'<p><strong>Message</strong><br>'.nl2br(e($message ?: 'No message provided.')).'</p>'
+                .'<p>The request is also available in People and Follow-up.</p>';
+            try {
+                $delivery->sendHtml($recipient, $subject, $html, $text);
+            } catch (Throwable $exception) {
+                Log::warning('Contact request email delivery failed after the request was safely recorded.', ['person_id' => $id, 'exception' => $exception::class]);
+            }
+        }
 
         if (! $r->expectsJson()) {
             $previous = url()->previous() ?: url('/');

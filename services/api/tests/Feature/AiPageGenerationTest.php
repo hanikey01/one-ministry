@@ -13,7 +13,6 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
-use Tests\Unit\AiPageCompositionCompilerTest;
 
 class AiPageGenerationTest extends TestCase
 {
@@ -41,6 +40,8 @@ class AiPageGenerationTest extends TestCase
         $this->assertTrue($service->processNext());
         $this->assertSame('composing', $service->owned($row->id, $actor)->state);
         $this->assertTrue($service->processNext());
+        $this->assertSame('reviewing', $service->owned($row->id, $actor)->state);
+        $this->assertTrue($service->processNext());
         $this->assertSame('compiling', $service->owned($row->id, $actor)->state);
         $this->assertTrue($service->processNext());
         $view = $service->view($service->owned($row->id, $actor));
@@ -48,7 +49,7 @@ class AiPageGenerationTest extends TestCase
         $this->assertSame(2, $view['proposal']['document']['version']);
         $this->assertSame('Welcome', $view['proposal']['title']);
         $this->assertDatabaseCount('pages', 0);
-        Http::assertSentCount(2);
+        Http::assertSentCount(3);
     }
 
     public function test_cancellation_during_provider_request_cannot_be_overwritten(): void
@@ -120,6 +121,8 @@ class AiPageGenerationTest extends TestCase
         $this->assertCount(1, $snapshot['media']);
         $this->assertSame('public', array_values($snapshot['media'])[0]['title']);
         $this->assertArrayNotHasKey('url', $context->forPrompt($snapshot)['media'][0]);
+        $this->assertSame('/media/'.array_values($snapshot['media'])[0]['id'], $context->forDesignPrompt($snapshot)['media'][0]['path']);
+        $this->assertSame([$context->forDesignPrompt($snapshot)['media'][0]['path']], $context->approvedMediaPaths($snapshot));
     }
 
     public function test_composition_retry_retains_the_successful_plan(): void
@@ -134,10 +137,11 @@ class AiPageGenerationTest extends TestCase
         $this->travel(16)->seconds();
         $service->processNext();
         $service->processNext();
+        $service->processNext();
         $view = $service->view($service->owned($row->id, $actor));
         $this->assertSame('completed', $view['state']);
         $this->assertSame('A clear welcome', $view['proposal']['design_plan']['page_strategy']);
-        Http::assertSentCount(3);
+        Http::assertSentCount(4);
     }
 
     public function test_generation_is_rejected_when_feature_is_disabled(): void
@@ -148,7 +152,7 @@ class AiPageGenerationTest extends TestCase
         $this->assertDatabaseCount('ai_page_generations', 0);
     }
 
-    public function test_optional_review_failure_keeps_the_valid_composition(): void
+    public function test_design_review_approval_keeps_the_valid_composition(): void
     {
         $actor = $this->actor();
         $this->provider();
@@ -156,12 +160,12 @@ class AiPageGenerationTest extends TestCase
         $row = $service->enqueue(['brief' => 'Design a welcoming public ministry homepage', 'review' => true], $actor, 'optional-review');
         $service->processNext();
         $service->processNext();
-        Http::fake(['*' => Http::response(['error' => ['message' => 'Unavailable']], 503)]);
+        $service->processNext();
         $service->processNext();
         $view = $service->view($service->owned($row->id, $actor));
         $this->assertSame('completed', $view['state']);
-        $this->assertSame('unavailable', $view['proposal']['review_status']);
-        $this->assertSame('Welcome', $view['proposal']['document']['sections'][0]['columns'][0]['elements'][0]['content']['text']);
+        $this->assertSame('approved', $view['proposal']['review_status']);
+        $this->assertStringContainsString('Welcome', $view['proposal']['document']['sections'][0]['columns'][0]['elements'][0]['content']['html']);
         $this->assertDatabaseCount('pages', 0);
     }
 
@@ -181,13 +185,14 @@ class AiPageGenerationTest extends TestCase
         DB::table('ai_provider_connections')->insert(['provider_key' => 'gemini', 'api_key_encrypted' => Crypt::encryptString('test-key'), 'enabled' => true]);
         DB::table('ai_model_catalog')->insert(['id' => (string) Str::uuid(), 'provider_key' => 'gemini', 'model_id' => 'primary', 'display_name' => 'Primary', 'supports_structured_output' => true, 'input_modalities' => '["text"]', 'output_modalities' => '["text"]', 'availability' => 'available']);
         DB::table('ai_task_routes')->insert(['task_key' => 'page_editor', 'primary_provider' => 'gemini', 'primary_model' => 'primary', 'fallback_models' => '[]', 'status' => 'verified']);
-        $plan = array_fill_keys(['page_strategy', 'visual_direction', 'typography_strategy', 'spacing_rhythm', 'responsive_strategy', 'cta_strategy', 'custom_code_reason'], 'A clear welcome');
-        $plan += ['visitor_journey' => ['Welcome'], 'sections' => [['purpose' => 'Welcome', 'element_types' => ['heading']]], 'accessibility_priorities' => ['Readability'], 'factual_constraints' => ['No inventions'], 'custom_code_needed' => false];
+        $plan = array_fill_keys(['page_strategy', 'visual_direction', 'typography_strategy', 'spacing_rhythm', 'responsive_strategy', 'cta_strategy', 'art_direction', 'color_strategy', 'imagery_strategy', 'motion_strategy', 'signature_motif', 'section_transitions'], 'A clear welcome');
+        $plan += ['visitor_journey' => ['Welcome'], 'sections' => [['name' => 'Welcome hero', 'purpose' => 'Welcome', 'hierarchy' => 'One heading', 'layout' => 'Editorial', 'responsive' => 'Stack on mobile', 'cta' => 'Plan a visit']], 'anti_patterns' => ['No generic cards'], 'accessibility_priorities' => ['Readability'], 'factual_constraints' => ['No inventions']];
         $payload = fn ($output) => ['candidates' => [['content' => ['parts' => [['text' => json_encode($output)]]]]]];
         $sequence = Http::fakeSequence()->push($payload($plan));
         if ($retryComposition) {
             $sequence->push(['error' => ['message' => 'Unavailable']], 503);
         }
-        $sequence->push($payload(AiPageCompositionCompilerTest::composition()));
+        $sequence->push($payload(['section' => ['name'=>'Welcome hero','purpose'=>'Welcome visitors','html'=>'<section class="hero"><h1 data-ai-editable="hero-heading" data-ai-label="Hero heading">Welcome</h1><p data-ai-editable="hero-introduction" data-ai-label="Hero introduction">Plan your visit.</p></section>','css'=>'.hero{padding:3rem;background:var(--surface);color:var(--ink)}','javascript'=>'','fallback'=>'Welcome. Plan your visit.']]));
+        $sequence->push($payload(['approved'=>true,'overall_score'=>88,'coherence_score'=>90,'originality_score'=>84,'hierarchy_score'=>90,'craft_score'=>89,'issues'=>[],'repair_section'=>0,'repair_instructions'=>'']));
     }
 }

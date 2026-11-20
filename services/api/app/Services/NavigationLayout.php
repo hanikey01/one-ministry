@@ -62,6 +62,9 @@ final class NavigationLayout
         if ($surface === 'staff' && $slot === 'sidebar' && $permissions->contains('content.manage') && ! collect($configured)->contains(fn ($entry) => (is_string($entry) ? $entry : ($entry['key'] ?? null)) === 'staff.navigation')) {
             $configured[] = ['key' => 'staff.navigation', 'icon' => $options['staff.navigation']['icon']];
         }
+        if ($surface === 'staff' && $slot === 'sidebar' && $permissions->contains('care.manage') && ! collect($configured)->contains(fn ($entry) => (is_string($entry) ? $entry : ($entry['key'] ?? null)) === 'staff.care')) {
+            $configured[] = ['key' => 'staff.care', 'icon' => $options['staff.care']['icon']];
+        }
         $featureStates = $surface === 'staff' && $user ? DB::table('feature_settings')->pluck('state', 'key') : collect();
         $canPreviewModules = $permissions->contains('settings.read');
         $terminology = app(MinistryTerminology::class);
@@ -85,10 +88,16 @@ final class NavigationLayout
             }
 
             $label = match ($key) {
+                'staff.people' => $terminology->label('person', 'plural'),
                 'staff.services' => $terminology->label('service', 'plural'),
+                'staff.events' => $terminology->label('event', 'plural'),
                 'staff.locations' => $terminology->label('location', 'plural'),
                 'staff.departments' => $terminology->label('department', 'plural'),
+                'staff.testimonies' => $terminology->label('testimony', 'plural'),
                 'member.departments' => 'My '.mb_strtolower($terminology->label('department', 'plural')),
+                'member.events' => $terminology->label('event', 'plural'),
+                'member.next-steps' => $terminology->label('next_step', 'plural'),
+                'member.testimonies' => 'My '.mb_strtolower($terminology->label('testimony', 'plural')),
                 default => $definition['label'],
             };
             $parameter = $definition['parameter'] ?? null;
@@ -123,7 +132,7 @@ final class NavigationLayout
             'staff.people' => $this->item('People', 'people', 'staff.people', 'Workspace', 'services.manage', 'people'),
             'staff.services' => $this->item('Services', 'services', 'staff.services', 'Workspace', 'services.manage', 'digital_church'),
             'staff.follow-up' => $this->item('Follow-up', 'followup', 'staff.follow-up', 'Workspace', 'services.manage', null, 'people'),
-            'staff.care' => $this->item('Care', 'care', 'staff.care', 'Workspace', 'care.manage', null, 'care'),
+            'staff.care' => $this->item('Care', 'care', 'staff.care', 'Workspace', 'care.manage'),
             'staff.events' => $this->item('Events', 'calendar', 'staff.events', 'Ministry', 'community.manage'),
             'staff.departments' => $this->item('Departments', 'departments', 'staff.departments', 'Ministry'),
             'staff.school.index' => $this->item('Digital school', 'school', 'staff.school.index', 'Ministry', 'school.manage', 'digital_school'),

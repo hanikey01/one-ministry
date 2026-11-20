@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('audit_events', function (Blueprint $table): void {
             $table->uuid('id')->primary();
-            $table->foreignUuid('actor_user_id')->constrained('users')->restrictOnDelete();
+            $table->foreignUuid('actor_user_id')->nullable()->constrained('users')->restrictOnDelete();
             $table->string('action', 120);
             $table->string('subject_type', 80);
             $table->uuid('subject_id');

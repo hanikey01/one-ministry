@@ -1,10 +1,32 @@
 # 09 — Decisions and Open Questions
 
+### D-047 - Domain-neutral, brief-driven AI page design
+
+Accepted by user direction, 2026-11-16. Full-page AI design is not restricted to ministry-specific page types, templates, or visual patterns. It may design any legitimate public page described by authorized staff, including business, product, event, campaign, portfolio, publication, directory, service, community, documentation, and experimental pages. The model derives the visitor journey and section composition from the brief while retaining factual accuracy, approved-media boundaries, sandbox restrictions, responsive requirements, staff review, and separate save/publish actions. Content depth guides completeness without selecting a template: concise normally produces 3-6 sections, balanced 5-10, and detailed 7-12, with an explicit single-section brief permitted. Planning may use up to 6,000 output tokens and each generated or revised visual section up to 12,000 when the configured model supports it. Editor document limits and authenticated generation advancement are sized for those richer proposals.
+
+**Status:** Implemented in source. Real-provider, browser visual, accessibility, aggregate performance, and database-backed release verification remain required.
+
+### D-046 - Section-based AI HTML and CSS canvas
+
+Accepted by user direction, 2026-11-14. AI page design no longer composes the registered native-element schema. It plans a visitor journey, then produces independently editable sections containing semantic HTML, self-contained responsive CSS, a plain-text fallback, and no executable JavaScript. Generated text nodes expose stable editable markers, and optional media placeholders expose typed slots that staff fill only through the installation media library; raw HTML and CSS remain available as an advanced escape hatch. Every section is validated separately, rendered in an opaque sandbox, inherits the installation theme through an explicit token bridge, reports its bounded height to the parent page, and remains independently reorderable, duplicable, removable, manually editable, or AI-revisable. The manual native-element builder and its existing element-level AI revision remain available but are not full-page AI generation constraints. Arbitrary AI JavaScript, remote resources, forms, embedded frames, and inline event handlers are excluded from the initial release.
+
+**Status:** Implemented in source. Real-provider generation, browser visual review, accessibility review, and public navigation behavior remain release gates.
+
+### D-045 - Provider connection and model capability are separate checks
+
+Accepted by user direction, 2026-11-14. AI route verification first checks each configured provider credential once through its lightweight model-list endpoint, then tests every selected model independently with a compact page-composition contract. A model is tested with strict JSON Schema first and one bounded JSON-object fallback when the provider rejects or cannot honor that schema mode. OpenRouter upstream fallbacks are disabled during verification and generation so the configured model is the model actually used. Provider authentication, transport, model capability, and internal response-processing failures remain distinct; an internal application parsing failure does not mark a model incompatible or erase prior compatibility evidence. Runtime structured generation uses the same response extraction and fallback policy as verification.
+
+**Status:** Implemented in source. Live provider checks and release-browser verification remain required.
+
 ### D-043 - Page AI transport and route verification upgrade
 
 Accepted by user direction, 2026-11-13. This supersedes the all-models-must-pass route activation rule in older AI documentation. Test each configured provider/model independently with a bounded nested composition probe. A passing primary may activate a degraded route when a fallback fails. Runtime readiness failures advance through configured fallbacks inside the attempt boundary; disappearance of one model must not disable usable alternatives. Persist per-model probe version, outcome, timestamp, and safe failure code. Gemini catalog discovery alone is not evidence of structured-output support; unverified text candidates remain selectable for testing.
 
 The requested compact composition compiler, two-stage workflow, durable generation jobs, approved media context, and proposal-review upgrades are subsequent work. This decision does not claim those upgrades are implemented. Staff application, save, and publication remain separate explicit actions.
+
+### D-044 - Section-sized durable AI page composition
+
+Accepted by user direction, 2026-11-13. Full-page AI composition must not depend on one deeply nested provider response. The approved architecture is composed one planned section at a time; each section is validated immediately through the same compiler boundary, completed sections are retained across retryable failures, and the final proposal is assembled only after every section passes. Polling may expose bounded progress and safe failure diagnostics but never prompts, generated content, credentials, or raw provider errors. This keeps the shared-hosting scheduler model and existing version-2 page document while creating the boundary needed for later render-and-repair tools.
 
 **Status:** Living record. This file distinguishes user-set direction from working assumptions and implementation choices awaiting validation.
 
@@ -187,13 +209,29 @@ When a question is resolved, record date, decision maker, evidence, alternatives
 
 **Status:** Accepted and implemented. Sensitive actions remain audited by their owning workflows.
 
+### D-048 — Durable prayer triage and Super Administrator escalation
+
+**Decision:** Every submitted prayer request remains in a restricted active queue until care work explicitly advances or closes it; an empty Care Staff roster never discards or hides it. Care Staff can see the full active prayer queue and claim an unassigned request, but cannot take another worker's assignment. The Super Administrator is the sole installation-wide escalation role: it bypasses ordinary permission-bundle checks, can view restricted care and other platform domains, and can assign or reassign any active prayer request to an active Care Staff member. Ministry Administrator remains broad nonrestricted administration and does not implicitly gain private-care reading rights. Restricted queue reads and assignment changes are audited without writing prayer plaintext into audit records.
+
+**Reason:** User direction, 2026-11-16. A request for prayer needs a durable staff-owned destination even before a care roster exists, while the installation owner needs an explicit, accountable escalation path.
+
+**Status:** Accepted and implemented for prayer triage. This supersedes the Ministry Administrator portion of D-037; Super Administrator retains the all-platform access portion.
+
+### D-049 — Custom ministry colour generates a complete accessible palette
+
+**Decision:** A ministry may choose either a platform preset or one custom ministry colour. When custom is selected, that stored seed generates the complete shared light/dark semantic palette: canvas, surfaces, text, muted text, borders, focus, selected state, action, action foreground, and navigation chrome. The generator selects or adjusts foregrounds to meet contrast targets. Success, warning, and danger remain platform-owned semantic colours and are not recoloured from the ministry seed. Individual colour pickers remain excluded.
+
+**Reason:** User direction, 2026-11-16. A ministry needs a coherent branded system rather than a custom navigation colour beside unrelated preset surfaces, without permitting inaccessible per-page colour fragmentation.
+
+**Status:** Accepted and implemented in the theme-token generator. This supersedes the custom-chrome portion of D-028.
+
 ### D-040 — Departments own the community domain
 
-**Decision:** The separate community-space product is removed as an active product concept. Departments own public discovery, member join requests, administrator/coordinator approval, scoped membership roles, department gatherings and attendance, and a member-only discussion space with leader moderation. Ministry administrators create departments, change public availability, and appoint coordinators or executives. Coordinators and executives manage ordinary members, join requests, and discussion moderation only inside their assigned departments. Care, finance, children, and giving records remain separate permission domains and are never exposed through department membership or discussion.
+**Decision:** The separate community-space product is removed as an active product concept. Departments own public discovery, member join requests, administrator/coordinator approval, scoped membership roles, department gatherings, and attendance. Department chat and message moderation are excluded. Ministry administrators create departments, change public availability, and appoint coordinators or executives. Coordinators and executives manage ordinary members and join requests only inside their assigned departments. Care, finance, children, and giving records remain separate permission domains and are never exposed through department membership.
 
 **Reason:** User direction, 2026-11-05. A separate community-space product duplicated the useful community behavior expected from Departments and made ministry configuration harder to understand.
 
-**Status:** Accepted and implemented in the fresh-install source baseline. No superseded community schema or compatibility migration is retained. Database, browser, accessibility, and deployment verification are part of the current release gate.
+**Status:** Superseded in part by user direction on 2026-11-16. The fresh-install baseline retains department discovery, join requests, review, membership roles, gatherings, and attendance while removing department chat, message-read tracking, moderation routes, and discussion configuration. No compatibility migration is retained because the project remains pre-release. Database, browser, accessibility, and deployment verification are part of the current release gate.
 
 ### D-038 — Installation-owned email workspace and bounded templates
 

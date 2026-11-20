@@ -15,13 +15,13 @@ class DepartmentCommunityTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_member_can_request_join_and_use_discussion_only_after_approval(): void
+    public function test_member_can_request_join_and_become_an_active_member_after_approval(): void
     {
         $admin = $this->install();
         $departments = app(DepartmentService::class);
         $departmentId = $departments->createDepartment([
             'name' => 'Young Adults', 'description' => 'Community and service.',
-            'is_public' => true, 'accepting_requests' => true, 'discussion_enabled' => true,
+            'is_public' => true, 'accepting_requests' => true,
         ], $admin, '127.0.0.1');
         $member = $this->member('member@example.org');
 
@@ -30,11 +30,15 @@ class DepartmentCommunityTest extends TestCase
         $requestId = DB::table('department_join_requests')->where('department_id', $departmentId)->value('id');
         $this->assertNotNull($requestId);
         $this->post("/member/departments/{$departmentId}/join-request")->assertSessionHasErrors('department');
-        $this->post("/member/departments/{$departmentId}/messages", ['content' => 'Hello'])->assertForbidden();
-
         $this->actingAs($admin)->patch("/staff/departments/{$departmentId}/join-requests/{$requestId}", ['status' => 'approved'])->assertRedirect();
-        $this->actingAs($member)->post("/member/departments/{$departmentId}/messages", ['content' => 'Hello department'])->assertRedirect();
-        $this->assertDatabaseHas('department_messages', ['department_id' => $departmentId, 'content' => 'Hello department']);
+        $personId = DB::table('people')->where('user_id', $member->id)->value('id');
+        $this->assertDatabaseHas('department_memberships', [
+            'department_id' => $departmentId,
+            'person_id' => $personId,
+            'role' => DepartmentService::MEMBER,
+            'status' => 'active',
+        ]);
+        $this->actingAs($member)->get("/member/departments/{$departmentId}")->assertOk()->assertSee('Your membership is active');
     }
 
     public function test_private_department_is_not_public_and_coordinator_cannot_change_public_settings(): void

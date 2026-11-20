@@ -353,7 +353,12 @@ class StaffWorkspaceController extends Controller
             'waitlist_enabled' => ['nullable', 'boolean'], 'registration_open' => ['nullable', 'boolean'],
         ]);
         $data = $this->resolveEventImage($request, $data);
-        DB::table('events')->insert([...$data, 'id' => (string) Str::uuid(), 'slug' => Str::slug($data['title']).'-'.Str::lower(Str::random(6)), 'featured' => $request->boolean('featured'), 'waitlist_enabled' => $request->boolean('waitlist_enabled'), 'registration_open' => $request->boolean('registration_open'), 'created_at' => now(), 'updated_at' => now()]);
+        $registrationOpen = $request->boolean('registration_open');
+        if (! $registrationOpen) {
+            $data['capacity'] = null;
+            $data['registration_deadline'] = null;
+        }
+        DB::table('events')->insert([...$data, 'id' => (string) Str::uuid(), 'slug' => Str::slug($data['title']).'-'.Str::lower(Str::random(6)), 'featured' => $request->boolean('featured'), 'waitlist_enabled' => $registrationOpen && $request->boolean('waitlist_enabled'), 'registration_open' => $registrationOpen, 'created_at' => now(), 'updated_at' => now()]);
 
         return to_route('staff.events')->with('status', 'Event created.');
     }
@@ -372,9 +377,34 @@ class StaffWorkspaceController extends Controller
             'capacity' => ['nullable', 'integer', 'min:1'], 'registration_deadline' => ['nullable', 'date', 'before_or_equal:starts_at'],
         ]);
         $data = $this->resolveEventImage($request, $data);
-        DB::table('events')->where('id', $event)->update([...$data, 'featured' => $request->boolean('featured'), 'registration_open' => $request->boolean('registration_open'), 'waitlist_enabled' => $request->boolean('waitlist_enabled'), 'updated_at' => now()]);
+        $registrationOpen = $request->boolean('registration_open');
+        if (! $registrationOpen) {
+            $data['capacity'] = null;
+            $data['registration_deadline'] = null;
+        }
+        DB::table('events')->where('id', $event)->update([...$data, 'featured' => $request->boolean('featured'), 'registration_open' => $registrationOpen, 'waitlist_enabled' => $registrationOpen && $request->boolean('waitlist_enabled'), 'updated_at' => now()]);
 
         return to_route('staff.events')->with('status', 'Event updated.');
+    }
+
+    public function destroyEvent(Request $request, string $event): RedirectResponse
+    {
+        $record = DB::table('events')->where('id', $event)->first();
+        abort_unless($record, 404);
+
+        if (DB::table('event_registrations')->where('event_id', $event)->exists()) {
+            return to_route('staff.events')->withErrors(['event' => 'This event has registrations and cannot be deleted. Cancel it instead so registered people retain their record.']);
+        }
+
+        DB::table('events')->where('id', $event)->delete();
+        DB::table('audit_events')->insert([
+            'id' => (string) Str::uuid(), 'actor_user_id' => $request->user()->id,
+            'action' => 'event.deleted', 'subject_type' => 'events', 'subject_id' => $event,
+            'changes_json' => json_encode(['title' => $record->title], JSON_THROW_ON_ERROR),
+            'ip_address' => $request->ip(), 'created_at' => now(),
+        ]);
+
+        return to_route('staff.events')->with('status', 'Event deleted.');
     }
 
     /** @return Collection<int, object> */
@@ -683,11 +713,108 @@ class StaffWorkspaceController extends Controller
     public function care(Request $request): View
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
-        $cases = DB::table('care_cases')->join('users', 'users.id', '=', 'care_cases.assigned_to')
-            ->select('care_cases.*', 'users.name as assigned_name')->where('care_cases.assigned_to', $request->user()->id)->where('care_cases.status', '!=', 'closed')->orderByDesc('care_cases.updated_at')->paginate(20);
+        $permissions = app(PermissionChecker::class);
+        $canSeeAllCare = $permissions->isSuperAdministrator($request->user());
+        $cases = DB::table('care_cases')->leftJoin('users', 'users.id', '=', 'care_cases.assigned_to')
+            ->select('care_cases.*', 'users.name as assigned_name')
+            ->when(! $canSeeAllCare, fn ($query) => $query->where('care_cases.assigned_to', $request->user()->id))
+            ->where('care_cases.status', '!=', 'closed')
+            ->orderByDesc('care_cases.updated_at')
+            ->paginate(20, ['*'], 'case_page');
+        $prayerRequests = DB::table('prayer_requests')
+            ->join('people', 'people.id', '=', 'prayer_requests.person_id')
+            ->leftJoin('users as assignees', 'assignees.id', '=', 'prayer_requests.assigned_to')
+            ->select('prayer_requests.*', 'people.first_name', 'people.last_name', 'people.email', 'people.phone', 'assignees.name as assigned_name')
+            ->whereIn('prayer_requests.status', ['received', 'in_progress'])
+            ->orderByRaw('prayer_requests.assigned_to is not null')
+            ->orderBy('prayer_requests.created_at')
+            ->paginate(20, ['*'], 'prayer_page');
+        $prayerRequests->getCollection()->transform(function (object $prayer): object {
+            $prayer->text = $this->prayerRequestText((string) $prayer->prayer_text_encrypted);
+            $prayer->unreadable = $prayer->text === null;
+
+            return $prayer;
+        });
+        $careWorkers = $canSeeAllCare
+            ? DB::table('users')
+                ->join('user_role_assignments', 'user_role_assignments.user_id', '=', 'users.id')
+                ->where('user_role_assignments.scope_type', 'installation')
+                ->whereNull('user_role_assignments.scope_id')
+                ->whereIn('user_role_assignments.role_key', ['care_staff', 'super_administrator'])
+                ->whereNull('user_role_assignments.revoked_at')
+                ->where(fn ($query) => $query->whereNull('user_role_assignments.expires_at')->orWhere('user_role_assignments.expires_at', '>', now()))
+                ->orderBy('users.name')
+                ->distinct()
+                ->get(['users.id', 'users.name'])
+            : collect();
         DB::table('audit_events')->insert(['id' => (string) Str::uuid(), 'actor_user_id' => $request->user()->id, 'action' => 'care.case_list_viewed', 'subject_type' => 'care_cases', 'subject_id' => (string) Str::uuid(), 'changes_json' => '{}', 'ip_address' => $request->ip(), 'created_at' => now()]);
 
-        return view('staff.care', compact('settings', 'cases') + ['user' => $request->user()]);
+        return view('staff.care', compact('settings', 'cases', 'prayerRequests', 'careWorkers', 'canSeeAllCare') + ['user' => $request->user()]);
+    }
+
+    public function claimPrayer(Request $request, string $prayer): RedirectResponse
+    {
+        $permissions = app(PermissionChecker::class);
+        $isSuperAdministrator = $permissions->isSuperAdministrator($request->user());
+        $data = $request->validate(['assigned_to' => ['nullable', 'uuid', 'exists:users,id']]);
+        $assigneeId = $isSuperAdministrator ? ($data['assigned_to'] ?? $request->user()->id) : $request->user()->id;
+
+        abort_unless($this->isActiveCareWorker($assigneeId), 422);
+
+        DB::transaction(function () use ($request, $prayer, $isSuperAdministrator, $assigneeId): void {
+            $record = DB::table('prayer_requests')->where('id', $prayer)->lockForUpdate()->first();
+            abort_unless($record && in_array($record->status, ['received', 'in_progress'], true), 404);
+            abort_unless($isSuperAdministrator || $record->assigned_to === null || $record->assigned_to === $request->user()->id, 404);
+
+            DB::table('prayer_requests')->where('id', $prayer)->update([
+                'assigned_to' => $assigneeId,
+                'assigned_at' => now(),
+                'status' => 'in_progress',
+                'updated_at' => now(),
+            ]);
+            DB::table('audit_events')->insert([
+                'id' => (string) Str::uuid(), 'actor_user_id' => $request->user()->id,
+                'action' => 'care.prayer_claimed', 'subject_type' => 'prayer_requests', 'subject_id' => $prayer,
+                'changes_json' => json_encode(['previous_assigned_to' => $record->assigned_to, 'assigned_to' => $assigneeId], JSON_THROW_ON_ERROR),
+                'ip_address' => $request->ip(), 'created_at' => now(),
+            ]);
+        });
+
+        return to_route('staff.care')->with('status', $assigneeId === $request->user()->id ? 'Prayer request assigned to you.' : 'Prayer request reassigned.');
+    }
+
+    private function isActiveCareWorker(string $userId): bool
+    {
+        return DB::table('user_role_assignments')
+            ->where('user_id', $userId)
+            ->where('scope_type', 'installation')
+            ->whereNull('scope_id')
+            ->whereIn('role_key', ['care_staff', 'super_administrator'])
+            ->whereNull('revoked_at')
+            ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->exists();
+    }
+
+    /**
+     * Read current encrypted requests and the short-lived plain-text records
+     * created before request encryption was standardised. Ciphertext encrypted
+     * with an unavailable key must never be treated as plain text.
+     */
+    private function prayerRequestText(string $storedValue): ?string
+    {
+        try {
+            return Crypt::decryptString($storedValue);
+        } catch (\Throwable) {
+            $payload = base64_decode($storedValue, true);
+            $encryptedPayload = is_string($payload) ? json_decode($payload, true) : null;
+
+            if (is_array($encryptedPayload)
+                && isset($encryptedPayload['iv'], $encryptedPayload['value'], $encryptedPayload['mac'])) {
+                return null;
+            }
+
+            return trim($storedValue) !== '' ? $storedValue : null;
+        }
     }
 
     public function reports(Request $request): View

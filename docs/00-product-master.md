@@ -46,7 +46,7 @@ Historical audits and status notes describe context; they do not override the do
 | Public guest | Learn about the ministry, watch a service, find a location, submit a request, and make contact without mandatory registration. |
 | Member or regular attendee | Join worship and departments, manage profile and preferences, see events and commitments, and request care. |
 | Online host or moderator | Welcome attendees, moderate chat, assist with prayer and next steps, and handle disruptions. |
-| Department or ministry leader | Manage an assigned department, attendance, membership requests, discussion, and follow-up within their scope. |
+| Department or ministry leader | Manage an assigned department, attendance, membership requests, and follow-up within their scope. |
 | Care team member | Receive assigned requests and record restricted care actions. |
 | Content or service producer | Publish content, prepare service schedules, operate live sessions, and review recordings. |
 | Administrator | Configure the ministry, permissions, locations, forms, policies, and reports. |

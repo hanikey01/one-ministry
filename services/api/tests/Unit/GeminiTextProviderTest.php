@@ -54,4 +54,33 @@ class GeminiTextProviderTest extends TestCase
 
         $this->assertSame(['title' => 'Welcome'], $result['output']);
     }
+
+    public function test_compatibility_probe_compiles_a_representative_page_shape(): void
+    {
+        Http::fake(function (Request $request) {
+            $schema = $request->data()['generationConfig']['responseJsonSchema'];
+            $this->assertArrayHasKey('section', $schema['properties']);
+            $this->assertSame(1600, $request->data()['generationConfig']['maxOutputTokens']);
+
+            return Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode(AiCompositionProbeTest::compositionFixture())]]]]]]);
+        });
+
+        $result = app(GeminiTextProvider::class)->validateStructuredOutput('test-key', 'gemini-test');
+
+        $this->assertSame('Welcome', $result['output']['section']['name']);
+    }
+
+    public function test_schema_rejection_falls_back_to_json_object_mode(): void
+    {
+        Http::fakeSequence()
+            ->push(['error' => ['message' => 'response schema is unsupported']], 400)
+            ->push(['candidates' => [['content' => ['parts' => [
+                ['text' => 'Here is the result: '.json_encode(AiCompositionProbeTest::compositionFixture())],
+            ]]]]], 200);
+
+        $result = app(GeminiTextProvider::class)->validateStructuredOutput('test-key', 'gemini-test');
+
+        $this->assertSame('json_object', $result['response_mode']);
+        Http::assertSent(fn (Request $request): bool => ! isset($request->data()['generationConfig']['responseJsonSchema']));
+    }
 }

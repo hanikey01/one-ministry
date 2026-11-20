@@ -42,7 +42,6 @@ class DepartmentService
             'description' => $input['description'] ?? null, 'image_url'=>$input['image_url']??null, 'image_alt'=>$input['image_alt']??null, 'category'=>$input['category']??null, 'contact_email'=>$input['contact_email']??null, 'featured'=>(bool)($input['featured']??false), 'status' => 'active',
             'is_public' => (bool) ($input['is_public'] ?? true),
             'accepting_requests' => (bool) ($input['accepting_requests'] ?? false),
-            'discussion_enabled' => (bool) ($input['discussion_enabled'] ?? true),
             'created_by' => $actor->id, 'created_at' => now(), 'updated_at' => now(),
         ]);
         $this->audit($actor, 'department.created', $id, ['name' => $input['name']], $ip);
@@ -60,7 +59,6 @@ class DepartmentService
             'image_url'=>$input['image_url']??null, 'image_alt'=>$input['image_alt']??null, 'category'=>$input['category']??null, 'contact_email'=>$input['contact_email']??null, 'featured'=>(bool)($input['featured']??false),
             'is_public' => (bool) ($input['is_public'] ?? false),
             'accepting_requests' => (bool) ($input['is_public'] ?? false) && (bool) ($input['accepting_requests'] ?? false),
-            'discussion_enabled' => (bool) ($input['discussion_enabled'] ?? false),
         ];
         DB::table('departments')->where('id', $departmentId)->update([...$changes, 'updated_at' => now()]);
         $this->audit($actor, 'department.settings_updated', $departmentId, $changes, $ip);
@@ -116,32 +114,6 @@ class DepartmentService
         });
     }
 
-    public function postMessage(string $departmentId, User $user, string $content, ?string $ip, ?string $parentMessageId = null): void
-    {
-        $personId = DB::table('people')->where('user_id', $user->id)->value('id');
-        abort_unless($personId && DB::table('department_memberships')->where(['department_id' => $departmentId, 'person_id' => $personId, 'status' => 'active'])->exists(), 403);
-        abort_unless(DB::table('departments')->where('id', $departmentId)->where('status', 'active')->where('discussion_enabled', true)->exists(), 404);
-        if ($parentMessageId && ! DB::table('department_messages')->where('id',$parentMessageId)->where('department_id',$departmentId)->whereNull('moderated_at')->exists()) abort(422,'The replied-to message is unavailable.');
-        DB::table('department_messages')->insert([
-            'id' => (string) Str::uuid(), 'department_id' => $departmentId, 'person_id' => $personId,
-            'parent_message_id'=>$parentMessageId, 'content' => trim($content), 'created_at' => now(), 'updated_at' => now(),
-        ]);
-    }
-
-    public function updateOwnMessage(string $departmentId, string $messageId, User $user, string $content, ?string $ip): void
-    {
-        $personId=DB::table('people')->where('user_id',$user->id)->value('id');
-        $updated=DB::table('department_messages')->where(['id'=>$messageId,'department_id'=>$departmentId,'person_id'=>$personId])->whereNull('moderated_at')->update(['content'=>trim($content),'edited_at'=>now(),'updated_at'=>now()]);
-        abort_unless($updated===1,404); $this->audit($user,'department.message_updated',$departmentId,['message_id'=>$messageId],$ip);
-    }
-
-    public function deleteOwnMessage(string $departmentId, string $messageId, User $user, ?string $ip): void
-    {
-        $personId=DB::table('people')->where('user_id',$user->id)->value('id');
-        $updated=DB::table('department_messages')->where(['id'=>$messageId,'department_id'=>$departmentId,'person_id'=>$personId])->whereNull('moderated_at')->update(['moderated_by'=>$user->id,'moderated_at'=>now(),'moderation_reason'=>'Deleted by author','updated_at'=>now()]);
-        abort_unless($updated===1,404); $this->audit($user,'department.message_deleted',$departmentId,['message_id'=>$messageId],$ip);
-    }
-
     public function withdrawRequest(string $departmentId, User $user, ?string $ip): void
     {
         $personId = DB::table('people')->where('user_id', $user->id)->value('id');
@@ -158,16 +130,6 @@ class DepartmentService
         if ($membership->role !== self::MEMBER) throw ValidationException::withMessages(['department'=>'Department leaders must be reassigned by an administrator before leaving.']);
         DB::table('department_memberships')->where('id', $membership->id)->delete();
         $this->audit($user, 'department.left', $departmentId, [], $ip);
-    }
-
-    public function removeMessage(string $departmentId, string $messageId, User $actor, string $reason, ?string $ip): void
-    {
-        $this->requireTeamManager($actor, $departmentId);
-        $updated = DB::table('department_messages')->where('id', $messageId)->where('department_id', $departmentId)->whereNull('moderated_at')->update([
-            'moderated_by' => $actor->id, 'moderated_at' => now(), 'moderation_reason' => trim($reason), 'updated_at' => now(),
-        ]);
-        abort_unless($updated === 1, 404);
-        $this->audit($actor, 'department.message_removed', $departmentId, ['message_id' => $messageId, 'reason' => trim($reason)], $ip);
     }
 
     public function addMember(string $departmentId, string $personId, string $role, User $actor, ?string $ip): void

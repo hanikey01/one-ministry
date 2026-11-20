@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" role="img" aria-labelledby="title desc">
+  <title id="title">Grow in the Word</title><desc id="desc">A wide Bible study hero artwork in cream, deep teal, and gold.</desc>
+  <defs><linearGradient id="sky" y2="1"><stop stop-color="#fff4df"/><stop offset=".65" stop-color="#e7d5aa"/><stop offset="1" stop-color="#0c3f42"/></linearGradient><linearGradient id="gold" x1="0" x2="1"><stop stop-color="#af741e"/><stop offset=".5" stop-color="#efbd55"/><stop offset="1" stop-color="#9a6416"/></linearGradient></defs>
+  <rect width="1920" height="1080" fill="url(#sky)"/><path d="M0 858Q382 620 722 820T1300 740T1920 610V1080H0Z" fill="#0e5a5b"/><path d="M0 934Q330 735 720 924T1400 834T1920 754V1080H0Z" fill="#073b42"/><path d="M0 1015Q420 822 848 1008T1920 868V1080H0Z" fill="#062a32"/>
+  <g stroke="#b57719" stroke-width="7" opacity=".75"><path d="M1290 122v180"/><path d="M1168 158l96 152"/><path d="M1412 158l-96 152"/><path d="M1038 232l202 122"/><path d="M1542 232l-202 122"/></g><circle cx="1290" cy="478" r="245" fill="#fff7df" opacity=".34"/>
+  <path d="M1044 798Q1248 616 1452 798Q1656 616 1842 798v190Q1644 826 1452 1000Q1258 826 1044 988Z" fill="#f9ebc7" stroke="#d2a74f" stroke-width="12"/><path d="M1452 798v202" stroke="#d2a74f" stroke-width="10"/><g stroke="#cfab62" stroke-width="5" opacity=".65"><path d="M1110 854h280M1110 902h280M1514 854h260M1514 902h260"/></g>
+</svg>

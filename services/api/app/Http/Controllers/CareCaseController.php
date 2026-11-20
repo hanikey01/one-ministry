@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\PermissionChecker;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -12,7 +13,12 @@ class CareCaseController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $cases = DB::table('care_cases')->where('assigned_to', $request->user()->id)->where('status', '!=', 'closed')->latest()->get();
+        $isSuperAdministrator = app(PermissionChecker::class)->isSuperAdministrator($request->user());
+        $cases = DB::table('care_cases')
+            ->when(! $isSuperAdministrator, fn ($query) => $query->where('assigned_to', $request->user()->id))
+            ->where('status', '!=', 'closed')
+            ->latest()
+            ->get();
         $this->audit($request, 'care.case_list_viewed', 'care_cases', (string) Str::uuid());
 
         return response()->json(['data' => $cases]);
@@ -64,7 +70,11 @@ class CareCaseController extends Controller
 
     private function assignedCase(Request $request, string $case): object
     {
-        $record = DB::table('care_cases')->where('id', $case)->where('assigned_to', $request->user()->id)->first();
+        $isSuperAdministrator = app(PermissionChecker::class)->isSuperAdministrator($request->user());
+        $record = DB::table('care_cases')
+            ->where('id', $case)
+            ->when(! $isSuperAdministrator, fn ($query) => $query->where('assigned_to', $request->user()->id))
+            ->first();
         abort_unless($record, 404);
 
         return $record;

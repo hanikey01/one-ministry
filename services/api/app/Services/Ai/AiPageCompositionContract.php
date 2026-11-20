@@ -28,6 +28,11 @@ final class AiPageCompositionContract
         return $object(['title' => $text, 'seo_title' => $text, 'seo_description' => $text, 'sections' => $list($section, self::MAX_SECTIONS, 1)]);
     }
 
+    public static function sectionSchema(array $types): array
+    {
+        return self::schema($types)['properties']['sections']['items'];
+    }
+
     public static function scopedSchema(array $types, string $kind): array
     {
         $section = self::schema($types)['properties']['sections']['items'];

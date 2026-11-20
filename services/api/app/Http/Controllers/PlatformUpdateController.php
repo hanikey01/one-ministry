@@ -18,7 +18,7 @@ class PlatformUpdateController extends Controller
 
     public function update(Request $request, PlatformUpdateService $updates): RedirectResponse
     {
-        $data = Validator::make($request->all(), ['channel' => ['required', 'in:stable,preview'], 'mode' => ['required', 'in:manual,automatic_security'], 'repository' => ['nullable', 'regex:/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/'], 'access_token' => ['nullable', 'string', 'max:500'], 'signing_key_id' => ['nullable', 'string', 'max:120'], 'public_key_pem' => ['nullable', 'string', 'max:10000']])->validate();
+        $data = Validator::make($request->all(), ['channel' => ['required', 'in:stable,preview']])->validate();
         $updates->updateConfiguration($data, $request->user(), $request->ip());
         return to_route('staff.updates')->with('status', 'Platform update settings saved.');
     }

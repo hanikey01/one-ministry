@@ -4,10 +4,12 @@
 @switch($element['type'] ?? '')
     @case('custom_code')@case('html')
         @php
-            $customSource = '<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; script-src \'unsafe-inline\'; img-src data:; media-src data:; connect-src \'none\'; form-action \'none\'; base-uri \'none\';"><style>'.($content['css'] ?? '').'</style></head><body>'.($content['html'] ?? '').'<script>'.str_ireplace('</script', '<\\/script', (string) ($content['javascript'] ?? '')).'</script></body></html>';
+            $customFrameId = 'custom-frame-'.preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($element['id'] ?? 'content'));
+            $frameBridge = "(()=>{const id=".json_encode($customFrameId).";const send=()=>parent.postMessage({type:'ai-canvas-height',id,height:Math.ceil(document.documentElement.scrollHeight)},'*');addEventListener('message',e=>{if(e.data?.type!=='ai-canvas-theme')return;for(const [key,value] of Object.entries(e.data.tokens||{}))document.documentElement.style.setProperty(key,value);send()});new ResizeObserver(send).observe(document.documentElement);addEventListener('load',send);send()})();";
+            $customSource = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; script-src \'unsafe-inline\'; img-src data: blob: http: https:; media-src data: blob: http: https:; frame-src http: https:; connect-src \'none\'; object-src \'none\'; form-action \'none\'; base-uri \'none\';"><style>:root{color-scheme:light dark;--font-display:Georgia,"Times New Roman",serif;--font-body:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--action:#2563eb;--action-foreground:#fff;--brand:#1e3a5f;--canvas:#f8fafc;--surface:#fff;--surface-muted:#f1f5f9;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--line-strong:#cbd5e1}*{box-sizing:border-box}html,body{width:100%;margin:0;overflow:hidden;background:transparent;color:var(--ink);font-family:var(--font-body)}body{min-width:0}a{color:inherit}img,video{max-width:100%;height:auto}</style><style>'.($content['css'] ?? '').'</style><style>html,body{width:100%!important;min-width:0!important}body>:not(script){display:block!important;width:100%!important;max-width:none!important;min-width:0!important;margin-left:0!important;margin-right:0!important}</style></head><body>'.($content['html'] ?? '').'<script>'.str_ireplace('</script', '<\\/script', $frameBridge).'</script></body></html>';
             $customFallbackId = 'custom-fallback-'.preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($element['id'] ?? 'content'));
         @endphp
-        <section class="public-page-custom-code"><p id="{{ $customFallbackId }}" class="public-page-custom-code-fallback">{{ $content['fallback'] ?? '' }}</p><iframe sandbox="allow-scripts" title="Custom page content" aria-describedby="{{ $customFallbackId }}" srcdoc="{{ $customSource }}"></iframe></section>
+        <section class="public-page-custom-code"><p id="{{ $customFallbackId }}" class="public-page-custom-code-fallback">{{ $content['fallback'] ?? '' }}</p><iframe id="{{ $customFrameId }}" data-ai-canvas-frame sandbox="allow-scripts allow-top-navigation-by-user-activation" title="{{ $content['reason'] ?? 'Custom page section' }}" aria-describedby="{{ $customFallbackId }}" srcdoc="{{ $customSource }}"></iframe></section>
     @break
     @case('hero')<section class="public-page-hero"><small>{{ $content['eyebrow'] ?? '' }}</small><h1>{{ $content['title'] ?? '' }}</h1><p>{{ $content['body'] ?? '' }}</p>@if(!empty($content['button_label']) && !empty($content['button_url']))<a class="button" href="{{ $content['button_url'] }}">{{ $content['button_label'] }}</a>@endif</section>@break
     @case('heading')<section class="public-page-copy"><h2>{{ $content['text'] ?? '' }}</h2></section>@break
@@ -51,7 +53,7 @@
     @case('accordion')<section class="public-page-accordion"><h2>{{ $content['title'] ?? '' }}</h2>@foreach(['one', 'two', 'three'] as $slot)@if(!empty($content['question_'.$slot]))<details><summary>{{ $content['question_'.$slot] }}</summary><p>{{ $content['answer_'.$slot] ?? '' }}</p></details>@endif@endforeach</section>@break
     @case('tabs')<section class="public-page-tabs"><h2>{{ $content['title'] ?? '' }}</h2><div>@foreach(['one', 'two', 'three'] as $slot)@if(!empty($content['tab_'.$slot.'_label']))<details @if($slot === 'one') open @endif><summary>{{ $content['tab_'.$slot.'_label'] }}</summary><p>{{ $content['tab_'.$slot.'_content'] ?? '' }}</p></details>@endif@endforeach</div></section>@break
     @case('social_links')<section class="public-page-social-links"><h2>{{ $content['title'] ?? 'Stay connected' }}</h2><div>@foreach(['facebook_url' => 'Facebook', 'instagram_url' => 'Instagram', 'youtube_url' => 'YouTube'] as $field => $label)@if(!empty($content[$field]))<a class="button button-secondary" href="{{ $content[$field] }}" target="_blank" rel="noopener noreferrer">{{ $label }}</a>@endif@endforeach</div></section>@break
-    @case('contact_form')<section class="public-page-contact-form"><div><h2>{{ $content['title'] ?? 'Get in touch' }}</h2><p>{{ $content['body'] ?? '' }}</p></div>@if(request()->query('contact') === 'received')<p class="public-page-form-success" role="status">Thank you. Your request has been received.</p>@endif<form method="POST" action="{{ url('/api/v1/public/contact') }}"><label>First name<input name="first_name" required maxlength="100" autocomplete="given-name"></label><label>Last name<input name="last_name" maxlength="100" autocomplete="family-name"></label><label>Email<input name="email" type="email" maxlength="254" autocomplete="email"></label><label>Phone<input name="phone" maxlength="40" autocomplete="tel"></label><label class="public-contact-message">How can we help?<textarea name="message" rows="5" maxlength="2000" placeholder="Share your question or request"></textarea></label><label class="public-page-consent"><input name="consent_to_contact" type="checkbox" value="1" required>I agree that the ministry may contact me about this request.</label><button class="button" type="submit">{{ $content['submit_label'] ?? 'Send request' }}</button></form></section>@break
+    @case('contact_form')<section class="public-page-contact-form"><div><h2>{{ $content['title'] ?? 'Get in touch' }}</h2><p>{{ $content['body'] ?? '' }}</p></div>@if(request()->query('contact') === 'received')<p class="public-page-form-success" role="status">Thank you. Your request has been received.</p>@endif<form method="POST" action="{{ route('public.contact.submit') }}">@csrf<label>First name<input name="first_name" required maxlength="100" autocomplete="given-name"></label><label>Last name<input name="last_name" maxlength="100" autocomplete="family-name"></label><label>Email<input name="email" type="email" maxlength="254" autocomplete="email"></label><label>Phone<input name="phone" maxlength="40" autocomplete="tel"></label><label class="public-contact-message">How can we help?<textarea name="message" rows="5" maxlength="2000" placeholder="Share your question or request"></textarea></label><label class="public-page-consent"><input name="consent_to_contact" type="checkbox" value="1" required>I agree that the ministry may contact me about this request.</label><button class="button" type="submit">{{ $content['submit_label'] ?? 'Send request' }}</button></form></section>@break
     @case('map_directions')<section class="public-page-map-directions"><x-ui.icon name="location" :size="28"/><div><h2>{{ $content['title'] ?? 'Find us' }}</h2><p>{!! nl2br(e($content['address'] ?? '')) !!}</p>@if(!empty($content['directions_url']))<a class="button" href="{{ $content['directions_url'] }}" target="_blank" rel="noopener noreferrer">{{ $content['button_label'] ?? 'Get directions' }}</a>@endif</div></section>@break
     @case('spacer')<div class="public-page-spacer public-page-spacer-{{ $content['height'] ?? 'medium' }}" aria-hidden="true"></div>@break
     @case('quote')<blockquote class="public-page-quote">“{{ $content['text'] ?? '' }}”@if(!empty($content['attribution']))<small>{{ $content['attribution'] }}</small>@endif</blockquote>@break
@@ -70,34 +72,44 @@
         if ($carouselSlides->isEmpty()) $carouselSlides = collect(array_slice(array_values(array_filter(preg_split('/\R/', (string) ($content['slides'] ?? '')) ?: [])), 0, 8))->map(fn ($slide) => ['type' => 'flyer', 'media_url' => '', 'title' => trim($slide), 'body' => '', 'button_label' => '', 'button_url' => '']);
     @endphp
     <section class="public-page-carousel" data-public-carousel>
-        <div class="public-page-carousel-intro">
-            <small>{{ $content['eyebrow'] ?? 'FEATURED' }}</small>
-            <h2>{{ $content['title'] ?? '' }}</h2>
-            <p>{{ $content['body'] ?? '' }}</p>
-        </div>
+        @if(filled($content['eyebrow'] ?? null) || filled($content['title'] ?? null) || filled($content['body'] ?? null))
+            <div class="public-page-carousel-intro">
+                @if(filled($content['eyebrow'] ?? null))<small>{{ $content['eyebrow'] }}</small>@endif
+                @if(filled($content['title'] ?? null))<h2>{{ $content['title'] }}</h2>@endif
+                @if(filled($content['body'] ?? null))<p>{{ $content['body'] }}</p>@endif
+            </div>
+        @endif
         @if($carouselSlides->isNotEmpty())
             <div class="public-page-carousel-stage" aria-roledescription="carousel" aria-label="Featured highlights">
                 @foreach($carouselSlides as $index => $slide)
                     <article class="public-page-carousel-slide" data-carousel-slide @if($index > 0) hidden aria-hidden="true" @endif>
                         <div class="public-page-carousel-media">
-                            @if($slide['type'] === 'video' && $slide['media_url'])
+                            @php
+                                $slideVideoUrl = (string) $slide['media_url'];
+                                $youtubeId = preg_match('~(?:youtu\.be/|youtube\.com/(?:watch\?v=|embed/|shorts/))([A-Za-z0-9_-]{6,})~', $slideVideoUrl, $match) ? $match[1] : null;
+                                $vimeoId = preg_match('~vimeo\.com/(?:video/)?([0-9]+)~', $slideVideoUrl, $match) ? $match[1] : null;
+                                $isVideoLink = $slide['type'] === 'video_link';
+                                $isVideoUpload = in_array($slide['type'], ['video_upload', 'video'], true);
+                            @endphp
+                            @if($isVideoLink && $youtubeId)
+                                <iframe src="https://www.youtube-nocookie.com/embed/{{ $youtubeId }}?autoplay=1&amp;mute=1&amp;playsinline=1&amp;rel=0" title="{{ $slide['title'] ?: 'Featured video' }}" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+                            @elseif($isVideoLink && $vimeoId)
+                                <iframe src="https://player.vimeo.com/video/{{ $vimeoId }}?autoplay=1&amp;muted=1&amp;playsinline=1&amp;dnt=1" title="{{ $slide['title'] ?: 'Featured video' }}" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
+                            @elseif($isVideoUpload && $slide['media_url'])
                                 <video controls preload="metadata" src="{{ $slide['media_url'] }}"></video>
                             @elseif($slide['media_url'])
                                 <img src="{{ $slide['media_url'] }}" alt="">
                             @else
-                                <div class="public-page-carousel-placeholder" aria-hidden="true"><span>{{ $slide['type'] === 'video' ? 'VIDEO' : 'FEATURED' }}</span></div>
+                                <div class="public-page-carousel-placeholder" aria-hidden="true"><span>{{ $isVideoLink || $isVideoUpload ? 'VIDEO' : 'FEATURED' }}</span></div>
                             @endif
                         </div>
                         <div class="public-page-carousel-overlay">
-                            <div><small>{{ $slide['type'] === 'video' ? 'WATCH' : 'FEATURED' }}</small><h3>{{ $slide['title'] }}</h3>@if($slide['body'])<p>{{ $slide['body'] }}</p>@endif</div>
+                            <div><small>{{ $isVideoLink || $isVideoUpload ? 'WATCH' : 'FEATURED' }}</small><h3>{{ $slide['title'] }}</h3>@if($slide['body'])<p>{{ $slide['body'] }}</p>@endif</div>
                             @if($slide['button_label'] && $slide['button_url'])<a class="button" href="{{ $slide['button_url'] }}">{{ $slide['button_label'] }}</a>@endif
                         </div>
                     </article>
                 @endforeach
             </div>
-            @if($carouselSlides->count() > 1)
-                <div class="public-page-carousel-controls"><button type="button" class="public-page-carousel-arrow" data-carousel-previous aria-label="Previous slide">←</button><div class="public-page-carousel-dots" role="tablist" aria-label="Choose featured highlight">@foreach($carouselSlides as $index => $slide)<button type="button" data-carousel-dot aria-label="Show slide {{ $index + 1 }}" aria-selected="{{ $index === 0 ? 'true' : 'false' }}"></button>@endforeach</div><button type="button" class="public-page-carousel-arrow" data-carousel-next aria-label="Next slide">→</button></div>
-            @endif
         @endif
     </section>
     @break

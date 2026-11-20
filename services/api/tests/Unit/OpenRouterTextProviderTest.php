@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Services\Ai\AiProviderException;
 use App\Services\Ai\OpenRouterTextProvider;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -50,16 +51,17 @@ class OpenRouterTextProviderTest extends TestCase
         Http::fake([
             'https://openrouter.ai/api/v1/chat/completions' => Http::response([
                 'model' => 'google/gemini-test',
-                'choices' => [['message' => ['content' => '{"ok":true}']]],
+                'choices' => [['message' => ['content' => json_encode(AiCompositionProbeTest::compositionFixture())]]],
             ]),
         ]);
 
         $result = app(OpenRouterTextProvider::class)->validateStructuredOutput('private-key', 'google/gemini-test');
 
-        $this->assertTrue($result['output']['ok']);
+        $this->assertSame('Welcome', $result['output']['section']['name']);
         Http::assertSent(fn ($request): bool => ($request->data()['provider']['require_parameters'] ?? false) === true
             && ($request->data()['response_format']['type'] ?? null) === 'json_schema'
-            && ($request->data()['response_format']['json_schema']['strict'] ?? false) === true);
+            && ($request->data()['response_format']['json_schema']['strict'] ?? false) === true
+            && isset($request->data()['response_format']['json_schema']['schema']['properties']['section']['properties']['html']));
     }
 
     public function test_structured_generation_removes_keywords_rejected_by_upstream_models(): void
@@ -97,5 +99,33 @@ class OpenRouterTextProviderTest extends TestCase
         );
 
         $this->assertSame('Welcome', $result['output']['title']);
+    }
+
+    public function test_compatibility_probe_reports_malformed_provider_json(): void
+    {
+        Http::fake(['*' => Http::response(['choices' => [['message' => ['content' => '{broken']]]])]);
+
+        try {
+            app(OpenRouterTextProvider::class)->validateStructuredOutput('private-key', 'google/gemini-test');
+            $this->fail('Malformed provider JSON must fail.');
+        } catch (AiProviderException $exception) {
+            $this->assertSame('provider_malformed_json', $exception->diagnosticCode);
+        }
+    }
+
+    public function test_schema_rejection_falls_back_to_json_object_without_changing_model(): void
+    {
+        Http::fakeSequence()
+            ->push(['error' => ['message' => 'JSON schema is not supported']], 400)
+            ->push(['model' => 'google/gemini-test', 'choices' => [['message' => ['content' => [
+                ['type' => 'output_text', 'text' => "```json\n".json_encode(AiCompositionProbeTest::compositionFixture())."\n```"],
+            ]]]]], 200);
+
+        $result = app(OpenRouterTextProvider::class)->validateStructuredOutput('private-key', 'google/gemini-test');
+
+        $this->assertSame('json_object', $result['response_mode']);
+        $this->assertSame('google/gemini-test', $result['model']);
+        Http::assertSent(fn ($request): bool => ($request->data()['response_format']['type'] ?? null) === 'json_object'
+            && ($request->data()['provider']['allow_fallbacks'] ?? true) === false);
     }
 }

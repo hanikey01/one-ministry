@@ -3,6 +3,7 @@
 namespace App\Services\Ai;
 
 use App\Models\User;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -206,37 +207,50 @@ final class AiModelSettingsService
         $choices = [['provider' => $route->primary_provider, 'model_id' => $route->primary_model], ...(is_array($fallbacks) ? $fallbacks : [])];
         $results = [];
         $failures = [];
-        foreach ($choices as $choice) {
+        $credentials = [];
+        foreach (array_unique(array_column($choices, 'provider')) as $providerKey) {
             try {
-                $connection = DB::table('ai_provider_connections')->where('provider_key', $choice['provider'])->where('enabled', true)->first();
-                if (! $connection || blank($connection->api_key_encrypted)) throw new RuntimeException('provider_not_ready');
-                $probe = $this->providers->get($choice['provider'])->validateStructuredOutput(
-                    Crypt::decryptString($connection->api_key_encrypted),
-                    $choice['model_id'],
-                );
-                $this->recordCompatibility($choice, true, null);
+                $connection = DB::table('ai_provider_connections')->where('provider_key', $providerKey)->where('enabled', true)->first();
+                if (! $connection || blank($connection->api_key_encrypted)) throw new AiProviderException('provider_not_ready');
+                try { $credentials[$providerKey] = Crypt::decryptString($connection->api_key_encrypted); }
+                catch (DecryptException) { throw new AiProviderException('provider_credential_unreadable'); }
+                $this->providers->get($providerKey)->validateConnection($credentials[$providerKey]);
+                DB::table('ai_provider_connections')->where('provider_key', $providerKey)->update([
+                    'connection_status' => 'connected', 'last_checked_at' => now(), 'last_error_code' => null, 'updated_at' => now(),
+                ]);
+            } catch (Throwable $exception) {
+                $diagnostic = $this->compatibilityDiagnostic($exception);
+                unset($credentials[$providerKey]);
+                DB::table('ai_provider_connections')->where('provider_key', $providerKey)->update([
+                    'connection_status' => 'error', 'last_checked_at' => now(), 'last_error_code' => $diagnostic, 'updated_at' => now(),
+                ]);
+                foreach (array_filter($choices, fn (array $choice): bool => $choice['provider'] === $providerKey) as $choice) {
+                    $failures[] = ['provider' => $providerKey, 'model' => $choice['model_id'], 'reason' => $diagnostic, 'scope' => 'provider'];
+                }
+            }
+        }
+        foreach ($choices as $choice) {
+            if (! isset($credentials[$choice['provider']])) continue;
+            try {
+                $probe = $this->providers->get($choice['provider'])->validateStructuredOutput($credentials[$choice['provider']], $choice['model_id']);
+                $this->recordCompatibility($choice, true, null, $probe['response_mode'] ?? null, $probe['latency_ms'] ?? null);
                 $results[] = ['provider' => $choice['provider'], 'model_id' => $choice['model_id'], ...$probe];
             } catch (Throwable $exception) {
-                $diagnostic = $exception instanceof AiProviderException ? $exception->diagnosticCode : match ($exception->getMessage()) {
-                    'provider_not_ready' => 'provider_not_ready',
-                    'structured_output_failed' => 'structured_output_failed',
-                    default => 'compatibility_probe_error',
-                };
+                $diagnostic = $this->compatibilityDiagnostic($exception);
+                $internal = str_starts_with($diagnostic, 'internal_');
                 Log::warning('AI model compatibility probe failed.', ['provider' => $choice['provider'], 'model' => $choice['model_id'], 'diagnostic' => $diagnostic, 'exception' => $exception::class]);
-                $this->recordCompatibility($choice, false, $diagnostic);
-                $failures[] = [
-                    'provider' => $choice['provider'],
-                    'model' => $choice['model_id'],
-                    'reason' => $exception instanceof AiProviderException ? $exception->diagnosticCode.($exception->httpStatus ? ' (HTTP '.$exception->httpStatus.')' : '') : match ($exception->getMessage()) {
-                        'provider_not_ready' => 'provider is not configured or enabled',
-                        'structured_output_failed' => 'provider did not return the required JSON shape',
-                        default => $diagnostic,
-                    },
-                ];
+                if (! $internal) $this->recordCompatibility($choice, false, $diagnostic);
+                $failures[] = ['provider' => $choice['provider'], 'model' => $choice['model_id'],
+                    'reason' => $diagnostic.($exception instanceof AiProviderException && $exception->httpStatus ? ' (HTTP '.$exception->httpStatus.')' : ''),
+                    'scope' => $internal ? 'internal' : 'model'];
             }
         }
         $primaryPassed = collect($results)->contains(fn (array $result): bool => $result['provider'] === $route->primary_provider && $result['model_id'] === $route->primary_model);
         if (! $primaryPassed) {
+            $primaryFailures = array_filter($failures, fn (array $failure): bool => $failure['provider'] === $route->primary_provider && $failure['model'] === $route->primary_model);
+            if ($primaryFailures !== [] && collect($primaryFailures)->every(fn (array $failure): bool => $failure['scope'] === 'internal')) {
+                throw new RuntimeException('The compatibility check could not complete because One Ministry could not process the provider response. The model was not marked incompatible and the existing route status was kept.');
+            }
             DB::transaction(function () use ($actor, $ip): void {
                 DB::table('ai_task_routes')->where('task_key', 'page_editor')->update(['status' => 'unverified', 'last_verified_at' => null, 'updated_at' => now()]);
                 $this->audit($actor, 'ai.page_editor_route.test_failed', 'page_editor', ['failed' => true, 'ip' => $ip]);
@@ -253,16 +267,26 @@ final class AiModelSettingsService
     }
 
     /** @param array{provider:string,model_id:string} $choice */
-    private function recordCompatibility(array $choice, bool $passed, ?string $code): void
+    private function recordCompatibility(array $choice, bool $passed, ?string $code, ?string $mode = null, ?int $latency = null): void
     {
         $query = DB::table('ai_model_catalog')->where('provider_key', $choice['provider'])->where('model_id', $choice['model_id']);
         $row = $query->first();
         if (! $row) return;
         $metadata = json_decode($row->metadata ?: '{}', true) ?: [];
-        $metadata['page_editor_compatibility'] = ['version' => AiCompositionProbe::VERSION, 'passed' => $passed, 'checked_at' => now()->toIso8601String(), 'failure_code' => $code];
+        $metadata['page_editor_compatibility'] = ['version' => AiCompositionProbe::VERSION, 'passed' => $passed, 'checked_at' => now()->toIso8601String(), 'failure_code' => $code, 'response_mode' => $mode, 'latency_ms' => $latency];
         $values = ['metadata' => json_encode($metadata, JSON_THROW_ON_ERROR), 'updated_at' => now()];
         if ($passed) $values['supports_structured_output'] = true;
         $query->update($values);
+    }
+
+    private function compatibilityDiagnostic(Throwable $exception): string
+    {
+        if ($exception instanceof AiProviderException) return $exception->diagnosticCode;
+        return match (true) {
+            $exception instanceof \JsonException => 'internal_json_processing_error',
+            $exception instanceof \TypeError, $exception instanceof \Error => 'internal_response_processing_error',
+            default => 'internal_compatibility_runtime_error',
+        };
     }
 
     /** @return array{provider:string,model_id:string} */

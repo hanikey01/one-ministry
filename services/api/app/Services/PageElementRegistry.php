@@ -87,6 +87,7 @@ final class PageElementRegistry
             'heading'=>['text'=>'A meaningful heading'], 'paragraph'=>['text'=>'Write a clear paragraph that helps people understand your ministry.'],
             'alert'=>['tone'=>'info'], 'progress'=>['value'=>'60'], 'gallery'=>['columns'=>'three'], 'media_text'=>['placement'=>'left'], 'list'=>['ordered'=>'no'],
             'spacer'=>['height'=>'medium'], 'icon'=>['icon'=>'heart'], 'icon_box'=>['icon'=>'people'], 'locations'=>['button_url'=>'/locations'], 'giving'=>['button_url'=>'/give'],
+            'carousel'=>['slide_one_type'=>'flyer', 'slide_two_type'=>'flyer', 'slide_three_type'=>'flyer'],
         ];
         if (isset($specific[$type][$field])) return $specific[$type][$field];
         return match ($field) { 'title'=>'Add a clear title', 'body','text','description'=>'Add clear, welcoming content for this page.',
@@ -107,7 +108,7 @@ final class PageElementRegistry
     /** @return array<int,string> */
     private function responsive(): array { return ['visibility','alignment','padding','margin','order','font_size','line_height','letter_spacing']; }
     /** @return array<string,array<int,string>> */
-    private function media(string $type): array { return ['types'=>match($type){'image','image_card','gallery','media_text'=>['image'],'video_embed'=>['video'],'audio'=>['audio'],'file'=>['file'],default=>[]}]; }
+    private function media(string $type): array { return ['types'=>match($type){'image','image_card','gallery','media_text'=>['image'],'video_embed'=>['video'],'audio'=>['audio'],'file'=>['file'],'carousel'=>['image','video'],default=>[]}]; }
     /** @return array<string,mixed> */
     private function fieldValidation(string $type,string $field): array
     {
@@ -132,7 +133,7 @@ final class PageElementRegistry
             'icon'=>[['heart','Heart'],['people','People'],['calendar','Calendar'],['location','Location'],['message','Message'],['book','Book'],['star','Star'],['check','Check'],['hand-heart','Care'],['globe','Globe']],
             'columns'=>[['two','Two'],['three','Three'],['four','Four']], 'placement'=>[['left','Media left'],['right','Media right']],
             'ordered'=>[['no','Bulleted'],['yes','Numbered']], 'height'=>[['small','Small'],['medium','Medium'],['large','Large']],
-            'slide_one_type','slide_two_type','slide_three_type'=>[['flyer','Flyer'],['video','Video']], default=>[]};
+            'slide_one_type','slide_two_type','slide_three_type'=>[['flyer','Flyer image'],['video_upload','Uploaded video'],['video_link','YouTube or Vimeo link'],['video','Hosted video (existing slide)']], default=>[]};
     }
     /** @param array<int,string> $keys @return array<string,array<string,mixed>> */
     private function controlDefinitions(array $keys): array

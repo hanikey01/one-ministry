@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\MinistrySetting;
 use App\Services\DepartmentService;
 use App\Services\PermissionChecker;
+use App\Support\MinistryTerminology;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -42,16 +43,15 @@ class StaffDepartmentController extends Controller
             'image_url'=>['nullable','url:http,https','max:1000'], 'image_alt'=>['nullable','string','max:255'],
             'media_asset_id'=>['nullable','uuid'], 'image_upload'=>['nullable','image','mimes:jpg,jpeg,png,webp,gif','max:10240'],
             'category'=>['nullable','string','max:80'], 'contact_email'=>['nullable','email','max:191'], 'featured'=>['nullable','boolean'],
-            'is_public' => ['nullable', 'boolean'], 'accepting_requests' => ['nullable', 'boolean'], 'discussion_enabled' => ['nullable', 'boolean'],
+            'is_public' => ['nullable', 'boolean'], 'accepting_requests' => ['nullable', 'boolean'],
         ]);
         $data = $this->resolveDepartmentImage($request, $data);
         $data['is_public'] = $request->has('is_public') ? $request->boolean('is_public') : true;
         $data['accepting_requests'] = $request->boolean('accepting_requests');
-        $data['discussion_enabled'] = $request->boolean('discussion_enabled');
         $data['featured'] = $request->boolean('featured');
         $departments->createDepartment($data, $request->user(), $request->ip());
 
-        return to_route('staff.departments')->with('status', 'Department created.');
+        return to_route('staff.departments')->with('status', app(MinistryTerminology::class)->label('department').' created.');
     }
 
     public function show(Request $request, string $department, DepartmentService $departments, PermissionChecker $permissions): View
@@ -69,11 +69,7 @@ class StaffDepartmentController extends Controller
         $joinRequests = DB::table('department_join_requests')->join('people', 'people.id', '=', 'department_join_requests.person_id')
             ->where('department_join_requests.department_id', $department)->where('department_join_requests.status', 'pending')
             ->orderBy('department_join_requests.created_at')->get(['department_join_requests.*', 'people.first_name', 'people.last_name', 'people.email']);
-        $messages = DB::table('department_messages')->join('people', 'people.id', '=', 'department_messages.person_id')
-            ->where('department_messages.department_id', $department)->whereNull('department_messages.moderated_at')
-            ->latest('department_messages.created_at')->limit(50)->get(['department_messages.*', 'people.first_name', 'people.last_name']);
-
-        return view('staff.department', compact('settings', 'members', 'people', 'joinRequests', 'messages') + ['department' => $item, 'imageAssets' => $this->departmentImageAssets(), 'user' => $request->user(), 'isAdministrator' => $permissions->allows($request->user(), 'departments.manage')]);
+        return view('staff.department', compact('settings', 'members', 'people', 'joinRequests') + ['department' => $item, 'imageAssets' => $this->departmentImageAssets(), 'user' => $request->user(), 'isAdministrator' => $permissions->allows($request->user(), 'departments.manage')]);
     }
 
     public function addMember(Request $request, string $department, DepartmentService $departments): RedirectResponse
@@ -99,11 +95,11 @@ class StaffDepartmentController extends Controller
             'image_url'=>['nullable','url:http,https','max:1000'], 'image_alt'=>['nullable','string','max:255'],
             'media_asset_id'=>['nullable','uuid'], 'image_upload'=>['nullable','image','mimes:jpg,jpeg,png,webp,gif','max:10240'],
             'category'=>['nullable','string','max:80'], 'contact_email'=>['nullable','email','max:191'], 'featured'=>['nullable','boolean'],
-            'is_public' => ['nullable', 'boolean'], 'accepting_requests' => ['nullable', 'boolean'], 'discussion_enabled' => ['nullable', 'boolean'],
+            'is_public' => ['nullable', 'boolean'], 'accepting_requests' => ['nullable', 'boolean'],
         ]);
         $data = $this->resolveDepartmentImage($request, $data);
-        $departments->updateDepartment($department, [...$data, 'featured'=>$request->boolean('featured'), 'is_public' => $request->boolean('is_public'), 'accepting_requests' => $request->boolean('accepting_requests'), 'discussion_enabled' => $request->boolean('discussion_enabled')], $request->user(), $request->ip());
-        return to_route('staff.departments.show', $department)->with('status', 'Department settings saved.');
+        $departments->updateDepartment($department, [...$data, 'featured'=>$request->boolean('featured'), 'is_public' => $request->boolean('is_public'), 'accepting_requests' => $request->boolean('accepting_requests')], $request->user(), $request->ip());
+        return to_route('staff.departments.show', $department)->with('status', app(MinistryTerminology::class)->label('department').' settings saved.');
     }
 
     public function reviewJoinRequest(Request $request, string $department, string $joinRequest, DepartmentService $departments): RedirectResponse
@@ -111,13 +107,6 @@ class StaffDepartmentController extends Controller
         $data = $request->validate(['status' => ['required', Rule::in(['approved', 'declined'])]]);
         $departments->reviewRequest($department, $joinRequest, $data['status'], $request->user(), $request->ip());
         return to_route('staff.departments.show', $department)->with('status', 'Join request reviewed.');
-    }
-
-    public function removeMessage(Request $request, string $department, string $message, DepartmentService $departments): RedirectResponse
-    {
-        $data = $request->validate(['reason' => ['required', 'string', 'max:240']]);
-        $departments->removeMessage($department, $message, $request->user(), $data['reason'], $request->ip());
-        return to_route('staff.departments.show', $department)->with('status', 'Discussion message removed.');
     }
 
     /** @return Collection<int, object> */

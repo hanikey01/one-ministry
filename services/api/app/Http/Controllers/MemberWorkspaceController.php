@@ -6,10 +6,10 @@ use App\Models\MinistrySetting;
 use App\Services\ConnectionRequestService;
 use App\Services\DepartmentService;
 use App\Services\ModuleAvailability;
+use App\Support\MinistryTerminology;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -31,7 +31,7 @@ class MemberWorkspaceController extends Controller
 
     public function departments(Request $request): View
     {
-        return $this->page($request, 'member.departments', 'My departments');
+        return $this->page($request, 'member.departments', 'My '.app(MinistryTerminology::class)->label('department', 'plural'));
     }
 
     public function department(Request $request, string $department): View
@@ -41,20 +41,7 @@ class MemberWorkspaceController extends Controller
             ->where('departments.id', $department)->where('department_memberships.person_id', $person->id)->where('department_memberships.status', 'active')
             ->select('departments.*', 'department_memberships.role')->first();
         abort_unless($item, 404);
-        $messages = $this->departmentMessageRows($department);
-        DB::table('department_message_reads')->updateOrInsert(['department_id' => $department, 'person_id' => $person->id], ['last_read_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
-
-        return view('member.department', ['settings' => MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID), 'features' => DB::table('feature_settings')->where('state', 'enabled')->pluck('key')->all(), 'user' => $request->user(), 'person' => $person, 'department' => $item, 'messages' => $messages]);
-    }
-
-    public function departmentMessages(Request $request, string $department): JsonResponse
-    {
-        $person = $this->person($request);
-        abort_unless(DB::table('department_memberships')->where(['department_id' => $department, 'person_id' => $person->id, 'status' => 'active'])->exists(), 404);
-        DB::table('department_message_reads')->updateOrInsert(['department_id' => $department, 'person_id' => $person->id], ['last_read_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
-        $messages = $this->departmentMessageRows($department);
-
-        return response()->json(['html' => view('member.partials.department-messages', compact('messages', 'person', 'department'))->render(), 'latest_id' => $messages->last()?->id]);
+        return view('member.department', ['settings' => MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID), 'features' => DB::table('feature_settings')->where('state', 'enabled')->pluck('key')->all(), 'user' => $request->user(), 'person' => $person, 'department' => $item]);
     }
 
     public function requestDepartment(Request $request, string $department, DepartmentService $departments): RedirectResponse
@@ -62,7 +49,7 @@ class MemberWorkspaceController extends Controller
         $data = $request->validate(['message' => ['nullable', 'string', 'max:2000']]);
         $departments->requestMembership($department, $request->user(), $data['message'] ?? null, $request->ip());
 
-        return to_route('member.departments')->with('status', 'Your request was sent to the department leaders.');
+        return to_route('member.departments')->with('status', 'Your request was sent to the '.str(app(MinistryTerminology::class)->label('department'))->lower().' leaders.');
     }
 
     public function withdrawDepartmentRequest(Request $request, string $department, DepartmentService $departments): RedirectResponse
@@ -76,46 +63,7 @@ class MemberWorkspaceController extends Controller
     {
         $departments->leave($department, $request->user(), $request->ip());
 
-        return to_route('member.departments')->with('status', 'You left the department.');
-    }
-
-    public function postDepartmentMessage(Request $request, string $department, DepartmentService $departments): RedirectResponse|JsonResponse
-    {
-        $data = $request->validate(['content' => ['required', 'string', 'max:2000'], 'parent_message_id' => ['nullable', 'uuid']]);
-        $departments->postMessage($department, $request->user(), $data['content'], $request->ip(), $data['parent_message_id'] ?? null);
-
-        if ($request->expectsJson()) return response()->json(['message' => 'Message sent.'], 201);
-
-        return to_route('member.departments.show', $department)->with('status', 'Message posted.');
-    }
-
-    public function updateDepartmentMessage(Request $request, string $department, string $message, DepartmentService $departments): RedirectResponse|JsonResponse
-    {
-        $data = $request->validate(['content' => ['required', 'string', 'max:2000']]);
-        $departments->updateOwnMessage($department, $message, $request->user(), $data['content'], $request->ip());
-
-        if ($request->expectsJson()) return response()->json(['message' => 'Message updated.']);
-
-        return back()->with('status', 'Message updated.');
-    }
-
-    public function deleteDepartmentMessage(Request $request, string $department, string $message, DepartmentService $departments): RedirectResponse|JsonResponse
-    {
-        $departments->deleteOwnMessage($department, $message, $request->user(), $request->ip());
-
-        if ($request->expectsJson()) return response()->json(['message' => 'Message deleted.']);
-
-        return back()->with('status', 'Message deleted.');
-    }
-
-    private function departmentMessageRows(string $department)
-    {
-        return DB::table('department_messages')->join('people', 'people.id', '=', 'department_messages.person_id')
-            ->leftJoin('department_messages as parent', 'parent.id', '=', 'department_messages.parent_message_id')
-            ->where('department_messages.department_id', $department)->whereNull('department_messages.moderated_at')
-            ->latest('department_messages.created_at')->limit(100)
-            ->get(['department_messages.id', 'department_messages.person_id', 'department_messages.parent_message_id', 'department_messages.content', 'department_messages.edited_at', 'department_messages.created_at', 'people.first_name', 'people.last_name', 'parent.content as parent_content'])
-            ->reverse()->values();
+        return to_route('member.departments')->with('status', 'You left the '.str(app(MinistryTerminology::class)->label('department'))->lower().'.');
     }
 
     public function activity(Request $request): View
@@ -160,7 +108,7 @@ class MemberWorkspaceController extends Controller
         abort_if($requiredFeature && ! in_array($requiredFeature, $features, true), 404);
         $isHome = $view === 'member.home';
         $departments = ($isHome || $view === 'member.departments')
-            ? DB::table('department_memberships')->join('departments', 'departments.id', '=', 'department_memberships.department_id')->leftJoin('department_message_reads', fn ($join) => $join->on('department_message_reads.department_id', '=', 'departments.id')->on('department_message_reads.person_id', '=', 'department_memberships.person_id'))->where('department_memberships.person_id', $person->id)->where('department_memberships.status', 'active')->select('departments.id', 'departments.name', 'departments.description', 'departments.image_url', 'departments.category', 'department_memberships.role')->selectRaw('(select count(*) from department_messages where department_messages.department_id=departments.id and department_messages.moderated_at is null and department_messages.person_id<>? and department_messages.created_at>coalesce(department_message_reads.last_read_at, department_memberships.created_at)) as unread_count', [$person->id])->get()
+            ? DB::table('department_memberships')->join('departments', 'departments.id', '=', 'department_memberships.department_id')->where('department_memberships.person_id', $person->id)->where('department_memberships.status', 'active')->select('departments.id', 'departments.name', 'departments.description', 'departments.image_url', 'departments.category', 'departments.contact_email', 'department_memberships.role')->get()
             : collect();
         $pendingDepartments = $view === 'member.departments' ? DB::table('department_join_requests')->join('departments', 'departments.id', '=', 'department_join_requests.department_id')->where('person_id', $person->id)->where('department_join_requests.status', 'pending')->get(['departments.id', 'departments.name', 'departments.image_url', 'department_join_requests.created_at']) : collect();
         $events = ($isHome || $view === 'member.events')

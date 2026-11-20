@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {waitForAiProposal} from '../../resources/js/ai-page-generation.js';
 
-test('polls each stage and returns a proposal for explicit review', async () => {
-    const states = ['planning', 'composing', 'compiling', 'completed'];
+test('polls each stage and returns a proposal ready for immediate canvas application', async () => {
+    const states = ['planning', 'composing', 'reviewing', 'compiling', 'completed'];
     const seen = [];
     const proposal = {title:'Welcome', document:{version:2, sections:[]}};
     const result = await waitForAiProposal({state:'queued', poll_url:'/generation'}, {
@@ -11,7 +11,16 @@ test('polls each stage and returns a proposal for explicit review', async () => 
         wait:async () => {}, onState:(state) => seen.push(state), isConnected:() => true,
     });
     assert.equal(result, proposal);
-    assert.equal(seen.length, 4);
+    assert.equal(seen.length, 5);
+});
+
+test('reports section-level progress while a page is composed', async () => {
+    const seen = [];
+    const proposal = {title:'Welcome', document:{version:2, sections:[]}};
+    await waitForAiProposal({state:'composing', progress:{completed_sections:1,total_sections:3}, poll_url:'/generation'}, {
+        fetchStatus:async () => ({state:'completed', proposal}), wait:async () => {}, onState:(state) => seen.push(state), isConnected:() => true,
+    });
+    assert.deepEqual(seen, ['Composing section 2 of 3.']);
 });
 
 test('failure exposes a safe reason and trace reference', async () => {

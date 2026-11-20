@@ -10,11 +10,11 @@
 | Ministry administrator | Broad nonrestricted ministry administration, settings, locations, modules, content, people operations, events, departments, services, and reports; never implicitly grants care, finance, audit, or security-role control |
 | Content & media editor | Draft, edit, and publish public pages, media, sermons, announcements, recordings, and communications; cannot change core settings |
 | Ministry operations coordinator | Directly assigned, scope-bound people follow-up, departments, events, service planning, and school operations within the granted area |
-| Care staff | Assigned private prayer/care cases |
+| Care staff | All active prayer requests for shared triage; may claim an unassigned request or continue their own private care work |
 | Finance staff | Giving, receipts, reconciliation, and finance reports |
 | Service & production team | Directly assigned service/meeting production, host, and moderation responsibilities within the granted service or meeting |
 | Children’s team | Feature-gated children access only after the safeguarding specification and dedicated child-team assignment model are accepted |
-| Super administrator | Highest installation role: all installed permission bundles, configuration, and role oversight; requires MFA and verified email for elevated actions |
+| Super administrator | Highest installation role: all platform permissions, including restricted care and giving; may view all care records and assign/reassign active prayer requests; requires MFA and verified email for elevated actions |
 | Security administrator | Security settings, elevated role grants, audit and export controls |
 | System operator | Infrastructure health and deployment; no default access to member records |
 
@@ -45,7 +45,7 @@ Legend: **O** own record; **S** assigned scope; **A** all nonrestricted ministry
 | View security audit | — | — | — | — | — | — | — | — | A |
 | Export restricted data | — | — | — | — | — | R by separate grant | R by separate grant | — | Grant/oversight only |
 
-The matrix grants are intentionally narrow. For example, a host may see the name and contact channel necessary to complete an active prayer handoff, not the person's historic care file. A ministry administrator may view task counts but cannot open the private request content solely because of the administrator role.
+The matrix grants are intentionally narrow except for the explicitly audited Super Administrator escalation role. For example, a host may see the name and contact channel necessary to complete an active prayer handoff, not the person's historic care file. A ministry administrator may view task counts but cannot open the private request content solely because of the administrator role.
 
 ## 3. Scope representation
 

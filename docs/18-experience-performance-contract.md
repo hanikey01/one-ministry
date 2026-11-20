@@ -44,9 +44,8 @@ No page-level literal colour may decide a shared surface, text, border, icon, me
 
 The appearance screen has one purpose per control:
 
-- Primary and accent: identity and primary actions.
-- Light/dark canvas and panels: shared application surfaces.
-- Sidebar: match the current content surface by default; reveal separate light/dark sidebar pickers directly below **Custom light and dark colours** only when selected.
+- Theme preset: choose a platform-owned complete palette.
+- Custom ministry colour: supply one palette seed from which the platform derives light/dark canvas, panels, text, borders, focus, selected, action, and navigation tokens with accessible foregrounds.
 - Typography and density: curated system choices only.
 
 The settings UI previews the current configuration, preserves saved choices, and uses the same components as the rest of the workspace. A colour picker never exposes a configuration whose resulting foreground is unreadable.

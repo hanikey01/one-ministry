@@ -9,7 +9,6 @@ use App\Http\Controllers\CareCaseController;
 use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\EmailVerificationPageController;
 use App\Http\Controllers\EmailWorkspaceController;
-use App\Http\Controllers\PlatformUpdateController;
 use App\Http\Controllers\EventOperationsController;
 use App\Http\Controllers\GivingController;
 use App\Http\Controllers\HomepageController;
@@ -209,9 +208,6 @@ Route::middleware(['auth', 'permission:settings.read'])->get('/staff/settings', 
 Route::middleware(['auth', 'permission:settings.update'])->put('/staff/settings', [StaffWorkspaceController::class, 'updateSettings'])->name('staff.settings.update');
 Route::middleware(['auth', 'permission:settings.update'])->put('/staff/settings/homepage', [StaffWorkspaceController::class, 'updateHomepage'])->name('staff.settings.homepage.update');
 Route::middleware(['auth', 'permission:settings.read'])->get('/staff/email', [EmailWorkspaceController::class, 'index'])->name('staff.email');
-Route::middleware(['auth', 'permission:settings.read'])->get('/staff/updates', [PlatformUpdateController::class, 'index'])->name('staff.updates');
-Route::middleware(['auth', 'permission:settings.update'])->put('/staff/updates', [PlatformUpdateController::class, 'update'])->name('staff.updates.update');
-Route::middleware(['auth', 'permission:settings.update'])->post('/staff/updates/check', [PlatformUpdateController::class, 'check'])->name('staff.updates.check');
 Route::middleware(['auth', 'permission:settings.update'])->put('/staff/email/delivery', [EmailWorkspaceController::class, 'updateDelivery'])->name('staff.email.delivery.update');
 Route::middleware(['auth', 'permission:settings.update'])->post('/staff/email/delivery/test', [EmailWorkspaceController::class, 'testDelivery'])->name('staff.email.delivery.test');
 Route::middleware(['auth', 'permission:settings.update'])->put('/staff/email/templates/{template}', [EmailWorkspaceController::class, 'updateTemplate'])->name('staff.email.templates.update');
@@ -255,6 +251,7 @@ Route::middleware(['auth', 'permission:services.manage'])->post('/staff/services
 Route::middleware(['auth', 'permission:community.manage'])->get('/staff/events', [StaffWorkspaceController::class, 'events'])->name('staff.events');
 Route::middleware(['auth', 'permission:community.manage'])->post('/staff/events', [StaffWorkspaceController::class, 'storeEvent'])->name('staff.events.store');
 Route::middleware(['auth', 'permission:community.manage'])->put('/staff/events/{event}', [StaffWorkspaceController::class, 'updateEvent'])->name('staff.events.update');
+Route::middleware(['auth', 'permission:community.manage'])->delete('/staff/events/{event}', [StaffWorkspaceController::class, 'destroyEvent'])->name('staff.events.destroy');
 Route::middleware(['auth', 'permission:content.manage'])->get('/staff/content', [StaffContentLibraryController::class, 'index'])->name('staff.content');
 Route::middleware(['auth','permission:content.manage'])->get('/staff/testimonies',[TestimonyController::class,'staffIndex'])->name('staff.testimonies');
 Route::middleware(['auth','permission:content.manage','verified_email'])->post('/staff/testimonies',[TestimonyController::class,'staffCreate'])->name('staff.testimonies.store');
@@ -309,11 +306,12 @@ Route::middleware(['auth', 'permission:content.manage'])->get('/staff/pages/medi
 Route::middleware(['auth', 'permission:content.manage'])->post('/staff/pages/preview', [PageWorkspaceController::class, 'preview'])->name('staff.pages.preview');
 Route::middleware(['auth', 'permission:content.manage', 'throttle:10,1'])->post('/staff/pages/ai-draft', AiPageDraftController::class)->name('staff.pages.ai-draft');
 Route::middleware(['auth', 'permission:content.manage', 'throttle:60,1'])->get('/staff/pages/ai-generations/{generation}', [AiPageDraftController::class, 'generationStatus'])->name('staff.pages.ai-generation.show');
-Route::middleware(['auth', 'permission:content.manage', 'throttle:12,1'])->post('/staff/pages/ai-generations/{generation}/process', [AiPageDraftController::class, 'processGeneration'])->name('staff.pages.ai-generation.process');
+Route::middleware(['auth', 'permission:content.manage', 'throttle:30,1'])->post('/staff/pages/ai-generations/{generation}/process', [AiPageDraftController::class, 'processGeneration'])->name('staff.pages.ai-generation.process');
 Route::middleware(['auth', 'permission:content.manage'])->delete('/staff/pages/ai-generations/{generation}', [AiPageDraftController::class, 'cancelGeneration'])->name('staff.pages.ai-generation.cancel');
 Route::middleware(['auth', 'permission:content.manage'])->post('/staff/pages/ai-object-revision', [AiPageDraftController::class, 'reviseObject'])->name('staff.pages.ai-object-revision');
 Route::middleware(['auth', 'permission:content.manage'])->post('/staff/pages', [PageWorkspaceController::class, 'store'])->name('staff.pages.store');
 Route::middleware(['auth', 'permission:content.manage'])->get('/staff/pages/{page}/edit', [PageWorkspaceController::class, 'edit'])->name('staff.pages.edit');
+Route::middleware(['auth', 'permission:content.manage'])->post('/staff/pages/{page}/apply-homepage-design', [PageWorkspaceController::class, 'applyHomepageDesign'])->name('staff.pages.apply-homepage-design');
 Route::middleware(['auth', 'permission:content.manage'])->put('/staff/pages/{page}', [PageWorkspaceController::class, 'update'])->name('staff.pages.update');
 Route::middleware(['auth', 'permission:content.manage'])->put('/staff/pages/{page}/quick-edit', [PageWorkspaceController::class, 'quickUpdate'])->name('staff.pages.quick-update');
 Route::middleware(['auth', 'permission:content.manage'])->delete('/staff/pages/{page}', [PageWorkspaceController::class, 'destroy'])->name('staff.pages.destroy');
@@ -321,6 +319,7 @@ Route::middleware(['auth', 'permission:content.publish', 'verified_email'])->pos
 Route::middleware(['auth', 'permission:services.manage'])->get('/staff/follow-up', [StaffWorkspaceController::class, 'followUp'])->name('staff.follow-up');
 Route::middleware(['auth', 'permission:services.manage'])->patch('/staff/follow-up/{task}', [StaffWorkspaceController::class, 'updateFollowUp'])->name('staff.follow-up.update');
 Route::middleware(['auth', 'permission:care.manage', 'verified_email'])->get('/staff/care', [StaffWorkspaceController::class, 'care'])->name('staff.care');
+Route::middleware(['auth', 'permission:care.manage', 'verified_email'])->post('/staff/care/prayer-requests/{prayer}/claim', [StaffWorkspaceController::class, 'claimPrayer'])->name('staff.care.prayer-requests.claim');
 Route::middleware(['auth', 'permission:reports.view', 'verified_email'])->get('/staff/reports', [StaffWorkspaceController::class, 'reports'])->name('staff.reports');
 Route::middleware('auth')->get('/staff/departments', [StaffDepartmentController::class, 'index'])->name('staff.departments');
 Route::middleware(['auth', 'permission:departments.manage'])->post('/staff/departments', [StaffDepartmentController::class, 'store'])->name('staff.departments.store');
@@ -329,7 +328,6 @@ Route::middleware(['auth', 'permission:departments.manage'])->put('/staff/depart
 Route::middleware('auth')->post('/staff/departments/{department}/members', [StaffDepartmentController::class, 'addMember'])->name('staff.departments.members.store');
 Route::middleware('auth')->delete('/staff/departments/{department}/members/{membership}', [StaffDepartmentController::class, 'removeMember'])->name('staff.departments.members.destroy');
 Route::middleware('auth')->patch('/staff/departments/{department}/join-requests/{joinRequest}', [StaffDepartmentController::class, 'reviewJoinRequest'])->name('staff.departments.requests.review');
-Route::middleware('auth')->delete('/staff/departments/{department}/messages/{message}', [StaffDepartmentController::class, 'removeMessage'])->name('staff.departments.messages.destroy');
 Route::middleware(['auth', 'permission:giving.manage', 'verified_email'])->get('/staff/giving', [StaffWorkspaceController::class, 'giving'])->name('staff.giving');
 Route::middleware(['auth', 'permission:locations.read'])->get('/staff/locations', [StaffWorkspaceController::class, 'locations'])->name('staff.locations');
 Route::middleware(['auth', 'permission:locations.manage'])->post('/staff/locations', [StaffLocationController::class, 'storePage'])->name('staff.locations.store');
@@ -375,13 +373,9 @@ Route::middleware('auth')->get('/member/events', [MemberWorkspaceController::cla
 Route::middleware('auth')->delete('/member/events/{event}/registration', [EventOperationsController::class, 'memberCancel'])->name('member.events.cancel');
 Route::middleware('auth')->get('/member/departments', [MemberWorkspaceController::class, 'departments'])->name('member.departments');
 Route::middleware('auth')->get('/member/departments/{department}', [MemberWorkspaceController::class, 'department'])->name('member.departments.show');
-Route::middleware('auth')->get('/member/departments/{department}/messages', [MemberWorkspaceController::class, 'departmentMessages'])->name('member.departments.messages.index');
 Route::middleware('auth')->post('/member/departments/{department}/join-request', [MemberWorkspaceController::class, 'requestDepartment'])->name('member.departments.request');
 Route::middleware('auth')->delete('/member/departments/{department}/join-request', [MemberWorkspaceController::class, 'withdrawDepartmentRequest'])->name('member.departments.request.withdraw');
 Route::middleware('auth')->delete('/member/departments/{department}/membership', [MemberWorkspaceController::class, 'leaveDepartment'])->name('member.departments.leave');
-Route::middleware('auth')->post('/member/departments/{department}/messages', [MemberWorkspaceController::class, 'postDepartmentMessage'])->name('member.departments.messages.store');
-Route::middleware('auth')->put('/member/departments/{department}/messages/{message}', [MemberWorkspaceController::class, 'updateDepartmentMessage'])->name('member.departments.messages.update');
-Route::middleware('auth')->delete('/member/departments/{department}/messages/{message}', [MemberWorkspaceController::class, 'deleteDepartmentMessage'])->name('member.departments.messages.delete');
 Route::middleware('auth')->get('/member/activity', [MemberWorkspaceController::class, 'activity'])->name('member.activity');
 Route::get('/member/next-steps', [MemberWorkspaceController::class, 'nextSteps'])->name('member.next-steps');
 Route::get('/member/prayer', [MemberWorkspaceController::class, 'prayerPage'])->name('member.prayer.page');
@@ -423,6 +417,7 @@ Route::get('/departments', [PublicWorkspaceController::class, 'departments'])->n
 Route::get('/departments/{slug}', [PublicWorkspaceController::class, 'department'])->name('public.departments.show');
 Route::get('/give', [PublicWorkspaceController::class, 'giving'])->name('public.giving');
 Route::get('/contact', [PublicWorkspaceController::class, 'contact'])->name('public.contact');
+Route::post('/contact', [StaffPeopleController::class, 'contact'])->name('public.contact.submit');
 Route::get('/testimonies',[TestimonyController::class,'publicIndex'])->name('public.testimonies');
 Route::get('/testimonies/{slug}',[TestimonyController::class,'publicShow'])->name('public.testimony');
 Route::get('/school', [PublicSchoolController::class, 'index'])->name('public.school.index');

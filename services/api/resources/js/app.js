@@ -1,5 +1,34 @@
 import { waitForAiProposal } from './ai-page-generation.js';
 
+if (!window.__aiCanvasBridge) {
+    window.__aiCanvasBridge = true;
+    const themeTokens = ['--action','--action-foreground','--brand','--canvas','--surface','--surface-muted','--ink','--muted','--line','--line-strong'];
+    const sendTheme = (frame) => {
+        const themeSurface = frame.closest('[data-public-shell],[data-workspace-shell],[data-worship-shell]') ?? document.documentElement;
+        const styles = getComputedStyle(themeSurface);
+        frame.contentWindow?.postMessage({type:'ai-canvas-theme', tokens:Object.fromEntries(themeTokens.map((key) => [key, styles.getPropertyValue(key).trim()]))}, '*');
+    };
+    const sendThemes = () => window.requestAnimationFrame(() => {
+        document.querySelectorAll('iframe[data-ai-canvas-frame]').forEach(sendTheme);
+    });
+    window.addEventListener('message', (event) => {
+        if (event.data?.type !== 'ai-canvas-height' || !event.data.id) return;
+        const frame = document.getElementById(event.data.id);
+        if (!(frame instanceof HTMLIFrameElement) || frame.contentWindow !== event.source || !frame.matches('[data-ai-canvas-frame]')) return;
+        frame.style.height = `${Math.max(80, Math.min(12000, Number(event.data.height) || 0))}px`;
+    });
+    document.addEventListener('load', (event) => {
+        const frame = event.target;
+        if (frame instanceof HTMLIFrameElement && frame.matches('[data-ai-canvas-frame]')) sendTheme(frame);
+    }, true);
+    document.addEventListener('click', (event) => {
+        if (event.target instanceof Element && event.target.closest('[data-public-theme-toggle],[data-workspace-theme-toggle],[data-worship-theme-toggle]')) sendThemes();
+    });
+    window.addEventListener('storage', (event) => {
+        if (event.key === 'ministry-theme') sendThemes();
+    });
+}
+
 let closeOpenEnhancedSelect = null;
 let enhancedSelectIndex = 0;
 let pageCleanups = [];
@@ -33,11 +62,13 @@ const initializePublicCarousels = () => {
     document.querySelectorAll('[data-public-carousel]').forEach((carousel) => {
         if (carousel.dataset.carouselInitialized === 'true') return;
         carousel.dataset.carouselInitialized = 'true';
+        pageCleanups.push(() => { delete carousel.dataset.carouselInitialized; });
         const slides = [...carousel.querySelectorAll('[data-carousel-slide]')];
-        const dots = [...carousel.querySelectorAll('[data-carousel-dot]')];
         if (slides.length < 2) return;
         let active = 0;
         let paused = false;
+        let pointerStart = null;
+        const status = carousel.querySelector('[data-carousel-status]');
         const show = (next) => {
             active = (next + slides.length) % slides.length;
             slides.forEach((slide, index) => {
@@ -45,16 +76,47 @@ const initializePublicCarousels = () => {
                 slide.hidden = !selected;
                 slide.setAttribute('aria-hidden', String(!selected));
             });
-            dots.forEach((dot, index) => dot.setAttribute('aria-selected', String(index === active)));
+            if (status) status.textContent = `${active + 1} of ${slides.length}`;
         };
-        carousel.querySelector('[data-carousel-previous]')?.addEventListener('click', () => show(active - 1));
-        carousel.querySelector('[data-carousel-next]')?.addEventListener('click', () => show(active + 1));
-        dots.forEach((dot, index) => dot.addEventListener('click', () => show(index)));
-        carousel.addEventListener('mouseenter', () => { paused = true; });
-        carousel.addEventListener('mouseleave', () => { paused = false; });
-        carousel.addEventListener('focusin', () => { paused = true; });
-        carousel.addEventListener('focusout', () => { paused = false; });
-        if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) setPageInterval(() => { if (!paused) show(active + 1); }, 6000);
+        addPageListener(carousel.querySelector('[data-carousel-previous]'), 'click', () => show(active - 1));
+        addPageListener(carousel.querySelector('[data-carousel-next]'), 'click', () => show(active + 1));
+        addPageListener(carousel, 'mouseenter', () => { paused = true; });
+        addPageListener(carousel, 'mouseleave', () => { paused = false; });
+        addPageListener(carousel, 'focusin', () => { paused = true; });
+        addPageListener(carousel, 'focusout', () => { paused = false; });
+        addPageListener(carousel, 'keydown', (event) => {
+            if (event.key === 'ArrowLeft') {
+                event.preventDefault();
+                show(active - 1);
+            }
+            if (event.key === 'ArrowRight') {
+                event.preventDefault();
+                show(active + 1);
+            }
+        });
+        addPageListener(carousel, 'pointerdown', (event) => {
+            if (event.pointerType === 'mouse' && event.button !== 0) return;
+            if (event.target.closest('a, button, input, select, textarea, video, iframe')) return;
+            pointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY };
+            carousel.setPointerCapture?.(event.pointerId);
+            paused = true;
+        });
+        addPageListener(carousel, 'pointerup', (event) => {
+            if (!pointerStart || pointerStart.id !== event.pointerId) return;
+            const horizontal = event.clientX - pointerStart.x;
+            const vertical = event.clientY - pointerStart.y;
+            pointerStart = null;
+            paused = false;
+            if (Math.abs(horizontal) >= 44 && Math.abs(horizontal) > Math.abs(vertical)) {
+                show(active + (horizontal < 0 ? 1 : -1));
+            }
+        });
+        addPageListener(carousel, 'pointercancel', () => { pointerStart = null; paused = false; });
+        if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+            setPageInterval(() => {
+                if (!paused && document.visibilityState === 'visible') show(active + 1);
+            }, 6000);
+        }
     });
 };
 
@@ -569,9 +631,6 @@ document.querySelectorAll('[data-ai-page-draft]').forEach((panel) => {
     const status = panel.querySelector('[data-ai-status]');
     const editor = panel.closest('[data-page-block-editor]');
     if (!button || !status || !editor) return;
-    let elementCatalog = {};
-    try { elementCatalog = JSON.parse(editor.dataset.elementCatalog || '{}'); } catch { elementCatalog = {}; }
-
     button.addEventListener('click', async () => {
         const brief = panel.querySelector('[data-ai-brief]')?.value.trim() ?? '';
         if (brief.length < 20) {
@@ -611,7 +670,6 @@ document.querySelectorAll('[data-ai-page-draft]').forEach((panel) => {
                 },
                 body: JSON.stringify({
                     brief,
-                    review: panel.querySelector('[data-ai-optional-review]')?.checked ?? false,
                     title: editor.querySelector('[name="title"]')?.value.trim() ?? '',
                     public_details: panel.querySelector('[data-ai-public-details]')?.value.trim() ?? '',
                     page_goal: panel.querySelector('[data-ai-page-goal]')?.value.trim() ?? '',
@@ -647,114 +705,15 @@ document.querySelectorAll('[data-ai-page-draft]').forEach((panel) => {
                 },
             });
             cancel.remove();
-            payload = {data:completedProposal};
-            const previousProposal = panel.querySelector('[data-ai-proposal]');
-            previousProposal?.remove();
-            const proposal = payload.data;
-            const proposalIsStale = () => (blocksInput?.value ?? '') !== sourceDocumentSignature;
-            const preview = document.createElement('section');
-            preview.className = 'ai-page-proposal';
-            preview.dataset.aiProposal = '';
-            preview.tabIndex = -1;
-            const heading = document.createElement('h3');
-            heading.textContent = `Page design ready: ${proposal.title}`;
-            const explanation = document.createElement('p');
-            explanation.textContent = 'Review the complete design below. Applying it replaces the current canvas; you can undo the change before saving.';
-            const rationale = document.createElement('div');
-            rationale.className = 'ai-page-design-rationale';
-            const rationaleTitle = document.createElement('strong');
-            rationaleTitle.textContent = 'Design strategy';
-            const rationaleCopy = document.createElement('p');
-            rationaleCopy.textContent = proposal.design_plan?.page_strategy || 'A complete responsive design based on the supplied brief.';
-            const rationaleDetails = document.createElement('ul');
-            [
-                ['Visual direction', proposal.design_plan?.visual_direction],
-                ['Typography', proposal.design_plan?.typography_strategy],
-                ['Spacing rhythm', proposal.design_plan?.spacing_rhythm],
-                ['Responsive strategy', proposal.design_plan?.responsive_strategy],
-                ['CTA strategy', proposal.design_plan?.cta_strategy],
-            ].forEach(([label, value]) => { if (!value) return; const item = document.createElement('li'); item.textContent = `${label}: ${value}`; rationaleDetails.append(item); });
-            rationale.append(rationaleTitle, rationaleCopy, rationaleDetails);
-            if (Array.isArray(proposal.design_review) && proposal.design_review.length) {
-                const reviewTitle = document.createElement('strong');
-                reviewTitle.textContent = 'AI design review and repairs';
-                const reviewList = document.createElement('ul');
-                proposal.design_review.forEach((finding) => {
-                    const item = document.createElement('li');
-                    item.textContent = `${String(finding.category || 'design').replaceAll('_', ' ')}: ${finding.correction || finding.issue || 'Design repaired.'}`;
-                    reviewList.append(item);
-                });
-                rationale.append(reviewTitle, reviewList);
+            const proposal = completedProposal;
+            if ((blocksInput?.value ?? '') !== sourceDocumentSignature) {
+                throw new Error('The page changed while AI was working. Generate the design again to preserve your manual edits.');
             }
-            const outline = document.createElement('ol');
-            const originalObjects = new Map();
-            const collectObjects = (documentValue) => { const objects = []; (documentValue?.sections || []).forEach((section) => { objects.push(section); (section.columns || []).forEach((column) => { objects.push(column); (column.elements || []).forEach((element) => objects.push(element)); }); }); return objects; };
-            try {
-                const original = JSON.parse(sourceDocumentSignature || '{}');
-                collectObjects(original).forEach((object) => originalObjects.set(object.id, JSON.stringify(object)));
-            } catch {}
-            const changedObjectIds = new Set(collectObjects(proposal.document).filter((object) => !originalObjects.has(object.id) || originalObjects.get(object.id) !== JSON.stringify(object)).map((object) => object.id));
-            const plannedElements = proposal.document?.sections?.flatMap((section) => section.columns?.flatMap((column) => column.elements ?? []) ?? []) ?? [];
-            plannedElements.forEach((block) => {
-                const item = document.createElement('li');
-                if (changedObjectIds.has(block.id)) { item.className = 'is-ai-changed'; item.title = 'Added or changed by AI'; }
-                const data = block.content ?? {};
-                const title = data.title || data.text || data.label || data.eyebrow || data.image_hint || data.alt || '';
-                item.textContent = [elementCatalog[block.type]?.label ?? block.type?.replaceAll('_', ' ') ?? 'Element', title].filter(Boolean).join(' · ');
-                outline.append(item);
-            });
-            const comparison = document.createElement('section');
-            comparison.className = 'ai-page-visual-comparison';
-            const comparisonHeading = document.createElement('div');
-            comparisonHeading.className = 'ai-page-comparison-heading';
-            comparisonHeading.innerHTML = '<strong>Visual before and after</strong><span>Highlighted outline items were added or replaced by AI.</span>';
-            const comparisonControls = document.createElement('div');
-            comparisonControls.className = 'ai-page-comparison-controls';
-            const comparisonFrames = document.createElement('div');
-            comparisonFrames.className = 'ai-page-comparison-frames';
-            const makeFrame = (label) => { const figure = document.createElement('figure'); const caption = document.createElement('figcaption'); caption.textContent = label; const frame = document.createElement('iframe'); frame.title = `${label} page preview`; frame.sandbox = 'allow-scripts'; figure.append(caption, frame); return {figure, frame}; };
-            const beforePreview = makeFrame('Before'); const afterPreview = makeFrame('AI proposal');
-            comparisonFrames.append(beforePreview.figure, afterPreview.figure);
-            ['desktop','tablet','mobile'].forEach((size) => { const control = document.createElement('button'); control.type = 'button'; control.className = `button button-secondary${size === 'desktop' ? ' is-active' : ''}`; control.textContent = size[0].toUpperCase() + size.slice(1); control.addEventListener('click', () => { comparison.dataset.preview = size; comparisonControls.querySelectorAll('button').forEach((item) => item.classList.toggle('is-active', item === control)); }); comparisonControls.append(control); });
-            comparison.dataset.preview = 'desktop'; comparison.append(comparisonHeading, comparisonControls, comparisonFrames);
-            const renderProposalPreview = async (frame, blocks, title, highlightedIds = new Set()) => { try { const response = await fetch(editor.dataset.previewEndpoint, {method:'POST', headers:{Accept:'text/html','Content-Type':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name=csrf-token]')?.content ?? ''}, body:JSON.stringify({title, blocks})}); if (!response.ok) throw new Error(); const html = await response.text(); const parsed = new DOMParser().parseFromString(html, 'text/html'); if (highlightedIds.size) { const style = parsed.createElement('style'); style.textContent = '[data-ai-proposal-changed]{outline:4px solid #f59e0b!important;outline-offset:-4px!important;position:relative}'; parsed.head.append(style); parsed.querySelectorAll('[data-page-editor-id]').forEach((node) => { if (highlightedIds.has(node.dataset.pageEditorId)) node.setAttribute('data-ai-proposal-changed',''); }); } frame.srcdoc = `<!doctype html>${parsed.documentElement.outerHTML}`; } catch { const message=document.createElement('p'); message.className='ai-page-preview-error'; message.textContent='This preview could not be rendered. Regenerate before applying.'; frame.replaceWith(message); apply.disabled=true; } };
-            renderProposalPreview(beforePreview.frame, sourceDocumentSignature, editor.querySelector('[name="title"]')?.value || 'Current page');
-            renderProposalPreview(afterPreview.frame, JSON.stringify(proposal.document), proposal.title || 'AI proposal', changedObjectIds);
-            const actions = document.createElement('div');
-            actions.className = 'ai-page-proposal-actions';
-            const apply = document.createElement('button');
-            apply.className = 'button';
-            apply.type = 'button';
-            apply.textContent = 'Apply page plan';
-            const discard = document.createElement('button');
-            discard.className = 'button button-secondary';
-            discard.type = 'button';
-            discard.textContent = 'Discard';
-            const regenerate = document.createElement('button');
-            regenerate.className = 'button button-secondary';
-            regenerate.type = 'button';
-            regenerate.textContent = 'Regenerate';
-            apply.addEventListener('click', () => {
-                if (proposalIsStale()) { status.textContent = 'The page changed after this proposal was requested. Regenerate to preserve your manual edits.'; apply.disabled = true; return; }
-                editor.dispatchEvent(new CustomEvent('ai-page-draft', { detail: proposal }));
-                preview.remove();
-                status.textContent = 'Page plan applied. Review the content, choose images and button destinations, then save as a draft.';
-                editor.querySelector('[data-canvas]')?.focus({ preventScroll: false });
-            });
-            regenerate.addEventListener('click', () => { preview.remove(); button.click(); });
-            discard.addEventListener('click', () => {
-                preview.remove();
-                status.textContent = 'Page plan discarded. Your current page is unchanged.';
-                button.focus();
-            });
-            actions.append(apply, regenerate, discard);
-            if (proposalIsStale()) { apply.disabled = true; explanation.textContent = 'The page changed while AI was working. Regenerate this proposal to preserve manual edits.'; }
-            preview.append(heading, explanation, rationale, comparison, outline, actions);
-            panel.append(preview);
-            preview.focus();
-            const route = `${payload.data.provider} · ${payload.data.model}`;
-            const contentSectionCount = Math.max(0, (proposal.document?.sections?.length ?? 0) - 2);
-            status.textContent = `Page plan prepared with ${contentSectionCount} content sections by ${route}${proposal.fallback_used ? ' (fallback model)' : ''}. Review it before applying.`;
+            editor.dispatchEvent(new CustomEvent('ai-page-draft', {detail: proposal}));
+            const route = `${proposal.provider} · ${proposal.model}`;
+            const sectionCount = proposal.document?.sections?.length ?? 0;
+            status.textContent = `Applied ${sectionCount} AI-designed sections to the canvas using ${route}${proposal.fallback_used ? ' (fallback model)' : ''}. Review and edit the live canvas, then save the draft.`;
+            editor.querySelector('[data-canvas]')?.focus({preventScroll: false});
         } catch (error) {
             status.textContent = error instanceof Error ? error.message : 'The page draft could not be generated. Try again.';
         } finally {
@@ -777,26 +736,24 @@ document.querySelectorAll('[data-page-block-editor]').forEach((form) => {
     let selectedTarget;
     const previewViewport = frame.closest('.page-editor-preview-viewport');
     const syncPreviewHeight = () => {
-        const previewDocument = frame.contentDocument;
-        if (!previewDocument) return;
-        const documentElement = previewDocument.documentElement;
-        const body = previewDocument.body;
+        const canvasDocument = frame.contentDocument;
+        if (!canvasDocument) return;
+
+        const root = canvasDocument.documentElement;
+        const body = canvasDocument.body;
         const height = Math.max(
-            documentElement?.scrollHeight || 0,
-            documentElement?.offsetHeight || 0,
-            body?.scrollHeight || 0,
-            body?.offsetHeight || 0,
-            720,
+            root?.scrollHeight ?? 0,
+            root?.offsetHeight ?? 0,
+            body?.scrollHeight ?? 0,
+            body?.offsetHeight ?? 0,
+            320,
         );
+
         frame.style.height = `${height}px`;
     };
     const installCanvasEditing = () => {
         const canvasDocument = frame.contentDocument;
         if (!canvasDocument) return;
-        syncPreviewHeight();
-        const previewResizeObserver = new ResizeObserver(syncPreviewHeight);
-        previewResizeObserver.observe(canvasDocument.documentElement);
-        if (canvasDocument.body) previewResizeObserver.observe(canvasDocument.body);
         const style = canvasDocument.createElement('style');
         style.textContent = `
             [data-page-editor-object] { cursor: pointer; }
@@ -955,6 +912,9 @@ document.querySelectorAll('[data-page-block-editor]').forEach((form) => {
             const html = await response.text();
             if (currentRequest !== requestId) return;
             const previewDocument = new DOMParser().parseFromString(html, 'text/html');
+            if (!previewDocument.querySelector('.public-page-structured')) {
+                throw new Error('The public preview returned an invalid document. Your draft edits are still here.');
+            }
             frame.srcdoc = `<!doctype html>${previewDocument.documentElement.outerHTML}`;
             frame.addEventListener('load', () => {
                 installCanvasEditing();
@@ -1304,102 +1264,6 @@ document.querySelectorAll('form[data-confirm]').forEach((form) => form.addEventL
 }));
 
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
-
-const departmentChat = document.querySelector('[data-department-chat]');
-if (departmentChat) {
-    const feed = departmentChat.querySelector('[data-chat-feed]');
-    const composer = departmentChat.querySelector('[data-chat-composer]');
-    const composerInput = departmentChat.querySelector('[data-chat-composer-input]');
-    const feedback = departmentChat.querySelector('[data-chat-feedback]');
-    let refreshing = false;
-
-    const setFeedback = (message = '', state = '') => {
-        if (!feedback) return;
-        feedback.textContent = message;
-        feedback.dataset.state = state;
-    };
-    const nearBottom = () => !feed || feed.scrollHeight - feed.scrollTop - feed.clientHeight < 120;
-    const scrollToBottom = (behavior = 'auto') => feed?.scrollTo({ top: feed.scrollHeight, behavior });
-    const resizeTextarea = (textarea) => {
-        textarea.style.height = 'auto';
-        textarea.style.height = `${Math.min(textarea.scrollHeight, 140)}px`;
-    };
-    const refreshMessages = async ({ force = false, scroll = false } = {}) => {
-        if (!feed || refreshing || document.hidden) return;
-        if (!force && departmentChat.querySelector('.department-chat-inline:not([hidden])')) return;
-        refreshing = true;
-        const shouldScroll = scroll || nearBottom();
-        try {
-            const response = await fetch(departmentChat.dataset.messagesUrl, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
-            const result = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(result.message || 'Messages could not be refreshed.');
-            if (typeof result.html === 'string' && result.html !== feed.innerHTML) feed.innerHTML = result.html;
-            if (shouldScroll) scrollToBottom(scroll ? 'smooth' : 'auto');
-        } catch (error) {
-            setFeedback(error instanceof Error ? error.message : 'Messages could not be refreshed.', 'error');
-        } finally {
-            refreshing = false;
-        }
-    };
-    const submitChatForm = async (form) => {
-        if (form.dataset.submitting === 'true') return;
-        form.dataset.submitting = 'true';
-        const submit = form.querySelector('[type="submit"],button:not([type])');
-        if (submit) submit.disabled = true;
-        setFeedback('Sending…', 'pending');
-        try {
-            const response = await fetch(form.action, {
-                method: 'POST', body: new FormData(form), credentials: 'same-origin',
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}) },
-            });
-            const result = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(result.message || Object.values(result.errors || {})[0]?.[0] || 'The message could not be saved.');
-            if (form === composer) { form.reset(); resizeTextarea(composerInput); }
-            form.hidden = form !== composer;
-            setFeedback(result.message || 'Saved.', 'success');
-            await refreshMessages({ force: true, scroll: true });
-            window.setTimeout(() => setFeedback(), 1600);
-        } catch (error) {
-            setFeedback(error instanceof Error ? error.message : 'The message could not be saved.', 'error');
-        } finally {
-            delete form.dataset.submitting;
-            if (submit) submit.disabled = false;
-        }
-    };
-
-    addPageListener(departmentChat, 'click', (event) => {
-        const message = event.target.closest('[data-chat-message]');
-        if (event.target.closest('[data-chat-reply]')) {
-            message?.querySelector('[data-chat-edit-form]')?.setAttribute('hidden', '');
-            const form = message?.querySelector('[data-chat-reply-form]');
-            if (form) { form.hidden = false; form.querySelector('textarea')?.focus(); }
-        }
-        if (event.target.closest('[data-chat-edit]')) {
-            message?.querySelector('[data-chat-reply-form]')?.setAttribute('hidden', '');
-            const form = message?.querySelector('[data-chat-edit-form]');
-            if (form) { form.hidden = false; form.querySelector('textarea')?.focus(); }
-        }
-        if (event.target.closest('[data-chat-inline-cancel]')) event.target.closest('.department-chat-inline').hidden = true;
-    });
-    addPageListener(departmentChat, 'submit', (event) => {
-        const form = event.target.closest('[data-chat-composer],[data-chat-reply-form],[data-chat-edit-form],[data-chat-delete-form]');
-        if (!form) return;
-        event.preventDefault();
-        if (form.matches('[data-chat-delete-form]') && !window.confirm('Delete this message?')) return;
-        void submitChatForm(form);
-    });
-    addPageListener(composerInput, 'input', () => resizeTextarea(composerInput));
-    addPageListener(composerInput, 'keydown', (event) => {
-        if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
-            event.preventDefault();
-            composer.requestSubmit();
-        }
-    });
-    addPageListener(document, 'visibilitychange', () => { if (!document.hidden) void refreshMessages(); });
-    setPageInterval(() => void refreshMessages(), 4000);
-    resizeTextarea(composerInput);
-    window.requestAnimationFrame(() => scrollToBottom());
-}
 
 const notificationStack = document.querySelector('[data-notification-stack]');
 const notificationTimers = new Map();

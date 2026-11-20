@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MinistrySetting;
+use App\Services\Library\PdfCoverGenerator;
 use App\Services\ModuleAvailability;
 use App\Services\PermissionChecker;
 use Illuminate\Contracts\View\View;
@@ -61,14 +62,14 @@ class StaffContentLibraryController extends Controller
         ]);
     }
 
-    public function store(Request $request, string $library): RedirectResponse
+    public function store(Request $request, string $library, PdfCoverGenerator $pdfCovers): RedirectResponse
     {
         $this->library($library, $request);
         if ($library === 'sermon_series') return $this->storeSeries($request);
 
         $base = $this->assetRules($library);
         $rules = [...$base];
-        if ($library === 'books_library') { $rules['file'] = ['required', 'file', 'mimes:pdf,epub,doc,docx,mobi,azw,azw3,txt', 'max:102400']; $rules['cover_image'] = ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240']; }
+        if ($library === 'books_library') { $rules['file'] = ['required', 'file', 'mimes:pdf,epub,doc,docx,mobi,azw,azw3,txt', 'max:102400']; }
         if ($library === 'audio_sermons') $rules['file'] = ['required', 'file', 'mimes:mp3,m4a,wav,ogg,aac', 'max:512000'];
         if ($library === 'video_sermons') { $rules['file'] = ['nullable', 'file', 'mimes:mp4,webm,mov,m4v', 'max:512000']; $rules['youtube_url'] = ['nullable', 'url', 'max:500', 'required_without:file']; }
         $data = $request->validate($rules);
@@ -79,6 +80,10 @@ class StaffContentLibraryController extends Controller
         $isYoutube = filled($data['youtube_url'] ?? null);
         $path = $file?->store('library/'.match ($library) {'books_library' => 'books', 'audio_sermons' => 'audio', default => 'video'}, 'local');
         $coverPath = $request->file('cover_image')?->store('library/covers', 'local');
+        if ($library === 'books_library' && ! $coverPath && $file?->extension() === 'pdf' && $path) {
+            $coverPath = $pdfCovers->generate('local', $path);
+            if ($coverPath && blank($data['cover_image_alt'] ?? null)) $data['cover_image_alt'] = 'First page of '.$data['title'];
+        }
         $tags = $data['tag_ids'] ?? [];
         unset($data['tag_ids'], $data['youtube_url'], $data['file'], $data['cover_image']);
         DB::transaction(function () use ($request, $data, $id, $library, $file, $path, $coverPath, $isYoutube, $tags): void {
@@ -133,14 +138,18 @@ class StaffContentLibraryController extends Controller
 
     public function storeCategory(Request $request): RedirectResponse
     {
-        $data = $request->validate(['name' => ['required', 'string', 'max:100'], 'library' => ['nullable', Rule::in(self::LIBRARIES)]]); $id = (string) Str::uuid();
+        $request->merge(['category_name' => trim((string) $request->input('category_name'))]);
+        $data = $request->validateWithBag('category', ['category_name' => ['required', 'string', 'max:100', Rule::unique('library_categories', 'name'), function (string $attribute, mixed $value, \Closure $fail): void { if (DB::table('library_categories')->where('slug', Str::slug((string) $value))->exists()) $fail('A category with this name already exists.'); }], 'library' => ['required', Rule::in(self::LIBRARIES)]]);
+        $data['name'] = trim($data['category_name']); unset($data['category_name']); $id = (string) Str::uuid();
         DB::table('library_categories')->insert(['id' => $id, 'name' => $data['name'], 'slug' => Str::slug($data['name']), 'library' => $data['library'] ?? null, 'created_at' => now(), 'updated_at' => now()]); $this->audit($request, 'library.category_created', 'library_categories', $id);
         return $this->back($data['library'] ?? 'books_library', 'Category created.');
     }
 
     public function storeTag(Request $request): RedirectResponse
     {
-        $data = $request->validate(['name' => ['required', 'string', 'max:80'], 'library' => ['required', Rule::in(self::LIBRARIES)]]); $id = (string) Str::uuid();
+        $request->merge(['tag_name' => trim((string) $request->input('tag_name'))]);
+        $data = $request->validateWithBag('tag', ['tag_name' => ['required', 'string', 'max:80', Rule::unique('library_tags', 'name'), function (string $attribute, mixed $value, \Closure $fail): void { if (DB::table('library_tags')->where('slug', Str::slug((string) $value))->exists()) $fail('A tag with this name already exists.'); }], 'library' => ['required', Rule::in(self::LIBRARIES)]]);
+        $data['name'] = trim($data['tag_name']); unset($data['tag_name']); $id = (string) Str::uuid();
         DB::table('library_tags')->insert(['id' => $id, 'name' => $data['name'], 'slug' => Str::slug($data['name']), 'created_at' => now(), 'updated_at' => now()]); $this->audit($request, 'library.tag_created', 'library_tags', $id);
         return $this->back($data['library'], 'Tag created.');
     }
@@ -164,7 +173,7 @@ class StaffContentLibraryController extends Controller
 
     private function assetRules(string $library, bool $updating = false): array
     {
-        $rules = ['title' => ['required', 'string', 'max:200'], 'description' => ['nullable', 'string', 'max:5000'], 'cover_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'], 'cover_image_alt' => ['nullable', 'string', 'max:180'], 'library_category_id' => ['nullable', 'uuid', 'exists:library_categories,id'], 'tag_ids' => [$updating ? 'sometimes' : 'nullable', 'array'], 'tag_ids.*' => ['uuid', 'exists:library_tags,id']];
+        $rules = ['title' => ['required', 'string', 'max:200'], 'description' => ['nullable', 'string', 'max:5000'], 'cover_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'], 'cover_image_alt' => ['nullable', 'string', 'max:180'], 'library_category_id' => ['nullable', 'uuid', Rule::exists('library_categories', 'id')->where(fn ($query) => $query->where(fn ($scope) => $scope->whereNull('library')->orWhere('library', $library)))], 'tag_ids' => [$updating ? 'sometimes' : 'nullable', 'array'], 'tag_ids.*' => ['uuid', 'exists:library_tags,id']];
         if ($library === 'books_library') $rules += ['author' => ['nullable', 'string', 'max:160']];
         else $rules += ['speaker' => ['nullable', 'string', 'max:160'], 'sermon_series_id' => ['nullable', 'uuid', 'exists:sermon_series,id']];
         return $rules;

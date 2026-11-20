@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" role="img" aria-labelledby="title desc">
+  <title id="title">Find Your Place</title><desc id="desc">A wide welcoming community hero artwork in cream, navy, teal, and gold.</desc>
+  <defs><linearGradient id="paper" y2="1"><stop stop-color="#fff5e5"/><stop offset="1" stop-color="#ead1a6"/></linearGradient><linearGradient id="door" y2="1"><stop stop-color="#fff5c8"/><stop offset="1" stop-color="#df9f38"/></linearGradient></defs>
+  <rect width="1920" height="1080" fill="url(#paper)"/><path d="M0 0h1920v214Q1480 132 1156 292T0 196Z" fill="#073b42" opacity=".92"/><path d="M0 782Q338 598 712 782T1310 746T1920 610V1080H0Z" fill="#0c5a5b"/><path d="M0 910Q386 728 764 914T1402 862T1920 790V1080H0Z" fill="#0b2f49"/><path d="M0 724Q386 546 818 738T1920 584" fill="none" stroke="#d49b34" stroke-width="8"/>
+  <path d="M1328 822V348Q1518 76 1708 348v474Z" fill="url(#door)" stroke="#b97920" stroke-width="16"/><path d="M1518 218v604" stroke="#fff8d2" stroke-width="10" opacity=".78"/><path d="M1192 822h644" stroke="#b97920" stroke-width="12" opacity=".48"/>
+  <g fill="#112535"><circle cx="1062" cy="850" r="54"/><path d="M962 1040q100-170 200 0Z"/><circle cx="1190" cy="816" r="42"/><path d="M1110 954q80-138 160 0Z"/><circle cx="1816" cy="816" r="42"/><path d="M1736 954q80-138 160 0Z"/><circle cx="1870" cy="850" r="54"/><path d="M1770 1040q100-170 200 0Z"/></g>
+</svg>

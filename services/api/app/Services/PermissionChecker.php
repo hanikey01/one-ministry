@@ -10,7 +10,7 @@ class PermissionChecker
 {
     public function allows(User $user, string $permission, string $scopeType = 'installation', ?string $scopeId = null): bool
     {
-        if ($this->isInstallationAdministrator($user)) {
+        if ($this->isSuperAdministrator($user)) {
             return true;
         }
 
@@ -35,7 +35,7 @@ class PermissionChecker
     /** @return array<int, string> */
     public function installationPermissions(User $user): array
     {
-        if ($this->isInstallationAdministrator($user)) {
+        if ($this->isSuperAdministrator($user)) {
             return DB::table('permissions')->orderBy('key')->pluck('key')->all();
         }
 
@@ -60,11 +60,11 @@ class PermissionChecker
             });
     }
 
-    private function isInstallationAdministrator(User $user): bool
+    public function isSuperAdministrator(User $user): bool
     {
         return DB::table('user_role_assignments')
             ->where('user_id', $user->id)
-            ->whereIn('role_key', ['ministry_administrator', 'super_administrator'])
+            ->where('role_key', 'super_administrator')
             ->where('scope_type', 'installation')
             ->whereNull('scope_id')
             ->whereNull('revoked_at')

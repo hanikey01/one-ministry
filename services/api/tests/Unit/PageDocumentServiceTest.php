@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Services\PageDocumentService;
 use App\Services\PageElementRegistry;
+use App\Services\HomepageStarterService;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -195,6 +196,44 @@ class PageDocumentServiceTest extends TestCase
         app(PageDocumentService::class)->normalise($document);
     }
 
+    public function test_carousel_supports_a_flyer_uploaded_video_and_video_link_with_per_slide_actions(): void
+    {
+        $document = ['version' => 2, 'sections' => [[
+            'id' => 'homepage-lead', 'type' => 'section', 'settings' => [], 'responsive' => [],
+            'columns' => [[
+                'id' => 'lead-column', 'settings' => [], 'responsive' => [],
+                'elements' => [[
+                    'id' => 'lead-carousel', 'type' => 'carousel', 'settings' => [], 'responsive' => [],
+                    'content' => [
+                        'eyebrow' => '', 'title' => '', 'body' => '', 'slides' => '', 'button_label' => '', 'button_url' => '',
+                        'slide_one_type' => 'flyer', 'slide_one_media_url' => 'https://cdn.example.test/flyer.jpg', 'slide_one_title' => 'Welcome', 'slide_one_body' => 'A welcome flyer', 'slide_one_button_label' => 'Plan a visit', 'slide_one_button_url' => '/visit',
+                        'slide_two_type' => 'video_upload', 'slide_two_media_url' => 'https://cdn.example.test/worship.mp4', 'slide_two_title' => 'Worship', 'slide_two_body' => 'An uploaded video', 'slide_two_button_label' => 'Watch', 'slide_two_button_url' => '/worship',
+                        'slide_three_type' => 'video_link', 'slide_three_media_url' => 'https://www.youtube.com/watch?v=6CKCThJB5w0', 'slide_three_title' => 'Message', 'slide_three_body' => 'An external video', 'slide_three_button_label' => 'Explore', 'slide_three_button_url' => '/sermons',
+                    ],
+                ]],
+            ]],
+        ]]];
+
+        $carousel = app(PageDocumentService::class)->normalise($document)['sections'][0]['columns'][0]['elements'][0]['content'];
+
+        $this->assertSame('video_upload', $carousel['slide_two_type']);
+        $this->assertSame('video_link', $carousel['slide_three_type']);
+        $this->assertSame('/sermons', $carousel['slide_three_button_url']);
+    }
+
+    public function test_homepage_starter_begins_with_a_three_slide_theme_aware_native_carousel(): void
+    {
+        $document = app(HomepageStarterService::class)->document([]);
+        $lead = $document['sections'][0]['columns'][0]['elements'][0];
+
+        $this->assertSame('carousel', $lead['type']);
+        $this->assertSame('/images/home/flyer-night-of-worship.svg', $lead['content']['slide_one_media_url']);
+        $this->assertSame('/images/home/flyer-grow-in-the-word.svg', $lead['content']['slide_two_media_url']);
+        $this->assertSame('/images/home/flyer-find-your-place.svg', $lead['content']['slide_three_media_url']);
+        $this->assertSame('/departments', $lead['content']['slide_three_button_url']);
+        $this->assertStringContainsString('public-page-carousel', $lead['settings']['custom_css']);
+    }
+
     public function test_page_objects_only_accept_bounded_overflow_settings(): void
     {
         $document = ['version' => 2, 'sections' => [[
@@ -293,6 +332,24 @@ class PageDocumentServiceTest extends TestCase
             $document=$base; $document['sections'][0]['columns'][0]['elements'][0]['content']['javascript']=$javascript;
             try { app(PageDocumentService::class)->normalise($document); $this->fail('Unsafe custom JavaScript must be rejected.'); } catch (ValidationException) { $this->assertTrue(true); }
         }
+    }
+
+    public function test_custom_code_accepts_internal_and_external_media_urls(): void
+    {
+        $document=['version'=>2,'sections'=>[['id'=>'section','type'=>'section','settings'=>[],'responsive'=>[],'columns'=>[['id'=>'column','settings'=>[],'responsive'=>[],'elements'=>[['id'=>'code','type'=>'custom_code','content'=>[
+            'reason'=>'No native element fits.',
+            'html'=>'<a href="https://example.com/details">Details</a><img src="/media/019abcde-1234-7000-8000-abcdefabcdef"><video src="https://cdn.example.com/message.mp4" controls></video><iframe src="https://www.youtube.com/embed/example" title="Message"></iframe>',
+            'css'=>'.hero{background-image:url("https://images.example.com/hero.jpg")}',
+            'javascript'=>'',
+            'fallback'=>'Media presentation.',
+        ],'settings'=>[],'responsive'=>[]]]]]]]];
+
+        $normalised=app(PageDocumentService::class)->normalise($document);
+
+        $content=$normalised['sections'][0]['columns'][0]['elements'][0]['content'];
+        $this->assertStringContainsString('https://cdn.example.com/message.mp4', $content['html']);
+        $this->assertStringContainsString('/media/019abcde-1234-7000-8000-abcdefabcdef', $content['html']);
+        $this->assertStringContainsString('https://images.example.com/hero.jpg', $content['css']);
     }
 
     public function test_section_and_column_layout_controls_survive_normalisation(): void

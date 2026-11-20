@@ -29,6 +29,18 @@ class EmailWorkspaceTest extends TestCase
         $this->actingAs($admin)->from('/staff/email')->put('/staff/email/templates/password_reset', ['subject' => 'Reset {{ private_token }}', 'body_template' => 'Hello {{ user_name }}', 'enabled' => '1'])->assertSessionHasErrors('body_template');
     }
 
+    public function test_email_action_button_preserves_its_contrast_foreground(): void
+    {
+        $admin = $this->install();
+
+        $response = $this->actingAs($admin)->get('/staff/email/templates/password_reset/preview');
+
+        $response->assertOk()
+            ->assertSee('color:#ffffff!important', false)
+            ->assertSee('-webkit-text-fill-color:#ffffff', false)
+            ->assertSee('<span style="color:#ffffff!important', false);
+    }
+
     public function test_saved_delivery_connection_can_send_a_test_and_records_success(): void
     {
         Mail::fake();

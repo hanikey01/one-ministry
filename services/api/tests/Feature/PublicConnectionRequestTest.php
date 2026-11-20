@@ -28,6 +28,7 @@ class PublicConnectionRequestTest extends TestCase
 
         $this->assertDatabaseHas('people', ['email' => 'grace@example.org', 'first_name' => 'Grace', 'consent_to_contact' => true]);
         $this->assertDatabaseHas('follow_up_tasks', ['kind' => 'next_step', 'request_key' => 'baptism', 'status' => 'open']);
+        $this->assertDatabaseHas('audit_events', ['actor_user_id' => null, 'action' => 'next_step.request_submitted']);
         $this->assertDatabaseMissing('users', ['email' => 'grace@example.org']);
     }
 
@@ -40,6 +41,7 @@ class PublicConnectionRequestTest extends TestCase
         $request = DB::table('prayer_requests')->first();
         $this->assertNull($request->user_id);
         $this->assertSame('Please pray for my family as we make a difficult decision.', Crypt::decryptString($request->prayer_text_encrypted));
+        $this->assertDatabaseHas('audit_events', ['actor_user_id' => null, 'action' => 'prayer.request_submitted']);
     }
 
     public function test_guest_testimony_requires_contact_and_publication_consent(): void
@@ -54,5 +56,6 @@ class PublicConnectionRequestTest extends TestCase
             ->assertRedirect()->assertSessionHas('status');
 
         $this->assertDatabaseHas('testimonies', ['title' => 'A new beginning', 'status' => 'submitted', 'consent_public' => true]);
+        $this->assertDatabaseHas('audit_events', ['actor_user_id' => null, 'action' => 'testimony.member_submitted']);
     }
 }

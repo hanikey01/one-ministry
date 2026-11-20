@@ -13,7 +13,11 @@ final class MinistryTerminology
         'meeting' => ['singular' => 'Meeting', 'plural' => 'Meetings', 'description' => 'Smaller interactive rooms, such as classes or department gatherings.'],
         'location' => ['singular' => 'Location', 'plural' => 'Locations', 'description' => 'Ministry campuses, branches, and gathering places.'],
         'department' => ['singular' => 'Department', 'plural' => 'Departments', 'description' => 'Ministry departments and their teams.'],
-        'member' => ['singular' => 'Member', 'plural' => 'Members', 'description' => 'People using the member community area.'],
+        'person' => ['singular' => 'Person', 'plural' => 'People', 'description' => 'Individual records in the staff directory. This does not change a person’s relationship status.'],
+        'member' => ['singular' => 'Member', 'plural' => 'Members', 'description' => 'People using the private member workspace.'],
+        'event' => ['singular' => 'Event', 'plural' => 'Events', 'description' => 'Published gatherings with registration, capacity, and attendance workflows.'],
+        'next_step' => ['singular' => 'Next step', 'plural' => 'Next steps', 'description' => 'Member connection requests that enter the staff follow-up workflow.'],
+        'testimony' => ['singular' => 'Testimony', 'plural' => 'Testimonies', 'description' => 'Consent-based stories submitted for staff review and optional public publishing.'],
     ];
 
     private const REQUEST_CACHE_KEY = 'ministry_terminology_overrides';
@@ -54,6 +58,8 @@ final class MinistryTerminology
         return match ([$path, $label]) {
             ['/departments', 'Departments'] => $this->label('department', 'plural'),
             ['/locations', 'Locations'] => $this->label('location', 'plural'),
+            ['/events', 'Events'] => $this->label('event', 'plural'),
+            ['/testimonies', 'Testimonies'] => $this->label('testimony', 'plural'),
             ['/member/departments', 'My departments'] => 'My '.mb_strtolower($this->label('department', 'plural')),
             default => $label,
         };
