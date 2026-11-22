@@ -9,6 +9,7 @@ final class RoleCatalog
         'ministry_administrator' => 'Ministry Administrator',
         'content_media_editor' => 'Content & Media Editor',
         'ministry_operations_coordinator' => 'Ministry Operations Coordinator',
+        'prayer_team' => 'Prayer Team',
         'care_staff' => 'Care Staff',
         'finance_staff' => 'Finance Staff',
         'service_production_team' => 'Service & Production Team',
@@ -25,15 +26,25 @@ final class RoleCatalog
      * @var list<string>
      */
     public const ROUTINE_INVITATION_ROLES = [
+        'ministry_administrator',
         'content_media_editor',
+        'ministry_operations_coordinator',
+        'prayer_team',
         'care_staff',
         'finance_staff',
+    ];
+
+    /** @var list<string> */
+    public const MFA_REQUIRED_ROLES = [
+        'security_administrator',
+        'super_administrator',
     ];
 
     /** @var array<string, list<string>> */
     public const PERMISSIONS = [
         'content_media_editor' => ['content.manage', 'content.publish'],
-        'ministry_operations_coordinator' => ['community.manage', 'departments.manage', 'services.manage', 'reports.view', 'school.manage', 'school.instruct'],
+        'ministry_operations_coordinator' => ['community.manage', 'departments.manage', 'services.manage', 'reports.view', 'school.manage', 'school.instruct', 'birthdays.read'],
+        'prayer_team' => ['prayer.read'],
         'care_staff' => ['care.manage', 'care.notes.write'],
         'finance_staff' => ['finance.view', 'finance.reconcile', 'giving.manage'],
         // These are enforced only through a future service/meeting assignment

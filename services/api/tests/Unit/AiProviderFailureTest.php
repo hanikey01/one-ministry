@@ -80,7 +80,7 @@ class AiProviderFailureTest extends TestCase
             'choices' => [['message' => ['content' => '{broken']]],
         ])]);
         $this->expectException(AiProviderException::class);
-        $this->expectExceptionMessage('structured_output_failed');
+        $this->expectExceptionMessage('provider_malformed_json');
         $this->generate($provider);
     }
 

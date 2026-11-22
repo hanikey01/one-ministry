@@ -98,7 +98,7 @@ class MemberWorkspaceController extends Controller
 
     public function profilePage(Request $request): View
     {
-        return $this->page($request, 'member.profile', 'Profile & preferences');
+        return $this->page($request, 'member.profile', 'Profile');
     }
 
     private function page(Request $request, string $view, string $title, ?string $requiredFeature = null): View
@@ -146,7 +146,6 @@ class MemberWorkspaceController extends Controller
     {
         $data = $this->connectionData($request, [
             'prayer_text' => ['required', 'string', 'max:4000'],
-            'visibility' => ['required', Rule::in(['prayer_team', 'assigned_care_only'])],
             'consent_to_contact' => ['nullable', 'boolean'],
         ]);
         $connections->rejectBot($data);
@@ -245,8 +244,6 @@ class MemberWorkspaceController extends Controller
         $preferenceValues = [
             'email_marketing' => $request->boolean('email_marketing'),
             'sms_marketing' => $request->boolean('sms_marketing'),
-            'birthday_staff_reminder' => $request->boolean('birthday_staff_reminder'),
-            'birthday_public_recognition' => $request->boolean('birthday_public_recognition'),
             'updated_at' => now(),
         ];
         if (DB::table('notification_preferences')->where('person_id', $person->id)->exists()) {
@@ -262,7 +259,7 @@ class MemberWorkspaceController extends Controller
             ]);
         }
 
-        return to_route('member.profile')->with('status', 'Your profile and preferences were saved.');
+        return to_route('member.profile')->with('status', 'Your profile was saved.');
     }
 
     private function person(Request $request): object

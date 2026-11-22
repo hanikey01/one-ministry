@@ -46,6 +46,7 @@ final class AiCanvasSectionService
         foreach (['name' => 100, 'purpose' => 1000, 'html' => 50000, 'css' => 50000, 'javascript' => 50000, 'fallback' => 2000] as $field => $limit) {
             if (! is_string($section[$field] ?? null)) $this->invalid('invalid_canvas_section');
             $result[$field] = trim(Str::limit($section[$field], $limit, ''));
+            if (in_array($field, ['html', 'css'], true)) $result[$field] = $this->unwrapCodeFence($result[$field]);
         }
         if ($result['name'] === '' || $result['purpose'] === '' || $result['html'] === '' || $result['css'] === '' || $result['fallback'] === '') {
             $this->invalid('incomplete_canvas_section');
@@ -54,15 +55,21 @@ final class AiCanvasSectionService
             $this->invalid('canvas_javascript_not_enabled');
         }
         if (! preg_match('/^<section\b[\s\S]*<\/section>$/i', $result['html'])
-            || preg_match('/<(?:script|style|iframe|object|embed|form|base|link|meta)\b|\son[a-z]+\s*=|javascript\s*:/i', $result['html'])) {
+            || preg_match('/<(?:script|iframe|object|embed|base|link|meta)\b|\son[a-z]+\s*=|javascript\s*:/i', $result['html'])) {
             $this->invalid('unsafe_canvas_html');
         }
-        if (preg_match('/(?:@import|expression\s*\(|behavior\s*:|javascript\s*:|https?:\/\/|\/\/)/i', $result['css'])) {
+        if (preg_match('/<(?:form|button|input)\b[^>]*\b(?:action|formaction)\s*=/i', $result['html'])) {
+            $this->invalid('unsafe_canvas_html');
+        }
+        if (preg_match('/(?:@import|expression\s*\(|behavior\s*:|javascript\s*:|url\s*\(\s*["\']?\s*(?:https?:)?\/\/)/i', $result['html'])) {
             $this->invalid('unsafe_canvas_css');
         }
-        if (mb_strlen($result['css']) < 120
-            || ! preg_match('/[^{}]+\{[^{}]+\}/s', $result['css'])
-            || ! preg_match('/@media\s*\([^)]*(?:max-width|min-width)[^)]*\)/i', $result['css'])) {
+        if (preg_match('/(?:@import|expression\s*\(|behavior\s*:|javascript\s*:|https?:\/\/)/i', $result['css'])) {
+            $this->invalid('unsafe_canvas_css');
+        }
+        $hasResponsiveRule = preg_match('/@media\s*\([^)]*(?:(?:max|min)-width\s*:|width\s*(?:[<>]=?|:))[^)]*\)/i', $result['css'])
+            || preg_match('/@container\b[^\{]*\([^)]*(?:width|inline-size)[^)]*\)/i', $result['css']);
+        if (! preg_match('/[^{}]+\{[^{}]+\}/s', $result['css']) || ! $hasResponsiveRule) {
             $this->invalid('insufficient_canvas_css');
         }
         $editableKeys = $this->markerKeys($result['html'], 'data-ai-editable');
@@ -81,22 +88,12 @@ final class AiCanvasSectionService
             }
         }
         if (preg_match('/\bsrcset\s*=/i', $result['html'])) $this->invalid('canvas_media_must_use_library');
-        // A model may render contact methods or calls to action with invented,
-        // unapproved destinations. The visual structure is still usable, so
-        // retain the link and neutralise its destination for staff editing
-        // instead of rejecting the complete generated page.
-        $result['html'] = preg_replace_callback(
-            '/\bhref\s*=\s*(["\'])(.*?)\1/is',
-            static function (array $match): string {
-                $destination = trim($match[2]);
-                if (in_array($destination, ['', '#'], true)) {
-                    return $match[0];
-                }
-
-                return 'href='.$match[1].'#'.$match[1];
-            },
-            $result['html'],
-        ) ?? $result['html'];
+        // AI calls to action are visual placeholders until staff deliberately
+        // assigns a destination. A fragment or empty href still resolves
+        // against the host URL inside srcdoc and can load the page recursively
+        // inside its own sandbox, so remove navigation rather than substituting
+        // another URL.
+        $result['html'] = self::neutraliseLinks($result['html']);
         preg_match_all('/<[^>]+\bdata-ai-media\s*=\s*(["\']).*?\1[^>]*>/is', $result['html'], $mediaTags);
         foreach ($mediaTags[0] ?? [] as $tag) {
             if (preg_match('/\bsrc\s*=\s*(["\'])(.*?)\1/is', $tag, $source) && trim($source[2]) !== '') {
@@ -111,6 +108,22 @@ final class AiCanvasSectionService
         }
 
         return $result;
+    }
+
+    public static function neutraliseLinks(string $html): string
+    {
+        return preg_replace_callback('/<a\b[^>]*>/is', static function (array $match): string {
+            $tag = preg_replace('/\s+href\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $match[0]) ?? $match[0];
+            $tag = preg_replace('/\s+target\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $tag) ?? $tag;
+            if (! preg_match('/\saria-disabled\s*=/i', $tag)) {
+                $tag = preg_replace('/>$/', ' aria-disabled="true">', $tag) ?? $tag;
+            }
+            if (! preg_match('/\sdata-ai-link-placeholder(?:\s|=|>)/i', $tag)) {
+                $tag = preg_replace('/>$/', ' data-ai-link-placeholder="">', $tag) ?? $tag;
+            }
+
+            return $tag;
+        }, $html) ?? $html;
     }
 
     public function compile(array $composition, array $features, array $approvedMediaPaths = []): array
@@ -168,5 +181,14 @@ final class AiCanvasSectionService
             $keys[] = $key;
         }
         return $keys;
+    }
+
+    private function unwrapCodeFence(string $value): string
+    {
+        if (preg_match('/^```(?:html|css)?\s*\R?([\s\S]*?)\R?```$/i', $value, $match)) {
+            return trim($match[1]);
+        }
+
+        return $value;
     }
 }

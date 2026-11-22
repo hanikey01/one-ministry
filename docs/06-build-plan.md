@@ -59,7 +59,7 @@ The bounded AI page editor is a separately feature-gated content-authoring enhan
 
 - A member joins a department and event; a coordinator records department attendance only within assigned scope.
 - A member submits a Next Step request and staff can assign, schedule, complete, or close it from Follow-up.
-- Birthday display and greetings occur only for opted-in people and obey local time/quiet hours.
+- Birthday display and advance staff reminders apply by default when a birthday is stored, use ministry-local time, disclose no age, and are idempotent per recipient and birthday year.
 - Campaign excludes unsubscribed people and logs provider failures for retry.
 
 ## 6. Phase 4 — Interactive meetings, media library, and giving

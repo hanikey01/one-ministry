@@ -9,15 +9,19 @@ use App\Models\MinistrySetting;
 use App\Models\User;
 use App\Services\PageDocumentService;
 use App\Support\RoleCatalog;
+use App\Support\AddressCatalog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Rule;
 
 class InstallMinistry
 {
+    public function __construct(private readonly AddressCatalog $addresses) {}
+
     /**
-     * @param  array{name: string, domain: string, timezone: string, location: string, admin_name: string, admin_email: string, password: string, tagline?: ?string, contact_email?: ?string, theme_preset?: string}  $input
+     * @param  array{name: string, domain: string, timezone: string, location: string, admin_name: string, admin_email: string, password: string, tagline?: ?string, contact_email?: ?string, theme_preset?: string, location_address_line_1?: ?string, location_address_line_2?: ?string, location_city?: ?string, location_region_code?: ?string, location_postal_code?: ?string, location_country_code?: ?string}  $input
      */
     public function execute(array $input): User
     {
@@ -26,6 +30,12 @@ class InstallMinistry
             'domain' => ['required', 'string', 'max:253', 'regex:/^(?!-)[a-z0-9-]+(?:\.[a-z0-9-]+)+$/i'],
             'timezone' => ['required', 'timezone'],
             'location' => ['required', 'string', 'max:160'],
+            'location_address_line_1' => ['nullable', 'string', 'max:255'],
+            'location_address_line_2' => ['nullable', 'string', 'max:255'],
+            'location_city' => ['nullable', 'string', 'max:120'],
+            'location_region_code' => ['nullable', 'string', 'max:16'],
+            'location_postal_code' => ['nullable', 'string', 'max:32'],
+            'location_country_code' => ['nullable', Rule::in(array_keys($this->addresses->countries()))],
             'admin_name' => ['required', 'string', 'max:160'],
             'admin_email' => ['required', 'email', 'max:254'],
             'password' => ['required', 'string', 'min:12'],
@@ -38,7 +48,27 @@ class InstallMinistry
             throw ValidationException::withMessages(['installation' => 'This installation is already configured.']);
         }
 
-        return DB::transaction(function () use ($input): User {
+        $countryCode = filled($input['location_country_code'] ?? null) ? strtoupper($input['location_country_code']) : null;
+        $regionCode = filled($input['location_region_code'] ?? null) ? (string) $input['location_region_code'] : null;
+        $countryName = $this->addresses->countryName($countryCode);
+        $regionName = $this->addresses->subdivisionName($countryCode, $regionCode);
+        if ($regionCode && ! $regionName) {
+            throw ValidationException::withMessages(['location_region_code' => 'Choose a valid state, province, or region for the selected country.']);
+        }
+        $structuredAddress = [
+            'address_line_1' => $input['location_address_line_1'] ?? null,
+            'address_line_2' => $input['location_address_line_2'] ?? null,
+            'locality' => $input['location_city'] ?? null,
+            'region_code' => $regionCode,
+            'region_name' => $regionName,
+            'postal_code' => $input['location_postal_code'] ?? null,
+            'country_code' => $countryCode,
+            'country_name' => $countryName,
+        ];
+        $locationAddress = $this->addresses->format($structuredAddress);
+
+        return DB::transaction(function () use ($input, $structuredAddress, $locationAddress): User {
+
             MinistrySetting::create([
                 'id' => MinistrySetting::SINGLETON_ID,
                 'name' => $input['name'],
@@ -48,12 +78,15 @@ class InstallMinistry
                 'timezone' => $input['timezone'],
                 'theme_preset' => $input['theme_preset'] ?? 'tech_blue',
                 'chrome_mode' => 'preset',
+                'public_address' => $locationAddress,
             ]);
 
             Location::create([
                 'name' => $input['location'],
                 'slug' => Str::slug($input['location']),
                 'timezone' => $input['timezone'],
+                'address' => $locationAddress ?: null,
+                ...$structuredAddress,
                 'is_primary' => true,
                 'is_public' => true,
             ]);

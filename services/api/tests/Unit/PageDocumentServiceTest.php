@@ -423,4 +423,67 @@ class PageDocumentServiceTest extends TestCase
 
         $this->assertSame('/media/8c2738b3-8de1-46c6-987b-f51f51649435?variant=public', $normalised['sections'][0]['settings']['background_image']);
     }
+
+    public function test_native_media_elements_accept_internal_and_external_http_media_urls(): void
+    {
+        $document = ['version' => 2, 'sections' => [[
+            'id' => 'section-media', 'type' => 'section', 'settings' => [], 'responsive' => [],
+            'columns' => [[
+                'id' => 'column-media', 'settings' => [], 'responsive' => [],
+                'elements' => [
+                    ['id' => 'image', 'type' => 'image', 'content' => ['url' => '/media/8c2738b3-8de1-46c6-987b-f51f51649435', 'alt' => 'Internal image', 'caption' => '', 'image_hint' => ''], 'settings' => [], 'responsive' => []],
+                    ['id' => 'media-text', 'type' => 'media_text', 'content' => ['media_url' => 'https://images.example.test/welcome.jpg', 'media_alt' => 'External image', 'placement' => 'left', 'title' => 'Welcome', 'body' => 'Hello', 'button_label' => '', 'button_url' => ''], 'settings' => [], 'responsive' => []],
+                    ['id' => 'video', 'type' => 'video_embed', 'content' => ['url' => 'https://media.example.test/message.mp4', 'title' => 'Message', 'caption' => 'Watch'], 'settings' => [], 'responsive' => []],
+                    ['id' => 'gallery', 'type' => 'gallery', 'content' => ['images' => "/media/8c2738b3-8de1-46c6-987b-f51f51649435\nhttps://images.example.test/two.jpg", 'columns' => 'two', 'caption' => 'Gallery'], 'settings' => [], 'responsive' => []],
+                ],
+            ]],
+        ]]];
+
+        $normalised = app(PageDocumentService::class)->normalise($document);
+        $elements = $normalised['sections'][0]['columns'][0]['elements'];
+
+        $this->assertSame('/media/8c2738b3-8de1-46c6-987b-f51f51649435', $elements[0]['content']['url']);
+        $this->assertSame('https://images.example.test/welcome.jpg', $elements[1]['content']['media_url']);
+        $this->assertSame('https://media.example.test/message.mp4', $elements[2]['content']['url']);
+        $this->assertStringContainsString('/media/', $elements[3]['content']['images']);
+    }
+
+    public function test_native_media_elements_reject_unsafe_url_schemes(): void
+    {
+        $document = ['version' => 2, 'sections' => [[
+            'id' => 'section-media', 'type' => 'section', 'settings' => [], 'responsive' => [],
+            'columns' => [['id' => 'column-media', 'settings' => [], 'responsive' => [], 'elements' => [[
+                'id' => 'image', 'type' => 'image', 'content' => ['url' => 'javascript:alert(1)', 'alt' => 'Unsafe', 'caption' => '', 'image_hint' => ''], 'settings' => [], 'responsive' => [],
+            ]]]],
+        ]]];
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        app(PageDocumentService::class)->normalise($document);
+    }
+
+    public function test_custom_canvas_renderer_preserves_authored_grid_or_flex_layout(): void
+    {
+        $rendered = view('public.partials.page-element', ['element' => [
+            'id' => 'canvas-layout',
+            'type' => 'custom_code',
+            'settings' => ['custom_class' => 'ai-canvas-design'],
+            'content' => [
+                'reason' => 'A composed visual section.',
+                'fallback' => 'A composed visual section.',
+                'html' => '<section class="canvas-layout"><h2>Welcome</h2><a href="#">Explore</a></section>',
+                'css' => '.canvas-layout{display:grid;grid-template-columns:1fr 1fr}',
+                'javascript' => '',
+            ],
+        ]])->render();
+
+        $this->assertStringContainsString('display:grid', $rendered);
+        $this->assertStringContainsString('body&gt;:not(script){width:100%!important', $rendered);
+        $this->assertStringContainsString('inline-size:100%!important', $rendered);
+        $this->assertStringContainsString('flex:1 1 100%!important', $rendered);
+        $this->assertStringNotContainsString('body&gt;:not(script){display:block!important', $rendered);
+        $this->assertStringContainsString('data-ai-canvas-design', $rendered);
+        $this->assertStringContainsString('aria-disabled=&quot;true&quot;', $rendered);
+        $this->assertStringNotContainsString('href=&quot;#&quot;', $rendered);
+        $this->assertStringNotContainsString('allow-top-navigation-by-user-activation', $rendered);
+    }
 }

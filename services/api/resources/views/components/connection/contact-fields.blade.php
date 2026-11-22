@@ -12,4 +12,3 @@
         </div>
     </fieldset>
 @endif
-<div class="connection-honeypot" aria-hidden="true"><label>Website<input name="website" tabindex="-1" autocomplete="off"></label></div>

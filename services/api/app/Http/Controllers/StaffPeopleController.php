@@ -143,7 +143,7 @@ class StaffPeopleController extends Controller
         $days = request()->integer('days', 30);
         $days = max(1, min($days, 90));
         $today = now()->startOfDay();
-        $people = DB::table('people')->join('notification_preferences', 'notification_preferences.person_id', '=', 'people.id')->where('notification_preferences.birthday_staff_reminder', true)->whereNotNull('people.birthday')->select('people.id', 'people.first_name', 'people.last_name', 'people.birthday', 'people.email', 'people.phone')->get()->map(function ($person) use ($today) {
+        $people = DB::table('people')->whereNotNull('birthday')->whereNotIn('status', ['inactive', 'archived', 'deleted'])->select('id', 'first_name', 'last_name', 'birthday', 'email', 'phone')->get()->map(function ($person) use ($today) {
             $birthday = CarbonImmutable::parse($person->birthday);
             $next = $birthday->setYear($today->year);
             if ($next->lt($today)) {

@@ -34,7 +34,23 @@ class AiCompositionProbeTest extends TestCase
     {
         $output = self::compositionFixture();
         $output['section']['html'] = '<section><script>alert(1)</script></section>';
-        $this->expectException(AiProviderException::class);
-        AiCompositionProbe::validate($output);
+        try {
+            AiCompositionProbe::validate($output);
+            $this->fail('Executable HTML must not verify a model.');
+        } catch (AiProviderException $exception) {
+            $this->assertSame('unsafe_canvas_html', $exception->diagnosticCode);
+        }
+    }
+
+    public function test_probe_preserves_the_exact_responsive_css_failure(): void
+    {
+        $output = self::compositionFixture();
+        $output['section']['css'] = '.welcome{display:grid}';
+        try {
+            AiCompositionProbe::validate($output);
+            $this->fail('Non-responsive CSS must not verify a model.');
+        } catch (AiProviderException $exception) {
+            $this->assertSame('insufficient_canvas_css', $exception->diagnosticCode);
+        }
     }
 }

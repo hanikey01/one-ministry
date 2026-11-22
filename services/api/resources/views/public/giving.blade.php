@@ -1,10 +1,12 @@
 <x-layouts.public :settings="$settings" :features="$features" title="Give">
-    <section class="public-heading"><p>GIVING</p><h1>Give with purpose.</h1><span>Choose a purpose and an available secure payment provider. A receipt is issued only after the provider confirms payment.</span></section>
+    <header class="public-heading giving-hero"><p>GENEROSITY</p><h1>Give with purpose</h1><span>Your generosity supports the ministry work, people, and outreach that matter to this community.</span><div class="giving-assurance"><span><x-ui.icon name="lock" :size="15"/> Secure provider checkout</span><span><x-ui.icon name="check" :size="15"/> Confirmation before receipt</span><span><x-ui.icon name="heart" :size="15"/> Choose where your gift goes</span></div></header>
+    <div class="giving-page-layout">
     <section class="public-card giving-shell" x-data="givingForm()" x-init="init()">
         @if($funds->isEmpty())
             <div class="giving-state giving-empty-state"><h2>{{ $offlineGivingMethods->isNotEmpty() ? 'Online giving is not available yet' : 'Giving is not available yet' }}</h2><p>{{ $offlineGivingMethods->isNotEmpty() ? 'Please use the published bank-transfer details below.' : 'This ministry has not published a donation purpose yet.' }}</p></div>
         @elseif($funds->isNotEmpty() && $givingMarkets->isNotEmpty())
         <form @submit.prevent="submit" novalidate>
+            <header class="giving-form-heading"><span>01</span><div><p>ONLINE GIVING</p><h2>Prepare your gift</h2><small>Required fields are used only to start checkout with the selected provider.</small></div></header>
             <div class="giving-grid">
                 <label>Donation purpose<select x-model="fundId" @change="selectFund" required><option value="">Choose a purpose</option>@foreach($funds as $fund)<option value="{{ $fund->id }}" data-currency="{{ $fund->currency }}" data-suggested='@json(json_decode($fund->suggested_amounts ?: '[]', true))'>{{ $fund->name }}</option>@endforeach</select></label>
                 <label>Country<select x-model="country" @change="loadProviders" required><option value="">Choose country</option>@foreach($givingMarkets->pluck('country')->unique() as $country)<option>{{ $country }}</option>@endforeach</select></label>
@@ -12,9 +14,10 @@
                 <label>Amount <span x-text="currency"></span><input x-model="amount" type="number" min="0" step="0.01" inputmode="decimal" required></label>
             </div>
             <div class="suggested" x-show="suggested.length" x-cloak><span class="giving-field-hint">Suggested amounts</span><template x-for="value in suggested" :key="value"><button type="button" @click="amount=(value/(10**exponent())).toFixed(exponent())" x-text="currency+' '+(value/(10**exponent())).toFixed(exponent())"></button></template></div>
-            <div class="giving-grid"><label>Name<input x-model="name" maxlength="160" autocomplete="name"></label><label>Email<input x-model="email" type="email" maxlength="254" autocomplete="email"></label></div>
+            <div class="giving-section-label"><span>02</span><div><strong>Your details</strong><small>Optional unless you would like an email receipt.</small></div></div>
+            <div class="giving-grid"><label>Name <em>Optional</em><input x-model="name" maxlength="160" autocomplete="name"></label><label>Email <em>Optional</em><input x-model="email" type="email" maxlength="254" autocomplete="email"></label></div>
             <label class="check"><input x-model="anonymous" type="checkbox"> Keep my name anonymous on public recognition</label>
-            <fieldset><legend>Payment provider</legend><p x-show="loadingProviders">Checking available providers…</p><div class="providers"><template x-for="item in providers" :key="item.provider"><label><input type="radio" x-model="provider" :value="item.provider"><span x-text="item.display_name"></span><small x-text="item.mode==='live'?'Secure checkout':'Test checkout'"></small></label></template></div><p x-show="!loadingProviders && country && currency && !providers.length">No configured provider is available for this country and currency.</p></fieldset>
+            <fieldset><legend><span>03</span> Secure payment</legend><p x-show="loadingProviders">Checking available providers…</p><div class="providers"><template x-for="item in providers" :key="item.provider"><label><input type="radio" x-model="provider" :value="item.provider"><span x-text="item.display_name"></span><small x-text="item.mode==='live'?'Secure checkout':'Test checkout'"></small></label></template></div><p x-show="!loadingProviders && country && currency && !providers.length">No configured provider is available for this country and currency.</p></fieldset>
             <div class="giving-error" role="alert" x-show="error" x-text="error"></div>
             <button class="public-primary" type="submit" :disabled="busy || !provider"><span x-text="busy?'Preparing secure checkout…':'Continue to secure checkout'"></span></button>
         </form>
@@ -32,6 +35,12 @@
             </section>
         @endif
     </section>
+    <aside class="giving-sidebar" aria-label="Giving information">
+        <section><span class="giving-sidebar-icon"><x-ui.icon name="security" :size="20"/></span><p>SAFE CHECKOUT</p><h2>Your payment stays with the provider</h2><span>This page prepares the gift, then sends you to the ministry’s configured payment provider. The ministry does not mark a gift as complete until that provider confirms it.</span></section>
+        <section><span class="giving-sidebar-icon"><x-ui.icon name="giving" :size="20"/></span><p>TRANSPARENT RECORDS</p><h2>Receipts follow confirmation</h2><span>When a receipt email is supplied, the receipt workflow begins only after payment verification. Pending or abandoned checkouts are not presented as completed gifts.</span></section>
+        <a href="{{ route('public.contact') }}"><span><strong>Need another way to give?</strong><small>Contact the ministry team</small></span><x-ui.icon name="arrow-right" :size="17"/></a>
+    </aside>
+    </div>
     @if($offlineGivingMethods->isNotEmpty())
     <section class="public-card bank-giving" aria-labelledby="bank-giving-title">
         <div><p class="eyebrow">BANK TRANSFER</p><h2 id="bank-giving-title">Give by bank transfer</h2><p>Use one of the ministry’s published accounts. A bank transfer is not automatically recorded or receipted as a confirmed donation; finance staff must reconcile it against the bank record.</p></div>

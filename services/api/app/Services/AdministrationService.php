@@ -32,6 +32,10 @@ class AdministrationService
                 'is_public' => $data['is_public'] ?? true,
                 'is_primary' => $data['is_primary'] ?? false,
             ]);
+            if ($location->is_primary) {
+                MinistrySetting::query()->whereKey(MinistrySetting::SINGLETON_ID)
+                    ->update(['public_address' => $location->address]);
+            }
             $this->audit($actor, 'location.created', 'locations', $location->id, [
                 'after' => $location->toArray(), 'previous_primary_id' => $previousPrimaryId,
             ], $ip);
@@ -58,6 +62,10 @@ class AdministrationService
             $changes = $location->getDirty();
             if ($changes !== []) {
                 $location->save();
+                if ($location->is_primary) {
+                    MinistrySetting::query()->whereKey(MinistrySetting::SINGLETON_ID)
+                        ->update(['public_address' => $location->address]);
+                }
                 $this->audit($actor, 'location.updated', 'locations', $location->id, [
                     'before' => array_intersect_key($before, $changes), 'after' => $changes,
                     'previous_primary_id' => $previousPrimaryId,

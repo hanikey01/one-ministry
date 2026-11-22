@@ -62,6 +62,48 @@ class AiCanvasSectionServiceTest extends TestCase
         app(AiCanvasSectionService::class)->normaliseSection($section);
     }
 
+    public function test_it_accepts_fenced_html_modern_responsive_css_styles_and_inert_forms(): void
+    {
+        $section = $this->section();
+        $section['html'] = "```html\n<section class=\"hero\"><style>.preview-note{font-weight:700}</style><form><label>Email<input type=\"email\" aria-label=\"Email\"></label></form><h1 data-ai-editable=\"hero-heading\" data-ai-label=\"Hero heading\">Welcome</h1></section>\n```";
+        $section['css'] = "```css\n.hero{display:grid;container-type:inline-size;padding:2rem}.preview-note{color:var(--ink)}@media(width <= 48rem){.hero{padding:1rem}}\n```";
+
+        $result = app(AiCanvasSectionService::class)->normaliseSection($section);
+
+        $this->assertStringStartsWith('<section', $result['html']);
+        $this->assertStringContainsString('<style>', $result['html']);
+        $this->assertStringContainsString('<form>', $result['html']);
+        $this->assertStringContainsString('@media(width <= 48rem)', $result['css']);
+    }
+
+    public function test_it_accepts_container_query_responsive_styling(): void
+    {
+        $section = $this->section();
+        $section['css'] = '.hero{container-type:inline-size;display:grid}@container (inline-size < 42rem){.hero{grid-template-columns:1fr}}';
+
+        $result = app(AiCanvasSectionService::class)->normaliseSection($section);
+
+        $this->assertStringContainsString('@container', $result['css']);
+    }
+
+    public function test_embedded_styles_cannot_load_external_resources(): void
+    {
+        $section = $this->section();
+        $section['html'] = '<section class="hero"><style>.hero{background:url(https://tracker.example/pixel)}</style><h1 data-ai-editable="hero-heading" data-ai-label="Hero heading">Welcome</h1></section>';
+
+        $this->expectException(ValidationException::class);
+        app(AiCanvasSectionService::class)->normaliseSection($section);
+    }
+
+    public function test_visual_forms_must_remain_inert(): void
+    {
+        $section = $this->section();
+        $section['html'] = '<section class="hero"><form action="https://example.test/collect"><h1 data-ai-editable="hero-heading" data-ai-label="Hero heading">Welcome</h1></form></section>';
+
+        $this->expectException(ValidationException::class);
+        app(AiCanvasSectionService::class)->normaliseSection($section);
+    }
+
     public function test_the_provider_contract_is_small_and_does_not_expose_native_elements(): void
     {
         $schema = json_encode(AiCanvasSectionService::schema(), JSON_THROW_ON_ERROR);
@@ -126,7 +168,8 @@ class AiCanvasSectionServiceTest extends TestCase
 
         $result = app(AiCanvasSectionService::class)->normaliseSection($section);
 
-        $this->assertStringContainsString('<a href="#">Read more</a>', $result['html']);
+        $this->assertStringContainsString('<a aria-disabled="true" data-ai-link-placeholder="">Read more</a>', $result['html']);
+        $this->assertStringNotContainsString('href=', $result['html']);
         $this->assertStringNotContainsString('/invented-page', $result['html']);
     }
 }

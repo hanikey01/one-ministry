@@ -60,7 +60,7 @@ class GeminiTextProviderTest extends TestCase
         Http::fake(function (Request $request) {
             $schema = $request->data()['generationConfig']['responseJsonSchema'];
             $this->assertArrayHasKey('section', $schema['properties']);
-            $this->assertSame(1600, $request->data()['generationConfig']['maxOutputTokens']);
+            $this->assertSame(8192, $request->data()['generationConfig']['maxOutputTokens']);
 
             return Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode(AiCompositionProbeTest::compositionFixture())]]]]]]);
         });

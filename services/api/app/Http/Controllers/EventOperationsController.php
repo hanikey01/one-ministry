@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ConnectionRequestService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -10,13 +11,14 @@ use Illuminate\Support\Str;
 
 class EventOperationsController extends Controller
 {
-    public function webRegister(Request $r, string $event): RedirectResponse
+    public function webRegister(Request $r, string $event, ConnectionRequestService $connections): RedirectResponse
     {
         $record = DB::table('events')->where('id', $event)->where('status', 'published')->first();
         abort_unless($record && ! $record->cancelled_at && $record->registration_open, 404);
         if ($record->registration_deadline && now()->greaterThan($record->registration_deadline)) return back()->withErrors(['registration'=>'Registration for this event has closed.']);
-        $person = $r->user() ? DB::table('people')->where('user_id', $r->user()->id)->first() : null;
         $data = $r->validate(['name'=>['required','string','max:160'],'email'=>['nullable','email','max:254']]);
+        $data['email'] = filled($data['email'] ?? null) ? mb_strtolower(trim($data['email'])) : null;
+        $person = $r->user() ? $connections->person($r) : $connections->existingPersonForEmail($data['email']);
         if ($person && DB::table('event_registrations')->where(['event_id'=>$event,'person_id'=>$person->id])->whereIn('status',['registered','waitlisted','checked_in'])->exists()) return back()->with('status','You are already registered for this event.');
         if ($data['email'] && DB::table('event_registrations')->where(['event_id'=>$event,'email'=>$data['email']])->whereIn('status',['registered','waitlisted','checked_in'])->exists()) return back()->withInput()->withErrors(['email'=>'This email is already registered for the event.']);
         $registered = DB::table('event_registrations')->where('event_id',$event)->whereIn('status',['registered','checked_in'])->count();
@@ -43,19 +45,20 @@ class EventOperationsController extends Controller
         return response()->json(['data' => ['event' => $record, 'registrations' => DB::table('event_registrations')->where('event_id', $event)->orderByRaw("case when status='registered' then 0 when status='waitlisted' then 1 else 2 end")->oldest()->get()]]);
     }
 
-    public function register(Request $r, string $event): JsonResponse
+    public function register(Request $r, string $event, ConnectionRequestService $connections): JsonResponse
     {
         $d = $r->validate(['name' => ['required', 'string', 'max:160'], 'email' => ['nullable', 'email', 'max:254']]);
+        $d['email'] = filled($d['email'] ?? null) ? mb_strtolower(trim($d['email'])) : null;
 
-        return DB::transaction(function () use ($r, $event, $d) {
+        return DB::transaction(function () use ($r, $event, $d, $connections) {
             $record = DB::table('events')->where('id', $event)->lockForUpdate()->first();
             abort_unless($record && $record->registration_open && ! $record->cancelled_at, 404);
             $registered = DB::table('event_registrations')->where('event_id', $event)->where('status', 'registered')->count();
             $status = $record->capacity !== null && $registered >= $record->capacity ? 'waitlisted' : 'registered';
             abort_if($status === 'waitlisted' && ! $record->waitlist_enabled, 409, 'This event is full.');
             $id = (string) Str::uuid();
-            $person = $r->user()?->id ? DB::table('people')->where('user_id', $r->user()->id)->value('id') : null;
-            DB::table('event_registrations')->insert([...$d, 'id' => $id, 'event_id' => $event, 'person_id' => $person, 'status' => $status, 'created_at' => now(), 'updated_at' => now()]);
+            $person = $r->user() ? $connections->person($r) : $connections->existingPersonForEmail($d['email']);
+            DB::table('event_registrations')->insert([...$d, 'id' => $id, 'event_id' => $event, 'person_id' => $person?->id, 'status' => $status, 'created_at' => now(), 'updated_at' => now()]);
 
             return response()->json(['data' => ['id' => $id, 'status' => $status]], 201);
         });

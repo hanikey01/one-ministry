@@ -27,11 +27,11 @@ class MemberPrayerController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $data = $request->validate(['prayer_text' => ['required', 'string', 'max:4000'], 'visibility' => ['required', 'in:prayer_team,assigned_care_only'], 'consent_to_contact' => ['required', 'boolean']]);
+        $data = $request->validate(['prayer_text' => ['required', 'string', 'max:4000'], 'consent_to_contact' => ['required', 'boolean']]);
         $person = DB::table('people')->where('user_id', $request->user()->id)->first();
         abort_unless($person, 422, 'Complete your member profile before submitting a prayer request.');
         $id = (string) Str::uuid();
-        DB::table('prayer_requests')->insert(['id' => $id, 'person_id' => $person->id, 'user_id' => $request->user()->id, 'prayer_text_encrypted' => Crypt::encryptString(trim($data['prayer_text'])), 'visibility' => $data['visibility'], 'consent_to_contact' => $data['consent_to_contact'], 'status' => 'received', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('prayer_requests')->insert(['id' => $id, 'person_id' => $person->id, 'user_id' => $request->user()->id, 'prayer_text_encrypted' => Crypt::encryptString(trim($data['prayer_text'])), 'visibility' => 'prayer_team', 'consent_to_contact' => $data['consent_to_contact'], 'status' => 'received', 'created_at' => now(), 'updated_at' => now()]);
 
         return response()->json(['data' => ['id' => $id, 'status' => 'received']], 201);
     }

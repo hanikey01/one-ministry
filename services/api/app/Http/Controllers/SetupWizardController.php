@@ -9,6 +9,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
+use Illuminate\Validation\Rule;
+use App\Support\AddressCatalog;
 
 class SetupWizardController extends Controller
 {
@@ -22,10 +24,10 @@ class SetupWizardController extends Controller
             return to_route('public.home');
         }
 
-        return view('setup.wizard', ['timezones' => timezone_identifiers_list()]);
+        return view('setup.wizard');
     }
 
-    public function store(Request $request, InstallMinistry $installer): RedirectResponse
+    public function store(Request $request, InstallMinistry $installer, AddressCatalog $addresses): RedirectResponse
     {
         if (! Schema::hasTable('ministry_settings')) {
             return redirect('/install.php');
@@ -35,8 +37,29 @@ class SetupWizardController extends Controller
             return to_route('login')->withErrors(['installation' => 'This installation is already configured.']);
         }
 
+        $request->validate([
+            'location' => ['required', 'string', 'max:160'],
+            'location_address_line_1' => ['required', 'string', 'max:255'],
+            'location_address_line_2' => ['nullable', 'string', 'max:255'],
+            'location_city' => ['required', 'string', 'max:120'],
+            'location_region_code' => ['nullable', 'string', 'max:16'],
+            'location_postal_code' => ['nullable', 'string', 'max:32'],
+            'location_country_code' => ['required', Rule::in(array_keys($addresses->countries()))],
+        ]);
+
+        if ($request->filled('location_region_code') && ! $addresses->subdivisionName(
+            (string) $request->input('location_country_code'),
+            (string) $request->input('location_region_code'),
+        )) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'location_region_code' => 'Choose a valid state, province, or region for the selected country.',
+            ]);
+        }
+
         $admin = $installer->execute($request->only([
             'name', 'domain', 'timezone', 'location', 'tagline', 'contact_email', 'theme_preset',
+            'location_address_line_1', 'location_address_line_2', 'location_city',
+            'location_region_code', 'location_postal_code', 'location_country_code',
             'admin_name', 'admin_email', 'password',
         ]));
 

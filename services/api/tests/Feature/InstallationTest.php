@@ -86,4 +86,41 @@ class InstallationTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors('installation');
     }
+
+    public function test_setup_wizard_requires_and_stores_complete_primary_location_details(): void
+    {
+        $input = $this->installationInput() + [
+            'location_address_line_1' => '12 Unity Avenue',
+            'location_address_line_2' => 'Community Hall',
+            'location_city' => 'Lagos',
+            'location_region_code' => 'LA',
+            'location_postal_code' => '100001',
+            'location_country_code' => 'NG',
+        ];
+
+        $this->post(route('setup.store'), $input)->assertRedirect(route('staff.overview'));
+
+        $this->assertDatabaseHas('locations', [
+            'name' => 'Main Campus',
+            'address' => "12 Unity Avenue\nCommunity Hall\nLagos, Lagos, 100001\nNigeria",
+            'address_line_1' => '12 Unity Avenue',
+            'address_line_2' => 'Community Hall',
+            'locality' => 'Lagos',
+            'region_code' => 'LA',
+            'region_name' => 'Lagos',
+            'postal_code' => '100001',
+            'country_code' => 'NG',
+            'country_name' => 'Nigeria',
+            'is_primary' => true,
+        ]);
+    }
+
+    public function test_setup_wizard_rejects_an_address_title_without_location_details(): void
+    {
+        $this->from(route('setup.create'))->post(route('setup.store'), $this->installationInput())
+            ->assertRedirect(route('setup.create'))
+            ->assertSessionHasErrors(['location_address_line_1', 'location_city', 'location_country_code']);
+
+        $this->assertDatabaseCount('ministry_settings', 0);
+    }
 }

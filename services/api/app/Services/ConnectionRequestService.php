@@ -32,9 +32,9 @@ class ConnectionRequestService
         }
 
         $email = mb_strtolower(trim((string) ($contact['email'] ?? '')));
-        $person = DB::table('people')->whereRaw('lower(email) = ?', [$email])->orderBy('created_at')->first();
+        $person = $this->existingPersonForEmail($email);
         if ($person) {
-            if (($contact['consent_to_contact'] ?? false) && ! $person->consent_to_contact) {
+            if (($contact['consent_to_contact'] ?? false) && ! $person->consent_to_contact && ! $person->user_id) {
                 DB::table('people')->where('id', $person->id)->update(['consent_to_contact' => true, 'updated_at' => now()]);
                 $person->consent_to_contact = true;
             }
@@ -57,12 +57,55 @@ class ConnectionRequestService
         return DB::table('people')->where('id', $id)->first();
     }
 
+    /**
+     * Resolve a typed email to the installation's person record. A matching
+     * account is linked to its person record, but callers must not treat this
+     * as authentication or populate authenticated ownership fields from it.
+     */
+    public function existingPersonForEmail(?string $email): ?object
+    {
+        $normalized = mb_strtolower(trim((string) $email));
+        if ($normalized === '') {
+            return null;
+        }
+
+        return DB::transaction(function () use ($normalized): ?object {
+            $user = DB::table('users')->whereRaw('lower(email) = ?', [$normalized])->first(['id', 'name', 'email']);
+            if ($user) {
+                $person = DB::table('people')->where('user_id', $user->id)->first();
+                if ($person) {
+                    return $person;
+                }
+
+                $person = DB::table('people')->whereNull('user_id')->whereRaw('lower(email) = ?', [$normalized])->orderBy('created_at')->lockForUpdate()->first();
+                if ($person) {
+                    DB::table('people')->where('id', $person->id)->update(['user_id' => $user->id, 'updated_at' => now()]);
+
+                    return DB::table('people')->where('id', $person->id)->first();
+                }
+
+                $names = preg_split('/\s+/', trim((string) $user->name), 2);
+                $id = (string) Str::uuid();
+                DB::table('people')->insert([
+                    'id' => $id, 'user_id' => $user->id, 'first_name' => $names[0] ?: 'Member',
+                    'last_name' => $names[1] ?? null, 'email' => mb_strtolower((string) $user->email),
+                    'status' => 'member', 'consent_to_contact' => false,
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+
+                return DB::table('people')->where('id', $id)->first();
+            }
+
+            return DB::table('people')->whereRaw('lower(email) = ?', [$normalized])->orderBy('created_at')->first();
+        });
+    }
+
     public function submitPrayer(Request $request, object $person, array $data): void
     {
         DB::table('prayer_requests')->insert([
             'id' => (string) Str::uuid(), 'person_id' => $person->id, 'user_id' => $request->user()?->id,
             'prayer_text_encrypted' => Crypt::encryptString(trim($data['prayer_text'])),
-            'visibility' => $data['visibility'], 'consent_to_contact' => (bool) ($data['consent_to_contact'] ?? false),
+            'visibility' => 'prayer_team', 'consent_to_contact' => (bool) ($data['consent_to_contact'] ?? false),
             'status' => 'received', 'created_at' => now(), 'updated_at' => now(),
         ]);
         $this->audit($request, 'prayer.request_submitted', 'prayer_requests', $person->id, ['source' => $request->user() ? 'member' : 'guest']);

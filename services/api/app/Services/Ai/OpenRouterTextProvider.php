@@ -68,7 +68,7 @@ final class OpenRouterTextProvider implements AiTextProvider
         $schema = AiCompositionProbe::schema();
         $result = $this->requestStructured($apiKey, $modelId, 'You verify HTML and CSS section generation for a page editor.',
             'Return one section named Welcome with a semantic root section, a heading and paragraph in HTML, responsive self-contained CSS, empty javascript, and a plain-text fallback. Give the heading and paragraph unique kebab-case data-ai-editable attributes and clear data-ai-label attributes. Use no remote resources.',
-            $schema, 'ai_page_composition_check', 1600, 0);
+            $schema, 'ai_page_composition_check', 8192, 0);
         AiCompositionProbe::validate($result['output']);
 
         return $result;
@@ -96,6 +96,7 @@ final class OpenRouterTextProvider implements AiTextProvider
                     ->post('/chat/completions', [
                         'model' => $modelId, 'messages' => $messages, 'max_tokens' => $maxTokens, 'temperature' => $temperature,
                         'provider' => ['require_parameters' => true, 'allow_fallbacks' => false, 'data_collection' => 'deny'],
+                        'plugins' => [['id' => 'response-healing']],
                         'response_format' => $format,
                     ])->throw()->json();
                 if (($payload['choices'][0]['finish_reason'] ?? null) === 'length') throw new AiProviderException('output_truncated');

@@ -48,6 +48,18 @@ class GivingManagementTest extends TestCase
         $this->assertDatabaseHas('audit_events',['action'=>'giving.offline_method_archived','subject_id'=>$method->id]);
     }
 
+    public function test_public_giving_uses_the_guided_layout_without_a_service_time_header_action(): void
+    {
+        $this->administrator();
+
+        $this->get(route('public.giving'))
+            ->assertOk()
+            ->assertSee('giving-page-layout', false)
+            ->assertSee('Give with purpose')
+            ->assertSee('Your payment stays with the provider')
+            ->assertDontSee('public-worship-action', false);
+    }
+
     private function administrator()
     {
         $admin=app(InstallMinistry::class)->execute(['name'=>'Hope Community','domain'=>'hope.example.org','timezone'=>'UTC','location'=>'Main Campus','admin_name'=>'Ada Admin','admin_email'=>'ada@example.org','password'=>'long-private-password']);

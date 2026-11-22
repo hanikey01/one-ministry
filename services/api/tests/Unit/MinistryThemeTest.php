@@ -19,15 +19,34 @@ class MinistryThemeTest extends TestCase
         $theme = MinistryTheme::publicTheme($settings);
         $variables = $this->variables(MinistryTheme::cssVariables($settings));
 
-        $this->assertSame('#C2410C', $theme['chrome_color']);
+        $this->assertSame('#692306', $theme['chrome_color']);
+        $this->assertSame('#FFFFFF', $theme['chrome_foreground']);
         $this->assertNotSame('#F6F9FF', $theme['light']['canvas']);
         $this->assertNotSame('#071426', $theme['dark']['canvas']);
         $this->assertSame('#C2410C', $variables['--theme-action-color']);
+        $this->assertSame('#692306', $variables['--theme-chrome-color']);
+        $this->assertSame('#692306', $variables['--theme-light-sidebar-color']);
+        $this->assertSame('#692306', $variables['--theme-dark-sidebar-color']);
+        $this->assertGreaterThanOrEqual(4.5, $this->contrast($theme['chrome_foreground'], $theme['chrome_color']));
         $this->assertSame('#15803D', $variables['--theme-success-color']);
         $this->assertSame('#B45309', $variables['--theme-warning-color']);
         $this->assertSame('#B91C1C', $variables['--theme-danger-color']);
         $this->assertGreaterThanOrEqual(4.5, $this->contrast($variables['--theme-brand-text-light'], $theme['light']['surface']));
         $this->assertGreaterThanOrEqual(4.5, $this->contrast($variables['--theme-brand-text-dark'], $theme['dark']['surface']));
+    }
+
+    public function test_preset_navigation_chrome_is_not_recoloured(): void
+    {
+        $settings = new MinistrySetting([
+            'theme_preset' => 'tech_blue',
+            'chrome_mode' => 'preset',
+            'chrome_color' => '#C2410C',
+        ]);
+
+        $variables = $this->variables(MinistryTheme::cssVariables($settings));
+
+        $this->assertSame('#2563EB', $variables['--theme-action-color']);
+        $this->assertSame('#0B1F3A', $variables['--theme-chrome-color']);
     }
 
     /** @return array<string, string> */

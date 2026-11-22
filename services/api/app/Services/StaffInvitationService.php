@@ -48,7 +48,7 @@ class StaffInvitationService
 
         try {
             $ministry = \App\Models\MinistrySetting::findOrFail(\App\Models\MinistrySetting::SINGLETON_ID);
-            $this->templates->send('staff_invitation', $email, ['invitee_name' => $name, 'inviter_name' => $actor->name, 'ministry_name' => $ministry->name, 'role_name' => Str::headline($roleKey), 'expires_hours' => 24, 'action_url' => $invitation['accept_url']], $name, 'Accept invitation');
+            $this->templates->send('staff_invitation', $email, ['invitee_name' => $name, 'inviter_name' => $actor->name, 'ministry_name' => $ministry->name, 'role_name' => RoleCatalog::INSTALLATION_ROLES[$roleKey] ?? Str::headline($roleKey), 'expires_hours' => 24, 'action_url' => $invitation['accept_url']], $name, 'Accept invitation');
         } catch (\Throwable $error) {
             DB::table('staff_invitations')->where('id', $invitation['id'])->update(['revoked_at' => now(), 'updated_at' => now()]);
             $this->audit($actor, 'staff_invitation.delivery_failed', $invitation['id'], ['email' => $email], $ip);

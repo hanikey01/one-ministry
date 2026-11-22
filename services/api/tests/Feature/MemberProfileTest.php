@@ -84,4 +84,16 @@ class MemberProfileTest extends TestCase
             ->assertHeader('X-Content-Type-Options', 'nosniff');
     }
 
+    public function test_member_profile_uses_profile_name_and_has_no_birthday_opt_in_fields(): void
+    {
+        $member = User::factory()->create();
+
+        $this->actingAs($member)->get('/member/profile')
+            ->assertOk()
+            ->assertSee('<h1>Profile</h1>', false)
+            ->assertDontSee('Profile & preferences')
+            ->assertDontSee('birthday_staff_reminder')
+            ->assertDontSee('birthday_public_recognition');
+    }
+
 }

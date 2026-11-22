@@ -7,13 +7,13 @@
 <x-layouts.workspace title="Content Library" :ministry-name="$settings->name" :user-name="$user->name" :user-initials="str($user->name)->substr(0, 2)" user-role="Staff workspace">
     <x-slot:navigation></x-slot:navigation>
 
-    <header class="workspace-page-heading staff-page-command">
+    <header class="workspace-page-heading staff-page-command content-library-heading">
         <div>
             <p>CONTENT LIBRARY</p>
             <h1>Books, sermons, and series</h1>
             <span>Create resources as drafts, then submit them to an authorized publisher for review.</span>
         </div>
-        <button class="button" type="button" data-workspace-dialog-open="content-create">Add {{ $labels[$library] }}</button>
+        <button class="button" type="button" data-workspace-dialog-open="content-create"><x-ui.icon name="add" :size="16"/><span>Add {{ str($labels[$library])->singular() }}</span></button>
         <dialog class="workspace-dialog content-edit-dialog" id="content-create" data-workspace-dialog aria-labelledby="content-create-title">
             <form method="POST" action="{{ route('staff.content.store', $library) }}" enctype="multipart/form-data" class="workspace-dialog-card content-edit-form">
                 @csrf
@@ -73,8 +73,9 @@
         </form>
     </div>
 
-    <section class="data-panel responsive-records">
-        <table>
+    <section class="content-library-records">
+        <header><div><p>CURRENT LIBRARY</p><h2>{{ $labels[$library] }}</h2><span>Review drafts, publication state, and resource details.</span></div><strong>{{ number_format($items->total()) }} {{ str('item')->plural($items->total()) }}</strong></header>
+        <div class="data-panel responsive-records"><table>
             <thead><tr><th>Title</th><th>Details</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
                 @forelse($items as $item)
@@ -126,7 +127,7 @@
                     <tr><td colspan="4" class="empty-cell">No {{ strtolower($labels[$library]) }} match this view. Add the first item as a draft.</td></tr>
                 @endforelse
             </tbody>
-        </table>
+        </table></div>
     </section>
     <div class="pagination-wrap">{{ $items->links() }}</div>
 

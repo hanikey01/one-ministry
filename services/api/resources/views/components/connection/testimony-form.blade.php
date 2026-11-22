@@ -2,6 +2,7 @@
 
 <form method="POST" action="{{ $action }}" class="connection-request-form">
     @csrf
+    <x-public-form-guard route="member.testimonies.store"/>
     <x-connection.contact-fields :guest="$guest"/>
     <label>Title<input name="title" value="{{ old('title') }}" maxlength="180" required placeholder="A short title for your story"></label>
     <label>Category<select name="category" required>@foreach($categories as $category)<option value="{{ $category }}" @selected(old('category') === $category)>{{ str($category)->headline() }}</option>@endforeach</select></label>

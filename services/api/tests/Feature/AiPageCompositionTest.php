@@ -39,6 +39,10 @@ class AiPageCompositionTest extends TestCase
                     'page_strategy'=>'Help visitors plan a visit','visitor_journey'=>['Welcome'],'sections'=>[['name'=>'Welcome hero','purpose'=>'Welcome first-time visitors','hierarchy'=>'One clear headline','layout'=>'Editorial split','responsive'=>'Stack on mobile','cta'=>'Plan a visit']],
                     'visual_direction'=>'Warm editorial','typography_strategy'=>'Strong heading','spacing_rhythm'=>'Generous','responsive_strategy'=>'Mobile first','cta_strategy'=>'One action','art_direction'=>'Editorial warmth with confident asymmetry','color_strategy'=>'Warm neutral field with one sharp accent','imagery_strategy'=>'Full-bleed contextual photography','motion_strategy'=>'Restrained reveal motion','signature_motif'=>'Offset rules and cropped imagery','section_transitions'=>'Alternate full-bleed and quiet editorial fields','anti_patterns'=>['No generic cards'],'accessibility_priorities'=>['Contrast'],'factual_constraints'=>['No inventions'],
                 ]];
+                if ($schemaName === 'ministry_public_page_section') return ['model'=>$modelId,'latency_ms'=>1,'response_mode'=>'json_schema','output'=>['section'=>[
+                    'name'=>'Welcome hero','purpose'=>'Welcome first-time visitors','html'=>'<section class="hero"><h1 data-ai-editable="hero-heading" data-ai-label="Hero heading">You are welcome here</h1></section>',
+                    'css'=>'.hero{display:grid}','javascript'=>'','fallback'=>'You are welcome here.',
+                ]]];
                 $title = $schemaName === 'public_page_canvas_revision' ? 'Everything you need for Sunday' : 'You are welcome here';
                 return ['model'=>$modelId,'latency_ms'=>1,'response_mode'=>'json_schema','output'=>['section'=>[
                     'name'=>'Welcome hero','purpose'=>'Welcome first-time visitors','html'=>'<section class="hero"><p data-ai-editable="hero-eyebrow" data-ai-label="Hero eyebrow">WELCOME</p><h1 data-ai-editable="hero-heading" data-ai-label="Hero heading">'.$title.'</h1><p data-ai-editable="hero-introduction" data-ai-label="Hero introduction">Plan your visit with confidence.</p></section>',
@@ -54,6 +58,7 @@ class AiPageCompositionTest extends TestCase
         $this->assertStringContainsString('You are welcome here', $element['content']['html']);
         $this->assertArrayNotHasKey('element_types', $provider->schemas['ministry_public_page_design_plan']['properties']['sections']['items']['properties']);
         $this->assertArrayHasKey('html', $provider->schemas['ministry_public_page_section']['properties']['section']['properties']);
+        $this->assertArrayHasKey('html', $provider->schemas['ministry_public_page_section_repair']['properties']['section']['properties']);
         $this->assertDatabaseCount('pages', 0);
 
         $revision = app(AiPageDraftService::class)->reviseObject(['title'=>'Plan a visit','instruction'=>'Make the invitation clearer.','page_purpose'=>'','kind'=>'section','section'=>0,'column'=>null,'element'=>null,'document'=>$draft['document']], $admin, '127.0.0.1');

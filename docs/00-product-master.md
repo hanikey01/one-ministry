@@ -156,8 +156,8 @@ A large service uses a broadcast viewing experience with app-based chat and resp
 
 ### 6.4 Celebrations and care
 
-- Birthday and anniversary dates are optional. A person chooses whether staff may see them and whether public recognition is allowed.
-- Optional greetings and reminders use local time and the person's communication preferences.
+- Birthday and anniversary dates are optional. When a member stores a birthday month and day, authorized staff reminders and normal public recognition are enabled by default; no separate member-facing birthday opt-ins are used.
+- Birthday reminders use the ministry time zone, reveal no age, and are limited to staff with explicit birthday access.
 - Prayer requests may be public, shared with a chosen team, or confidential. The requester can ask for follow-up and can request removal.
 - Pastoral notes are separate from general member notes, restricted by assignment, and auditable.
 - Children's records and check-in require a dedicated permissions and safeguarding specification before release.

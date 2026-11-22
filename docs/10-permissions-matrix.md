@@ -10,7 +10,8 @@
 | Ministry administrator | Broad nonrestricted ministry administration, settings, locations, modules, content, people operations, events, departments, services, and reports; never implicitly grants care, finance, audit, or security-role control |
 | Content & media editor | Draft, edit, and publish public pages, media, sermons, announcements, recordings, and communications; cannot change core settings |
 | Ministry operations coordinator | Directly assigned, scope-bound people follow-up, departments, events, service planning, and school operations within the granted area |
-| Care staff | All active prayer requests for shared triage; may claim an unassigned request or continue their own private care work |
+| Prayer team | Read active prayer requests through the restricted prayer workspace; no access to pastoral care cases or notes |
+| Care staff | Assigned pastoral care cases and notes; prayer requests require a separate `prayer.read` grant |
 | Finance staff | Giving, receipts, reconciliation, and finance reports |
 | Service & production team | Directly assigned service/meeting production, host, and moderation responsibilities within the granted service or meeting |
 | Children’s team | Feature-gated children access only after the safeguarding specification and dedicated child-team assignment model are accepted |
@@ -34,7 +35,8 @@ Legend: **O** own record; **S** assigned scope; **A** all nonrestricted ministry
 | View/correct attendance | O (view) | S | S (view service) | S (view service) | S | — | — | A (aggregate) | — |
 | Run service / see media health | — | — | S (host actions) | S | — | — | — | — | — |
 | Moderate service chat | — | — | S | S | — | — | — | — | — |
-| View private prayer/care | O (own request) | — | R (active handoff only) | — | — | R | — | — | — |
+| View prayer requests | O (own request) | — | — | — | — | — | — | A with `prayer.read` | — |
+| View assigned care cases | O (own request status) | — | — | — | — | R | — | — | — |
 | Write care notes | — | — | — | — | — | R | — | — | — |
 | Manage follow-up | O (own response status) | S | S (assigned handoff) | — | S | R | — | A (status only) | — |
 | Manage content drafts | — | — | — | — | — | — | — | S if granted | — |
@@ -61,7 +63,7 @@ An assignment records role, grantee, scope type (`installation`, `location`, `de
 | Care or finance export | Domain-specific grant and review; never included in general people export |
 | Change payment provider | Finance plus security approval, credential verification, audit |
 | Start/stop recording | Authorized host/producer, visible notice, audit |
-| Change role or scope | Granting authority separate from ordinary module administration; audit |
+| Change role or scope | `roles.manage`, verified email, current MFA verification, and audit; Super/Security targets must already have verified email and enabled MFA |
 | Correct attendance | Assigned scope, reason, appended correction |
 | Configure Zoom Video SDK credentials | Super or ministry administrator, MFA, audit; secret values never displayed after save |
 | Configure AI provider credentials and page-editor model routes | Ministry or super administrator with `ai.manage` and verified email; audited; MFA not required; secret values never displayed after save |

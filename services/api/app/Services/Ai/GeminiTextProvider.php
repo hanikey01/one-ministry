@@ -63,7 +63,7 @@ final class GeminiTextProvider implements AiTextProvider
         $schema = AiCompositionProbe::schema();
         $result = $this->requestStructured($apiKey, $modelId, 'You verify HTML and CSS section generation for a page editor.',
             'Return one section named Welcome with a semantic root section, a heading and paragraph in HTML, responsive self-contained CSS, empty javascript, and a plain-text fallback. Give the heading and paragraph unique kebab-case data-ai-editable attributes and clear data-ai-label attributes. Use no remote resources.',
-            $schema, 1600, 0);
+            $schema, 8192, 0);
         AiCompositionProbe::validate($result['output']);
         return $result;
     }

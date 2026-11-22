@@ -96,6 +96,20 @@ class StaffInvitationAndSessionTest extends TestCase
         $this->assertDatabaseMissing('staff_invitations', ['email' => 'production@example.org']);
     }
 
+    public function test_administrator_and_operations_roles_are_available_to_installation_wide_invitations(): void
+    {
+        $admin = $this->install();
+        $this->actingAsSensitive($admin);
+
+        foreach (['ministry_administrator', 'ministry_operations_coordinator'] as $index => $role) {
+            $this->postJson('/api/v1/staff/invitations', [
+                'name' => 'Invited Staff '.$index,
+                'email' => "staff{$index}@example.org",
+                'role_key' => $role,
+            ])->assertCreated()->assertJsonPath('data.role_key', $role);
+        }
+    }
+
     public function test_session_handles_hide_cookie_values_and_enforce_ownership(): void
     {
         $admin = $this->install();

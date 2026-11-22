@@ -48,9 +48,11 @@ use App\Http\Controllers\StaffFeatureController;
 use App\Http\Controllers\StaffInvitationController;
 use App\Http\Controllers\StaffLiveStreamController;
 use App\Http\Controllers\StaffLocationController;
+use App\Http\Controllers\AddressCatalogController;
 use App\Http\Controllers\StaffMeetingsMediaController;
 use App\Http\Controllers\InteractiveMeetingController;
 use App\Http\Controllers\StaffPeopleController;
+use App\Http\Controllers\StaffPrayerController;
 use App\Http\Controllers\StaffReportController;
 use App\Http\Controllers\StaffRunSheetController;
 use App\Http\Controllers\StaffServiceController;
@@ -67,10 +69,10 @@ Route::prefix('api/v1')->group(function (): void {
     Route::get('/auth/csrf', [AuthController::class, 'csrf']);
 Route::post('/installation/setup', [InitialSetupController::class, 'store']);
 Route::post('/auth/login', [AuthController::class, 'login']);
-Route::post('/auth/password/reset-request', [PasswordRecoveryController::class, 'request']);
+Route::post('/auth/password/reset-request', [PasswordRecoveryController::class, 'request'])->middleware('public_form_guard:rate')->name('api.password.reset-request');
 Route::post('/auth/password/reset', [PasswordRecoveryController::class, 'reset']);
 Route::post('/auth/invitations/accept', [StaffInvitationController::class, 'accept']);
-Route::post('/auth/email/verify', [EmailVerificationController::class, 'verify']);
+Route::post('/auth/email/verify', [EmailVerificationController::class, 'verify'])->middleware('public_form_guard:rate')->name('api.email.verify');
     Route::middleware('auth')->group(function (): void {
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::get('/me/profile', [MemberController::class, 'profile']);
@@ -83,7 +85,7 @@ Route::post('/auth/email/verify', [EmailVerificationController::class, 'verify']
         Route::get('/me/prayer-requests', [MemberPrayerController::class, 'index']);
 Route::post('/me/prayer-requests', [MemberPrayerController::class, 'store']);
 Route::post('/me/prayer-requests/{prayer}/removal-request', [MemberPrayerController::class, 'requestRemoval']);
-Route::post('/auth/email/verification-request', [EmailVerificationController::class, 'request']);
+Route::post('/auth/email/verification-request', [EmailVerificationController::class, 'request'])->middleware('public_form_guard:rate')->name('api.email.verification-request');
         Route::get('/auth/mfa', [MfaController::class, 'status']);
         Route::post('/auth/mfa/setup', [MfaController::class, 'begin']);
 Route::post('/auth/mfa/enable', [MfaController::class, 'enable']);
@@ -319,7 +321,7 @@ Route::middleware(['auth', 'permission:content.publish', 'verified_email'])->pos
 Route::middleware(['auth', 'permission:services.manage'])->get('/staff/follow-up', [StaffWorkspaceController::class, 'followUp'])->name('staff.follow-up');
 Route::middleware(['auth', 'permission:services.manage'])->patch('/staff/follow-up/{task}', [StaffWorkspaceController::class, 'updateFollowUp'])->name('staff.follow-up.update');
 Route::middleware(['auth', 'permission:care.manage', 'verified_email'])->get('/staff/care', [StaffWorkspaceController::class, 'care'])->name('staff.care');
-Route::middleware(['auth', 'permission:care.manage', 'verified_email'])->post('/staff/care/prayer-requests/{prayer}/claim', [StaffWorkspaceController::class, 'claimPrayer'])->name('staff.care.prayer-requests.claim');
+Route::middleware(['auth', 'permission:prayer.read', 'verified_email'])->get('/staff/prayer-requests', [StaffPrayerController::class, 'index'])->name('staff.prayer-requests');
 Route::middleware(['auth', 'permission:reports.view', 'verified_email'])->get('/staff/reports', [StaffWorkspaceController::class, 'reports'])->name('staff.reports');
 Route::middleware('auth')->get('/staff/departments', [StaffDepartmentController::class, 'index'])->name('staff.departments');
 Route::middleware(['auth', 'permission:departments.manage'])->post('/staff/departments', [StaffDepartmentController::class, 'store'])->name('staff.departments.store');
@@ -338,6 +340,7 @@ Route::middleware(['auth', 'permission:features.manage'])->put('/staff/modules',
 Route::middleware(['auth', 'permission:features.manage'])->put('/staff/modules/{key}', [StaffWorkspaceController::class, 'updateModule'])->name('staff.modules.update');
 Route::middleware(['auth', 'permission:roles.manage', 'verified_email'])->get('/staff/access', [StaffWorkspaceController::class, 'staffAccess'])->name('staff.access');
 Route::middleware(['auth', 'permission:roles.manage', 'verified_email'])->post('/staff/access', [StaffWorkspaceController::class, 'inviteStaff'])->name('staff.access.invite');
+Route::middleware(['auth', 'permission:roles.manage', 'verified_email', 'mfa'])->put('/staff/access/accounts/{user}/roles', [StaffWorkspaceController::class, 'syncStaffRoles'])->name('staff.access.roles.sync');
 Route::middleware('auth')->get('/staff/security', [StaffWorkspaceController::class, 'security'])->name('staff.security');
 Route::middleware('auth')->post('/staff/security/mfa', [StaffWorkspaceController::class, 'beginMfa'])->name('staff.security.mfa.begin');
 Route::middleware('auth')->post('/staff/security/mfa/enable', [StaffWorkspaceController::class, 'enableMfa'])->name('staff.security.mfa.enable');
@@ -348,24 +351,28 @@ Route::middleware(['auth'])->get('/meetings/{meeting}', [InteractiveMeetingContr
 Route::middleware(['auth'])->get('/meetings/{meeting}/waiting-status', [InteractiveMeetingController::class, 'waitingStatus'])->name('meetings.waiting-status');
 Route::middleware(['auth', 'verified_email'])->get('/staff/meetings/{meeting}/lobby', [InteractiveMeetingController::class, 'lobby'])->name('staff.meetings.lobby');
 Route::middleware(['auth', 'verified_email'])->post('/staff/meetings/{meeting}/lobby/{participant}', [InteractiveMeetingController::class, 'decideLobby'])->name('staff.meetings.lobby.decide');
-Route::get('/verify-email', [EmailVerificationPageController::class, 'show'])->name('email.verify.show');
-Route::post('/verify-email', [EmailVerificationPageController::class, 'verify'])->name('email.verify');
+Route::middleware('public_form_guard:start')->get('/verify-email', [EmailVerificationPageController::class, 'show'])->name('email.verify.show');
+Route::post('/verify-email', [EmailVerificationPageController::class, 'verify'])->middleware('public_form_guard:account')->name('email.verify');
 Route::middleware('guest')->get('/setup', [SetupWizardController::class, 'create'])->name('setup.create');
 Route::middleware('guest')->post('/setup', [SetupWizardController::class, 'store'])->name('setup.store');
-Route::middleware('guest')->get('/register', [BrowserAuthController::class, 'registerCreate'])->name('register');
-Route::middleware(['guest', 'throttle:5,1'])->post('/register', [BrowserAuthController::class, 'registerStore'])->name('register.store');
-Route::middleware('guest')->get('/register/verify', [BrowserAuthController::class, 'registerVerifyCreate'])->name('register.verify');
-Route::middleware(['guest', 'throttle:8,1'])->post('/register/verify', [BrowserAuthController::class, 'registerVerifyStore'])->name('register.verify.store');
-Route::middleware(['guest', 'throttle:3,1'])->post('/register/resend', [BrowserAuthController::class, 'registerResend'])->name('register.resend');
-Route::middleware('guest')->get('/register/complete', [BrowserAuthController::class, 'registerCompleteCreate'])->name('register.complete');
-Route::middleware(['guest', 'throttle:5,1'])->post('/register/complete', [BrowserAuthController::class, 'registerCompleteStore'])->name('register.complete.store');
-Route::middleware('guest')->get('/forgot-password', [BrowserAuthController::class, 'forgotCreate'])->name('password.forgot');
-Route::middleware('guest')->get('/accept-invitation', [StaffInvitationController::class, 'create'])->name('staff.invitation.accept.page');
-Route::middleware('guest')->post('/accept-invitation', [StaffInvitationController::class, 'storeBrowser'])->name('staff.invitation.accept.store');
-Route::middleware('guest')->post('/forgot-password', [BrowserAuthController::class, 'forgotStore'])->name('password.email');
-Route::middleware('guest')->get('/reset-password', [BrowserAuthController::class, 'resetCreate'])->name('password.reset.create');
-Route::middleware('guest')->post('/reset-password', [BrowserAuthController::class, 'resetStore'])->name('password.reset.store');Route::middleware('guest')->get('/login', [BrowserAuthController::class, 'create'])->name('login');
-Route::middleware('guest')->post('/login', [BrowserAuthController::class, 'store'])->name('login.store');
+Route::get('/address-catalog/{country}/subdivisions', [AddressCatalogController::class, 'subdivisions'])
+    ->where('country', '[A-Za-z]{2}')
+    ->middleware('throttle:120,1')
+    ->name('address-catalog.subdivisions');
+Route::middleware(['guest', 'public_form_guard:start'])->get('/register', [BrowserAuthController::class, 'registerCreate'])->name('register');
+Route::middleware(['guest', 'public_form_guard:account'])->post('/register', [BrowserAuthController::class, 'registerStore'])->name('register.store');
+Route::middleware(['guest', 'public_form_guard:start'])->get('/register/verify', [BrowserAuthController::class, 'registerVerifyCreate'])->name('register.verify');
+Route::middleware(['guest', 'public_form_guard:account'])->post('/register/verify', [BrowserAuthController::class, 'registerVerifyStore'])->name('register.verify.store');
+Route::middleware(['guest', 'public_form_guard:account'])->post('/register/resend', [BrowserAuthController::class, 'registerResend'])->name('register.resend');
+Route::middleware(['guest', 'public_form_guard:start'])->get('/register/complete', [BrowserAuthController::class, 'registerCompleteCreate'])->name('register.complete');
+Route::middleware(['guest', 'public_form_guard:account'])->post('/register/complete', [BrowserAuthController::class, 'registerCompleteStore'])->name('register.complete.store');
+Route::middleware(['guest', 'public_form_guard:start'])->get('/forgot-password', [BrowserAuthController::class, 'forgotCreate'])->name('password.forgot');
+Route::middleware(['guest', 'public_form_guard:start'])->get('/accept-invitation', [StaffInvitationController::class, 'create'])->name('staff.invitation.accept.page');
+Route::middleware(['guest', 'public_form_guard:account'])->post('/accept-invitation', [StaffInvitationController::class, 'storeBrowser'])->name('staff.invitation.accept.store');
+Route::middleware(['guest', 'public_form_guard:account'])->post('/forgot-password', [BrowserAuthController::class, 'forgotStore'])->name('password.email');
+Route::middleware(['guest', 'public_form_guard:start'])->get('/reset-password', [BrowserAuthController::class, 'resetCreate'])->name('password.reset.create');
+Route::middleware(['guest', 'public_form_guard:account'])->post('/reset-password', [BrowserAuthController::class, 'resetStore'])->name('password.reset.store');Route::middleware('guest')->get('/login', [BrowserAuthController::class, 'create'])->name('login');
+Route::middleware(['guest', 'public_form_guard:rate'])->post('/login', [BrowserAuthController::class, 'store'])->name('login.store');
 Route::middleware('auth')->post('/logout', [BrowserAuthController::class, 'destroy'])->name('logout');
 Route::view('/dashboard-preview', 'staff.redesign-preview')->name('staff.redesign-preview');
 Route::middleware('auth')->get('/member', [MemberWorkspaceController::class, 'home'])->name('member.home');
@@ -381,7 +388,7 @@ Route::get('/member/next-steps', [MemberWorkspaceController::class, 'nextSteps']
 Route::get('/member/prayer', [MemberWorkspaceController::class, 'prayerPage'])->name('member.prayer.page');
 Route::middleware('auth')->get('/member/giving', [MemberWorkspaceController::class, 'giving'])->name('member.giving');
 Route::get('/member/testimonies',[TestimonyController::class,'memberIndex'])->name('member.testimonies');
-Route::middleware('throttle:3,1')->post('/member/testimonies',[TestimonyController::class,'memberStore'])->name('member.testimonies.store');
+Route::middleware('public_form_guard')->post('/member/testimonies',[TestimonyController::class,'memberStore'])->name('member.testimonies.store');
 Route::middleware('auth')->delete('/member/testimonies/{testimony}',[TestimonyController::class,'memberWithdraw'])->name('member.testimonies.withdraw');
 Route::middleware('auth')->get('/member/profile', [MemberWorkspaceController::class, 'profilePage'])->name('member.profile');
 Route::middleware('auth')->get('/member/school', [MemberSchoolController::class, 'index'])->name('member.school.index');
@@ -393,8 +400,8 @@ Route::middleware('auth')->post('/member/school/{course}/assessments/{assessment
 Route::middleware('auth')->get('/member/school/{course}/certificate', [MemberSchoolController::class, 'certificate'])->name('member.school.certificate');
 Route::get('/certificates/{code}', [CertificateVerificationController::class, 'show'])->name('public.certificates.verify');
 Route::middleware('auth')->put('/member', [MemberWorkspaceController::class, 'update'])->name('member.update');
-Route::middleware('throttle:5,1')->post('/member/prayer', [MemberWorkspaceController::class, 'prayer'])->name('member.prayer');
-Route::middleware('throttle:5,1')->post('/member/next-steps', [MemberWorkspaceController::class, 'requestNextStep'])->name('member.next-steps.request');
+Route::middleware('public_form_guard')->post('/member/prayer', [MemberWorkspaceController::class, 'prayer'])->name('member.prayer');
+Route::middleware('public_form_guard')->post('/member/next-steps', [MemberWorkspaceController::class, 'requestNextStep'])->name('member.next-steps.request');
 Route::get('/storage/{path}', [PublicStorageController::class, 'show'])
     ->withoutMiddleware([
         \Illuminate\Cookie\Middleware\EncryptCookies::class,
@@ -411,13 +418,13 @@ Route::get('/locations', [PublicWorkspaceController::class, 'locations'])->name(
 Route::get('/locations/{slug}', [PublicWorkspaceController::class, 'location'])->name('public.location');
 Route::get('/service-times', [PublicWorkspaceController::class, 'serviceTimes'])->name('public.service-times');
 Route::get('/events', [PublicWorkspaceController::class, 'events'])->name('public.events');
-Route::get('/events/{slug}', [PublicWorkspaceController::class, 'event'])->name('public.events.show');
-Route::post('/events/{event}/register', [EventOperationsController::class, 'webRegister'])->name('public.events.register');
+Route::middleware('public_form_guard:start')->get('/events/{slug}', [PublicWorkspaceController::class, 'event'])->name('public.events.show');
+Route::middleware('public_form_guard')->post('/events/{event}/register', [EventOperationsController::class, 'webRegister'])->name('public.events.register');
 Route::get('/departments', [PublicWorkspaceController::class, 'departments'])->name('public.departments');
 Route::get('/departments/{slug}', [PublicWorkspaceController::class, 'department'])->name('public.departments.show');
 Route::get('/give', [PublicWorkspaceController::class, 'giving'])->name('public.giving');
 Route::get('/contact', [PublicWorkspaceController::class, 'contact'])->name('public.contact');
-Route::post('/contact', [StaffPeopleController::class, 'contact'])->name('public.contact.submit');
+Route::middleware('public_form_guard')->post('/contact', [StaffPeopleController::class, 'contact'])->name('public.contact.submit');
 Route::get('/testimonies',[TestimonyController::class,'publicIndex'])->name('public.testimonies');
 Route::get('/testimonies/{slug}',[TestimonyController::class,'publicShow'])->name('public.testimony');
 Route::get('/school', [PublicSchoolController::class, 'index'])->name('public.school.index');

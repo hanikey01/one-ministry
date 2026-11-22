@@ -15,6 +15,7 @@
         @endif
         <form class="public-contact-form" method="POST" action="{{ route('public.contact.submit') }}">
             @csrf
+            <x-public-form-guard route="public.contact.submit"/>
             <label>First name <input name="first_name" required maxlength="100" autocomplete="given-name"></label>
             <label>Last name <input name="last_name" maxlength="100" autocomplete="family-name"></label>
             <label>Email address <input name="email" type="email" maxlength="254" autocomplete="email"></label>

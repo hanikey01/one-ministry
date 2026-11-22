@@ -92,7 +92,7 @@ class MinistryTheme
             $preset = self::paletteFromSeed($customSeed);
         }
 
-        $chrome = $customSeed ?? $preset['chrome'];
+        $chrome = $preset['chrome'];
 
         $values = [
             '--theme-preset' => $settings?->theme_preset ?? 'tech_blue',
@@ -172,7 +172,9 @@ class MinistryTheme
             'dark_muted' => self::adjustForContrast(self::mix($darkInk, $darkSurface, 0.42), $darkSurface, 4.5),
             'dark_line' => self::mix($darkInk, $darkSurface, 0.82),
             'action' => $seed,
-            'chrome' => $seed,
+            // Keep the selected ministry colour as the action/active accent,
+            // while navigation uses a deeper tone from the same hue family.
+            'chrome' => self::mix($seed, '#000000', 0.46),
         ];
     }
 

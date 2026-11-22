@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\FeatureSetting;
 use App\Models\ServiceOccurrence;
+use App\Services\ConnectionRequestService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -11,7 +12,7 @@ use Illuminate\Support\Str;
 
 class ServiceResponseController extends Controller
 {
-    public function connection(Request $request, ServiceOccurrence $service): JsonResponse
+    public function connection(Request $request, ServiceOccurrence $service, ConnectionRequestService $connections): JsonResponse
     {
         $this->guard($service);
         $data = $request->validate([
@@ -27,23 +28,27 @@ class ServiceResponseController extends Controller
         if ($existing) {
             return response()->json(['data' => ['id' => $existing->id, 'status' => 'already_received']]);
         }
+        $email = filled($data['email'] ?? null) ? mb_strtolower(trim($data['email'])) : null;
+        $person = $request->user() ? $connections->person($request) : $connections->existingPersonForEmail($email);
         $id = (string) Str::uuid();
-        DB::table('service_connection_responses')->insert(['id' => $id, 'service_occurrence_id' => $service->id, 'user_id' => $request->user()?->id, 'kind' => $data['kind'], 'name' => $data['name'] ?? null, 'email' => $data['email'] ?? null, 'phone' => $data['phone'] ?? null, 'consent_to_contact' => (bool) ($data['consent_to_contact'] ?? false), 'idempotency_key' => $key, 'created_at' => now()]);
+        DB::table('service_connection_responses')->insert(['id' => $id, 'service_occurrence_id' => $service->id, 'person_id' => $person?->id, 'user_id' => $request->user()?->id, 'kind' => $data['kind'], 'name' => $data['name'] ?? null, 'email' => $email, 'phone' => $data['phone'] ?? null, 'consent_to_contact' => (bool) ($data['consent_to_contact'] ?? false), 'idempotency_key' => $key, 'created_at' => now()]);
 
         return response()->json(['data' => ['id' => $id, 'status' => 'received']], 201);
     }
 
-    public function prayer(Request $request, ServiceOccurrence $service): JsonResponse
+    public function prayer(Request $request, ServiceOccurrence $service, ConnectionRequestService $connections): JsonResponse
     {
         $this->guard($service);
-        $data = $request->validate(['prayer_text' => ['required', 'string', 'max:4000'], 'display_name' => ['nullable', 'string', 'max:160'], 'contact_email' => ['nullable', 'email', 'max:254'], 'visibility' => ['nullable', 'string', 'in:prayer_team,assigned_care_only'], 'consent_to_contact' => ['boolean']]);
+        $data = $request->validate(['prayer_text' => ['required', 'string', 'max:4000'], 'display_name' => ['nullable', 'string', 'max:160'], 'contact_email' => ['nullable', 'email', 'max:254'], 'consent_to_contact' => ['boolean']]);
         $key = $request->header('Idempotency-Key');
         $existing = $key ? DB::table('service_prayer_requests')->where('service_occurrence_id', $service->id)->where('idempotency_key', $key)->first() : null;
         if ($existing) {
             return response()->json(['data' => ['id' => $existing->id, 'status' => 'already_received']]);
         }
+        $email = filled($data['contact_email'] ?? null) ? mb_strtolower(trim($data['contact_email'])) : null;
+        $person = $request->user() ? $connections->person($request) : $connections->existingPersonForEmail($email);
         $id = (string) Str::uuid();
-        DB::table('service_prayer_requests')->insert(['id' => $id, 'service_occurrence_id' => $service->id, 'user_id' => $request->user()?->id, 'display_name' => $data['display_name'] ?? null, 'contact_email' => $data['contact_email'] ?? null, 'prayer_text' => trim($data['prayer_text']), 'visibility' => $data['visibility'] ?? 'assigned_care_only', 'consent_to_contact' => (bool) ($data['consent_to_contact'] ?? false), 'idempotency_key' => $key, 'created_at' => now()]);
+        DB::table('service_prayer_requests')->insert(['id' => $id, 'service_occurrence_id' => $service->id, 'person_id' => $person?->id, 'user_id' => $request->user()?->id, 'display_name' => $data['display_name'] ?? null, 'contact_email' => $email, 'prayer_text' => trim($data['prayer_text']), 'visibility' => 'prayer_team', 'consent_to_contact' => (bool) ($data['consent_to_contact'] ?? false), 'idempotency_key' => $key, 'created_at' => now()]);
 
         return response()->json(['data' => ['id' => $id, 'status' => 'received']], 201);
     }

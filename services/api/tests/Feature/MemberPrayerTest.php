@@ -20,11 +20,11 @@ class MemberPrayerTest extends TestCase
 
         $created = $this->actingAs($owner)->postJson('/api/v1/me/prayer-requests', [
             'prayer_text' => 'Please pray for wisdom.',
-            'visibility' => 'assigned_care_only',
             'consent_to_contact' => false,
         ])->assertCreated();
 
         $stored = DB::table('prayer_requests')->where('id', $created->json('data.id'))->first();
+        $this->assertSame('prayer_team', $stored->visibility);
         $this->assertNotSame('Please pray for wisdom.', $stored->prayer_text_encrypted);
         $this->actingAs($owner)->getJson('/api/v1/me/prayer-requests')->assertJsonPath('data.0.prayer_text', 'Please pray for wisdom.');
         $this->actingAs($other)->getJson('/api/v1/me/prayer-requests')->assertOk()->assertJsonCount(0, 'data');

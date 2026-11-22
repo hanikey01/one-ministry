@@ -14,7 +14,7 @@ Accepted by user direction, 2026-11-14. AI page design no longer composes the re
 
 ### D-045 - Provider connection and model capability are separate checks
 
-Accepted by user direction, 2026-11-14. AI route verification first checks each configured provider credential once through its lightweight model-list endpoint, then tests every selected model independently with a compact page-composition contract. A model is tested with strict JSON Schema first and one bounded JSON-object fallback when the provider rejects or cannot honor that schema mode. OpenRouter upstream fallbacks are disabled during verification and generation so the configured model is the model actually used. Provider authentication, transport, model capability, and internal response-processing failures remain distinct; an internal application parsing failure does not mark a model incompatible or erase prior compatibility evidence. Runtime structured generation uses the same response extraction and fallback policy as verification.
+Accepted by user direction, 2026-11-14. AI route verification first checks each configured provider credential once through its lightweight model-list endpoint, then tests every selected model independently with a compact page-composition contract. The probe permits up to 8,192 combined reasoning and visible-output tokens so reasoning-capable models are not falsely rejected at the former 1,600-token cutoff. A model is tested with strict JSON Schema first and one bounded JSON-object fallback when the provider rejects or cannot honor that schema mode. OpenRouter upstream fallbacks are disabled during verification and generation so the configured model is the model actually used; its response-healing plugin may repair JSON syntax, after which the same authoritative local schema/compiler validation still runs. Provider authentication, transport, model capability, and internal response-processing failures remain distinct; an internal application parsing failure does not mark a model incompatible or erase prior compatibility evidence. Runtime structured generation uses the same response extraction and fallback policy as verification.
 
 **Status:** Implemented in source. Live provider checks and release-browser verification remain required.
 
@@ -219,7 +219,7 @@ When a question is resolved, record date, decision maker, evidence, alternatives
 
 ### D-049 — Custom ministry colour generates a complete accessible palette
 
-**Decision:** A ministry may choose either a platform preset or one custom ministry colour. When custom is selected, that stored seed generates the complete shared light/dark semantic palette: canvas, surfaces, text, muted text, borders, focus, selected state, action, action foreground, and navigation chrome. The generator selects or adjusts foregrounds to meet contrast targets. Success, warning, and danger remain platform-owned semantic colours and are not recoloured from the ministry seed. Individual colour pickers remain excluded.
+**Decision:** A ministry may choose either a platform preset or one custom ministry colour. When custom is selected, that stored seed generates the complete shared light/dark semantic palette: canvas, surfaces, text, muted text, borders, focus, selected state, action, action foreground, and navigation chrome. The selected seed remains the action and active-state accent; navigation chrome is a darker generated variation of the same hue. The generator selects or adjusts foregrounds to meet contrast targets. Success, warning, and danger remain platform-owned semantic colours and are not recoloured from the ministry seed. Individual colour pickers remain excluded.
 
 **Reason:** User direction, 2026-11-16. A ministry needs a coherent branded system rather than a custom navigation colour beside unrelated preset surfaces, without permitting inaccessible per-page colour fragmentation.
 
@@ -256,3 +256,59 @@ When a question is resolved, record date, decision maker, evidence, alternatives
 **Reason:** One Email workspace gives staff a coherent delivery and campaign workflow while preserving consent, shared-hosting operation, and clear separation from transactional system messages.
 
 **Status:** Accepted and implemented for the fresh-install baseline, 2026-11-11. SMS remains outside this implementation step.
+
+### D-050 — Default birthday behavior and prayer-team routing
+
+**Decision:** Storing a birthday month/day enables public recognition and advance staff reminders by default; the member interface has no separate reminder or recognition opt-ins. Reminders use ministry-local dates, contain no age, require `birthdays.read`, and deduplicate by person, recipient, birthday year, and reminder type. Prayer submission no longer offers assigned care staff. All requests route to the restricted prayer workspace for Prayer Team, appropriate Ministry Administrators, and Super Administrators through `prayer.read`; prayer reads are audited and pastoral care-case assignment remains a separate domain.
+
+**Reason:** Explicit user direction, 2026-11-20. The previous three-preference birthday model and assigned-care prayer routing conflict with the required member experience and staff operating model.
+
+**Status:** Accepted. This supersedes the birthday preference language in D-006/product documents and the prayer-assignment portions of D-048. Legacy database columns remain temporarily for non-destructive upgrade compatibility but are not read or written by current behavior.
+
+### D-051 — Staff-controlled media URLs across the page editor
+
+**Decision:** Every staff-editable page-media position, including media markers inside an AI canvas section, accepts either a validated installation-local path beginning with `/` or a complete HTTP(S) URL. The Media Library remains the preferred convenience path but is not mandatory. AI providers still cannot invent remote media sources; a staff member must explicitly choose or enter them. Applying media is an undoable draft edit. A missing or stale canvas marker is an explicit recoverable error and never closes the picker or reports a successful change. Sandboxed custom sections retain their authored grid or flex display while the renderer enforces a full-width, non-overflowing root.
+
+**Reason:** User direction, 2026-11-21. Native page fields already accepted internal and external media, but AI canvas markers exposed only the Media Library and could silently fail, leaving intended visual regions blank and making responsive sections appear left-aligned.
+
+**Status:** Accepted for implementation. This expands the media policy in D-031 and supersedes the YouTube/Vimeo-only wording previously present in `07-design.md`; protocol allowlisting, sandbox isolation, draft review, and publication controls remain unchanged.
+
+### D-052 — Existing-account role management in Staff Access
+
+**Decision:** Staff Access manages roles for existing user accounts as well as invitations. Each account appears in one row with one multi-select control representing its complete active installation-role set. An actor with `roles.manage`, verified email, and a current MFA-verified session saves that set atomically: newly selected roles create assignments and deselected roles revoke their assignments without deleting history. Super Administrator and Security Administrator may be granted only to a target with verified email and enabled MFA. Every mutation is audited, and the final active Super Administrator cannot be removed. Department, service, and meeting object assignments remain in their owning workspaces.
+
+**Reason:** Explicit user direction, 2026-11-21. Invitation-only access administration cannot correct or expand an existing account's responsibility and prevents a ministry from deliberately appointing another Super Administrator.
+
+**Status:** Updated by user direction, 2026-11-21, to replace assignment-per-row editing with one account row and an atomic multi-role selector. This resolves the earlier `05-systems.md` wording that excluded a separate MFA challenge from every staff workflow and clarifies that the routine invitation allowlist does not limit existing-account role management.
+
+### D-053 — Guest email is a CRM filing key, not authentication
+
+**Decision:** Public testimony, prayer, next-step, event-registration, and live-service response forms normalize a supplied email and file the record under the matching installation-local person/account when one exists. A registered account without a person row receives one using the account's stored identity. Typed email never populates an authenticated actor/submitted-by field, never exposes account existence, and cannot change a registered person's general contact-consent preference.
+
+**Reason:** Explicit user direction, 2026-11-21. Separate guest records for a known email fragment one person's ministry history, while treating typed email as authentication would create impersonation and privacy risks.
+
+**Status:** Accepted for implementation. Restricted data remains governed by its existing domain permissions.
+
+### D-054 — Searchable IANA city time zones
+
+**Decision:** Setup and Appearance settings store canonical IANA city time-zone identifiers and present them as a searchable region list with human-readable city names and current UTC offsets. UTC is retained as the universal option. Manual fixed-offset choices are not offered because they do not track daylight-saving changes.
+
+**Reason:** The unformatted hundreds-item identifier list is difficult to scan. WordPress provides useful precedent by grouping PHP/IANA identifiers by continent and showing UTC choices, but the ministry platform prioritizes schedule correctness over compatibility-oriented manual offsets.
+
+**Status:** Accepted for implementation, 2026-11-21.
+
+### D-055 — Structured portable location addresses
+
+**Decision:** Setup and staff location editing use the same bundled CLDR/Google-derived country and first-level subdivision catalog. Country and supported state/province/region fields are searchable selectors that persist stable codes plus display names. City/locality remains an explicit text field because a complete worldwide city selector requires an external geocoding provider. Structured components are authoritative; the existing multiline `locations.address` remains a generated compatibility field for public rendering and export. The primary location address mirrors the installation public address.
+
+**Reason:** Explicit user direction, 2026-11-21. Free-typed country and region values drift, cannot drive dependent choices, and made setup inconsistent with later location editing.
+
+**Status:** Implemented in source. Existing legacy formatted addresses remain visible until staff save structured replacements; database migration and browser verification remain release-gate work.
+
+### D-056 — Broad AI page design inside an isolated execution boundary
+
+**Decision:** AI page composition accepts broad semantic HTML, embedded style blocks, inert form layout, ordinary CSS, modern media-query range syntax, and container queries. Harmless Markdown code fences around HTML or CSS are normalized before validation. The compiler must not reject a design merely because it uses a newer responsive syntax or a concise valid stylesheet. Generated executable HTML, inline event handlers, unsafe URL schemes, external resource loaders, and active form submission remain excluded from AI output until the iframe runtime provides a verified no-egress policy. AI-authored calls to action are non-navigating visual placeholders until staff assigns a real destination; the compiler and renderer remove model-created `href` values so a fragment cannot recursively load the public page inside its own sandbox. AI-authored palette variables remain part of the design and are not replaced by installation theme-switcher tokens at publish time. A locally rejected section receives one bounded same-model correction request before configured fallback handling. Compatibility checks preserve the canonical rejection code rather than reporting every semantic failure as malformed structured output.
+
+**Reason:** Explicit user direction, 2026-11-21. The page designer must be able to create varied, modern layouts without syntactic false negatives, while generated content remains untrusted even when a model is not expected to act maliciously. The existing opaque-origin iframe still permits external image/media/frame requests and user-activated top navigation, so removing all executable-content controls would expose visitor input and navigation to generated code.
+
+**Status:** Implemented in the composition validator and page-generation repair path. No Docker or production asset build was run per user direction; focused provider, compiler, frontend, and browser validation remain release gates.

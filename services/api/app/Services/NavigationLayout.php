@@ -133,6 +133,7 @@ final class NavigationLayout
             'staff.services' => $this->item('Services', 'services', 'staff.services', 'Workspace', 'services.manage', 'digital_church'),
             'staff.follow-up' => $this->item('Follow-up', 'followup', 'staff.follow-up', 'Workspace', 'services.manage', null, 'people'),
             'staff.care' => $this->item('Care', 'care', 'staff.care', 'Workspace', 'care.manage'),
+            'staff.prayer-requests' => $this->item('Prayer requests', 'prayer', 'staff.prayer-requests', 'Workspace', 'prayer.read'),
             'staff.events' => $this->item('Events', 'calendar', 'staff.events', 'Ministry', 'community.manage'),
             'staff.departments' => $this->item('Departments', 'departments', 'staff.departments', 'Ministry'),
             'staff.school.index' => $this->item('Digital school', 'school', 'staff.school.index', 'Ministry', 'school.manage', 'digital_school'),
@@ -167,7 +168,7 @@ final class NavigationLayout
             'member.prayer.page' => $this->item('Prayer', 'care', 'member.prayer.page', 'My ministry'),
             'member.testimonies' => $this->item('My testimonies','sparkles','member.testimonies','My ministry',null,null,'testimonies'),
             'member.giving' => $this->item('Giving', 'giving', 'member.giving', 'My account', null, null, 'giving'),
-            'member.profile' => $this->item('Profile & preferences', 'people', 'member.profile', 'My account'),
+            'member.profile' => $this->item('Profile', 'people', 'member.profile', 'My account'),
         ];
     }
 

@@ -4,6 +4,7 @@ if (!window.__aiCanvasBridge) {
     window.__aiCanvasBridge = true;
     const themeTokens = ['--action','--action-foreground','--brand','--canvas','--surface','--surface-muted','--ink','--muted','--line','--line-strong'];
     const sendTheme = (frame) => {
+        if (frame.matches('[data-ai-canvas-design]')) return;
         const themeSurface = frame.closest('[data-public-shell],[data-workspace-shell],[data-worship-shell]') ?? document.documentElement;
         const styles = getComputedStyle(themeSurface);
         frame.contentWindow?.postMessage({type:'ai-canvas-theme', tokens:Object.fromEntries(themeTokens.map((key) => [key, styles.getPropertyValue(key).trim()]))}, '*');
@@ -1210,7 +1211,10 @@ enhancedSelects.forEach((select) => {
     }, true);
     addPageListener(document, 'click', (event) => { if (!wrapper.contains(event.target) && !options.contains(event.target)) close(); });
     select.addEventListener('change', sync);
-    new MutationObserver(sync).observe(select, { attributes: true, attributeFilter: ['disabled'] });
+    new MutationObserver((mutations) => {
+        if (mutations.some((mutation) => mutation.type === 'childList')) renderChoices();
+        else sync();
+    }).observe(select, { attributes: true, attributeFilter: ['disabled'], childList: true });
     select.before(wrapper); wrapper.append(select, trigger, options); renderChoices();
 });
 };
@@ -1226,9 +1230,52 @@ const localizeGivingSelects = (root = document) => {
 };
 localizeGivingSelects();
 initializeEnhancedSelects();
+
+const initializeAddressFields = (root = document) => {
+    root.querySelectorAll('[data-address-fields]').forEach((fields) => {
+        if (fields.dataset.addressFieldsReady === 'true') return;
+        fields.dataset.addressFieldsReady = 'true';
+        const country = fields.querySelector('[data-address-country]');
+        const subdivision = fields.querySelector('[data-address-subdivision]');
+        const endpoint = fields.dataset.subdivisionsEndpoint;
+        if (!country || !subdivision || !endpoint) return;
+        let requestId = 0;
+        country.addEventListener('change', async () => {
+            const currentRequest = ++requestId;
+            const code = country.value;
+            subdivision.disabled = true;
+            subdivision.replaceChildren(new Option(code ? 'Loading states and regions…' : 'Choose a country first', ''));
+            if (!code) return;
+            try {
+                const response = await fetch(endpoint.replace('__COUNTRY__', encodeURIComponent(code)), {
+                    headers: { Accept: 'application/json' }, credentials: 'same-origin',
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(result.message || 'States and regions could not be loaded.');
+                if (currentRequest !== requestId) return;
+                const choices = Array.isArray(result.data?.subdivisions) ? result.data.subdivisions : [];
+                const fragment = document.createDocumentFragment();
+                fragment.append(new Option(choices.length ? 'Choose a state or region' : 'No listed state or region', ''));
+                choices.forEach((choice) => {
+                    const option = new Option(choice.label, choice.value);
+                    option.dataset.searchText = choice.search_text || `${choice.label} ${choice.value}`;
+                    fragment.append(option);
+                });
+                subdivision.replaceChildren(fragment);
+                subdivision.disabled = choices.length === 0;
+            } catch (error) {
+                if (currentRequest !== requestId) return;
+                subdivision.replaceChildren(new Option(error instanceof Error ? error.message : 'States and regions could not be loaded.', ''));
+                subdivision.disabled = true;
+            }
+        });
+    });
+};
+initializeAddressFields();
 // Pages that replace fragments in place (for example the media library filters)
 // can re-run the same select enhancement without a full navigation.
 window.initializeEnhancedSelects = initializeEnhancedSelects;
+window.initializeAddressFields = initializeAddressFields;
 
 document.querySelectorAll('[data-copy-text]').forEach((button) => button.addEventListener('click', async () => {
     const value = button.dataset.copyText ?? '';
@@ -1247,6 +1294,7 @@ document.addEventListener('ministry:enhance-selects', (event) => {
     const root = event.detail instanceof Element ? event.detail : document;
     localizeGivingSelects(root);
     initializeEnhancedSelects(root);
+    initializeAddressFields(root);
 });
 
 document.querySelectorAll('[data-provider-form]').forEach((form) => {

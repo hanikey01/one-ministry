@@ -61,6 +61,8 @@ class OpenRouterTextProviderTest extends TestCase
         Http::assertSent(fn ($request): bool => ($request->data()['provider']['require_parameters'] ?? false) === true
             && ($request->data()['response_format']['type'] ?? null) === 'json_schema'
             && ($request->data()['response_format']['json_schema']['strict'] ?? false) === true
+            && ($request->data()['max_tokens'] ?? null) === 8192
+            && ($request->data()['plugins'][0]['id'] ?? null) === 'response-healing'
             && isset($request->data()['response_format']['json_schema']['schema']['properties']['section']['properties']['html']));
     }
 

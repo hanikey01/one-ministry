@@ -46,7 +46,7 @@ Within `services/api/app/Modules/<Module>/`, keep `Models`, `Data`, `Policies`, 
 | --- | --- |
 | `resources/views/public` | Home, public pages, content, locations, events, live watch |
 | `resources/views/auth` | Login, recovery, invitation acceptance, verification |
-| `resources/views/member` | Profile, preferences, departments, events, participation, own giving |
+| `resources/views/member` | Profile, communication choices, departments, events, participation, own giving |
 | `resources/views/staff` | People, care, follow-up, service production, content, reports, settings |
 | `app/Livewire` | Server-authorized interactive workflows, tables, forms, and dashboards |
 | `resources/js` | Alpine.js progressive enhancement, media controls, drawers, and light browser behavior |

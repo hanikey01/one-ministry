@@ -14,8 +14,6 @@ class NotificationPreferenceController extends Controller
         $data = $request->validate([
             'email_marketing' => ['sometimes', 'boolean'],
             'sms_marketing' => ['sometimes', 'boolean'],
-            'birthday_staff_reminder' => ['sometimes', 'boolean'],
-            'birthday_public_recognition' => ['sometimes', 'boolean'],
             'quiet_hours_timezone' => ['nullable', 'timezone'],
             'quiet_hours_start' => ['nullable', 'date_format:H:i'],
             'quiet_hours_end' => ['nullable', 'date_format:H:i'],
