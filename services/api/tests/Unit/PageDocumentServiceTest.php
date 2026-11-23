@@ -2,6 +2,8 @@
 
 namespace Tests\Unit;
 
+use App\Services\AboutPageStarterService;
+use App\Services\CrusadeArchiveStarterService;
 use App\Services\PageDocumentService;
 use App\Services\PageElementRegistry;
 use App\Services\HomepageStarterService;
@@ -221,17 +223,99 @@ class PageDocumentServiceTest extends TestCase
         $this->assertSame('/sermons', $carousel['slide_three_button_url']);
     }
 
-    public function test_homepage_starter_begins_with_a_three_slide_theme_aware_native_carousel(): void
+    public function test_homepage_starter_begins_with_a_theme_aware_three_slide_carousel(): void
     {
         $document = app(HomepageStarterService::class)->document([]);
         $lead = $document['sections'][0]['columns'][0]['elements'][0];
 
         $this->assertSame('carousel', $lead['type']);
-        $this->assertSame('/images/home/flyer-night-of-worship.svg', $lead['content']['slide_one_media_url']);
-        $this->assertSame('/images/home/flyer-grow-in-the-word.svg', $lead['content']['slide_two_media_url']);
-        $this->assertSame('/images/home/flyer-find-your-place.svg', $lead['content']['slide_three_media_url']);
-        $this->assertSame('/departments', $lead['content']['slide_three_button_url']);
+        $this->assertSame('/images/pages/home-arrival-hero.png', $lead['content']['slide_one_media_url']);
+        $this->assertSame('/images/pages/home-community-carousel.png', $lead['content']['slide_two_media_url']);
+        $this->assertSame('/images/pages/home-service-carousel.png', $lead['content']['slide_three_media_url']);
+        $this->assertSame('/service-times', $lead['content']['slide_one_button_url']);
+        $this->assertSame('/about-us', $lead['content']['slide_three_button_url']);
         $this->assertStringContainsString('public-page-carousel', $lead['settings']['custom_css']);
+        $this->assertStringContainsString('touch-action: pan-y', $lead['settings']['custom_css']);
+        $this->assertStringContainsString('border-color: #fff !important', $lead['settings']['custom_css']);
+        $this->assertStringContainsString('border-radius: 999px !important', $lead['settings']['custom_css']);
+    }
+
+    public function test_homepage_starter_keeps_connection_pathways_unique_and_points_its_story_to_about(): void
+    {
+        $document = app(HomepageStarterService::class)->document([]);
+        $typesBySection = collect($document['sections'])->map(fn (array $section) => collect($section['columns'])
+            ->flatMap(fn (array $column) => collect($column['elements'])->pluck('type'))
+            ->all());
+        $pathwayUrls = collect($document['sections'][2]['columns'])
+            ->map(fn (array $column) => $column['elements'][0]['content']['button_url'])
+            ->all();
+        $story = $document['sections'][4]['columns'][0]['elements'][0];
+
+        $this->assertSame(['events', 'locations'], $typesBySection[3]);
+        $this->assertSame(['/member/prayer', '/testimonies', '/departments', '/contact'], $pathwayUrls);
+        $this->assertSame('Submit a prayer request', $document['sections'][2]['columns'][0]['elements'][0]['content']['title']);
+        $this->assertNotContains('departments', $typesBySection[3]);
+        $this->assertNotContains('prayer', collect($typesBySection)->flatten()->all());
+        $this->assertSame('About us', $story['content']['button_label']);
+        $this->assertSame('/about-us', $story['content']['button_url']);
+    }
+
+    public function test_homepage_starter_only_includes_giving_when_the_module_is_enabled(): void
+    {
+        $withoutGiving = app(HomepageStarterService::class)->document([]);
+        $withGiving = app(HomepageStarterService::class)->document(['giving']);
+        $withoutUrls = collect($withoutGiving['sections'])->flatMap(fn (array $section) => collect($section['columns'])->flatMap(fn (array $column) => collect($column['elements'])->pluck('content.button_url')));
+        $withUrls = collect($withGiving['sections'])->flatMap(fn (array $section) => collect($section['columns'])->flatMap(fn (array $column) => collect($column['elements'])->pluck('content.button_url')));
+
+        $this->assertNotContains('/give', $withoutUrls);
+        $this->assertContains('/give', $withUrls);
+        $this->assertCount(5, $withoutGiving['sections']);
+        $this->assertCount(6, $withGiving['sections']);
+        $givingSection = $withGiving['sections'][5];
+        $this->assertCount(1, $givingSection['columns']);
+        $this->assertSame('media_text', $givingSection['columns'][0]['elements'][0]['type']);
+        $this->assertSame('/images/pages/giving-community-support.png', $givingSection['columns'][0]['elements'][0]['content']['media_url']);
+        $this->assertSame('right', $givingSection['columns'][0]['elements'][0]['content']['placement']);
+        $this->assertStringContainsString('grid-template-columns: minmax(280px, .85fr) minmax(0, 1.15fr)', $givingSection['columns'][0]['elements'][0]['settings']['custom_css']);
+        $this->assertStringContainsString('.public-page-media-visual { order: 2; aspect-ratio: 16 / 9', $givingSection['columns'][0]['elements'][0]['settings']['custom_css']);
+        $this->assertStringContainsString('height: 100%; min-height: 0; object-fit: cover', $givingSection['columns'][0]['elements'][0]['settings']['custom_css']);
+    }
+
+    public function test_about_page_starter_is_a_theme_aware_native_editable_document(): void
+    {
+        $document = app(AboutPageStarterService::class)->document([]);
+        $types = collect($document['sections'])->flatMap(fn (array $section) => collect($section['columns'])->flatMap(fn (array $column) => collect($column['elements'])->pluck('type')));
+
+        $this->assertSame(2, $document['version']);
+        $this->assertCount(6, $document['sections']);
+        $this->assertSame('hero', $document['sections'][0]['columns'][0]['elements'][0]['type']);
+        $this->assertSame('/service-times', $document['sections'][0]['columns'][0]['elements'][0]['content']['button_url']);
+        $this->assertSame('auto', $document['sections'][0]['columns'][0]['elements'][0]['settings']['button_width']);
+        $this->assertStringContainsString('align-content: end', $document['sections'][0]['columns'][0]['elements'][0]['settings']['custom_css']);
+        $this->assertStringContainsString('margin: 0 auto 0 0', $document['sections'][0]['columns'][0]['elements'][0]['settings']['custom_css']);
+        $this->assertSame('/images/pages/home-arrival-hero.png', $document['sections'][0]['settings']['background_image']);
+        $this->assertSame(['image_card', 'image_card'], collect($document['sections'][5]['columns'])->map(fn (array $column) => $column['elements'][0]['type'])->all());
+        $this->assertSame(['/departments', '/locations'], collect($document['sections'][5]['columns'])->map(fn (array $column) => $column['elements'][0]['content']['button_url'])->all());
+        $this->assertSame(['/images/pages/home-service-carousel.png', '/images/pages/home-arrival-hero.png'], collect($document['sections'][5]['columns'])->map(fn (array $column) => $column['elements'][0]['content']['url'])->all());
+        $this->assertNotContains('departments', $types);
+        $this->assertNotContains('locations', $types);
+        $this->assertNotContains('testimonial', $types);
+        $this->assertNotContains('statistics', $types);
+    }
+
+    public function test_crusade_archive_starter_has_empty_native_media_slots_for_staff_content(): void
+    {
+        $document = app(CrusadeArchiveStarterService::class)->document([]);
+        $elements = collect($document['sections'])->flatMap(fn (array $section) => collect($section['columns'])->flatMap(fn (array $column) => $column['elements']));
+        $videos = $elements->where('type', 'video_embed')->values();
+
+        $this->assertSame(2, $document['version']);
+        $this->assertSame('hero', $document['sections'][0]['columns'][0]['elements'][0]['type']);
+        $this->assertSame('gallery', $document['sections'][2]['columns'][0]['elements'][0]['type']);
+        $this->assertSame('', $document['sections'][2]['columns'][0]['elements'][0]['content']['images']);
+        $this->assertCount(4, $videos);
+        $this->assertSame(['Highlight one', 'Highlight two', 'Highlight three', 'Full crusade recording'], $videos->pluck('content.title')->all());
+        $this->assertSame(['', '', '', ''], $videos->pluck('content.url')->all());
     }
 
     public function test_page_objects_only_accept_bounded_overflow_settings(): void

@@ -188,6 +188,48 @@ class InstallMinistry
             ]);
             MinistrySetting::query()->whereKey(MinistrySetting::SINGLETON_ID)->update(['homepage_page_id' => $homepageId]);
 
+            // The public site begins with the matching About Us design too. Both
+            // defaults remain ordinary editable pages after installation.
+            $aboutDocument = app(\App\Services\AboutPageStarterService::class)->document(FeatureSetting::query()->where('state', 'enabled')->pluck('key')->all());
+            DB::table('pages')->insert([
+                'id' => (string) Str::uuid(),
+                'title' => 'About Us',
+                'slug' => 'about-us',
+                'body' => app(PageDocumentService::class)->plainText($aboutDocument, FeatureSetting::query()->where('state', 'enabled')->pluck('key')->all()),
+                'blocks' => json_encode($aboutDocument, JSON_THROW_ON_ERROR),
+                'page_type' => 'standard',
+                'source_key' => 'about',
+                'seo_title' => 'About '.$input['name'],
+                'seo_description' => 'Learn about our ministry, its story, values, people, and public life.',
+                'status' => 'published',
+                'created_by' => $admin->id,
+                'updated_by' => $admin->id,
+                'published_by' => $admin->id,
+                'published_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // Keep the archive private until staff have added the genuine crusade
+            // media and checked its historical details.
+            $crusadeDocument = app(\App\Services\CrusadeArchiveStarterService::class)->document(FeatureSetting::query()->where('state', 'enabled')->pluck('key')->all());
+            DB::table('pages')->insert([
+                'id' => (string) Str::uuid(),
+                'title' => 'Ministry Crusade',
+                'slug' => 'crusade-archive',
+                'body' => app(PageDocumentService::class)->plainText($crusadeDocument, FeatureSetting::query()->where('state', 'enabled')->pluck('key')->all()),
+                'blocks' => json_encode($crusadeDocument, JSON_THROW_ON_ERROR),
+                'page_type' => 'standard',
+                'source_key' => 'crusade_archive',
+                'seo_title' => 'Ministry Crusade Archive',
+                'seo_description' => 'A private, editable archive for verified crusade photos and recordings.',
+                'status' => 'draft',
+                'created_by' => $admin->id,
+                'updated_by' => $admin->id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
             foreach ([
                 ['Media & Production', 'media-production', 'Visual, audio, livestream, projection, and service production.'],
                 ['Prayer', 'prayer', 'Prayer gatherings and prayer-team coordination.'],

@@ -4085,7 +4085,8 @@ html body.ministry-app .workspace-content header.workspace-page-heading.staff-pa
 }
 html body.ministry-app .workspace-content header.workspace-page-heading.staff-page-command>.button,
 html body.ministry-app .workspace-content header.workspace-page-heading.staff-page-command>.page-command-actions,
-html body.ministry-app .workspace-content header.workspace-page-heading.staff-page-command>.page-command-actions>.button{
+html body.ministry-app .workspace-content header.workspace-page-heading.staff-page-command>.page-command-actions>.button,
+html body.ministry-app .workspace-content header.workspace-page-heading.staff-page-command>.page-command-actions>form>.button{
     width:max-content;
     max-width:100%;
     flex:0 0 auto;
@@ -4093,7 +4094,8 @@ html body.ministry-app .workspace-content header.workspace-page-heading.staff-pa
     white-space:nowrap;
 }
 html body.ministry-app .workspace-content header.workspace-page-heading.staff-page-command>.button,
-html body.ministry-app .workspace-content header.workspace-page-heading.staff-page-command>.page-command-actions>.button{
+html body.ministry-app .workspace-content header.workspace-page-heading.staff-page-command>.page-command-actions>.button,
+html body.ministry-app .workspace-content header.workspace-page-heading.staff-page-command>.page-command-actions>form>.button{
     min-height:42px;
     gap:8px;
     padding-inline:15px;
@@ -4188,7 +4190,8 @@ body .content-library-tools strong{flex:0 0 auto;padding:0 7px;color:var(--ink);
     }
     html body.ministry-app .workspace-content header.workspace-page-heading.staff-page-command>.button,
     html body.ministry-app .workspace-content header.workspace-page-heading.staff-page-command>.page-command-actions,
-    html body.ministry-app .workspace-content header.workspace-page-heading.staff-page-command>.page-command-actions>.button{
+    html body.ministry-app .workspace-content header.workspace-page-heading.staff-page-command>.page-command-actions>.button,
+    html body.ministry-app .workspace-content header.workspace-page-heading.staff-page-command>.page-command-actions>form>.button{
         width:max-content;
         align-self:flex-start;
     }

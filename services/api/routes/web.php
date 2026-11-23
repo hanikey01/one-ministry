@@ -304,6 +304,7 @@ Route::middleware(['auth', 'permission:content.manage'])->put('/staff/navigation
 Route::middleware(['auth', 'permission:content.manage'])->delete('/staff/navigation/{item}', [NavigationWorkspaceController::class, 'destroy'])->name('staff.navigation.destroy');
 Route::middleware(['auth', 'permission:content.manage'])->get('/staff/pages', [PageWorkspaceController::class, 'index'])->name('staff.pages');
 Route::middleware(['auth', 'permission:content.manage'])->get('/staff/pages/create', [PageWorkspaceController::class, 'create'])->name('staff.pages.create');
+Route::middleware(['auth', 'permission:content.manage'])->post('/staff/pages/create-about', [PageWorkspaceController::class, 'createAboutPage'])->name('staff.pages.create-about');
 Route::middleware(['auth', 'permission:content.manage'])->get('/staff/pages/media', [PageWorkspaceController::class, 'mediaCatalog'])->name('staff.pages.media');
 Route::middleware(['auth', 'permission:content.manage'])->post('/staff/pages/preview', [PageWorkspaceController::class, 'preview'])->name('staff.pages.preview');
 Route::middleware(['auth', 'permission:content.manage', 'throttle:10,1'])->post('/staff/pages/ai-draft', AiPageDraftController::class)->name('staff.pages.ai-draft');
@@ -312,6 +313,7 @@ Route::middleware(['auth', 'permission:content.manage', 'throttle:30,1'])->post(
 Route::middleware(['auth', 'permission:content.manage'])->delete('/staff/pages/ai-generations/{generation}', [AiPageDraftController::class, 'cancelGeneration'])->name('staff.pages.ai-generation.cancel');
 Route::middleware(['auth', 'permission:content.manage'])->post('/staff/pages/ai-object-revision', [AiPageDraftController::class, 'reviseObject'])->name('staff.pages.ai-object-revision');
 Route::middleware(['auth', 'permission:content.manage'])->post('/staff/pages', [PageWorkspaceController::class, 'store'])->name('staff.pages.store');
+Route::middleware(['auth', 'permission:content.manage'])->post('/staff/pages/{page}/duplicate', [PageWorkspaceController::class, 'duplicate'])->name('staff.pages.duplicate');
 Route::middleware(['auth', 'permission:content.manage'])->get('/staff/pages/{page}/edit', [PageWorkspaceController::class, 'edit'])->name('staff.pages.edit');
 Route::middleware(['auth', 'permission:content.manage'])->post('/staff/pages/{page}/apply-homepage-design', [PageWorkspaceController::class, 'applyHomepageDesign'])->name('staff.pages.apply-homepage-design');
 Route::middleware(['auth', 'permission:content.manage'])->put('/staff/pages/{page}', [PageWorkspaceController::class, 'update'])->name('staff.pages.update');

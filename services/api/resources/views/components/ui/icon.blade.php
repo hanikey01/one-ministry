@@ -9,6 +9,7 @@
         @case('departments') <circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2"/><path d="M3 20a6 6 0 0 1 12 0M15 15a5 5 0 0 1 6 5"/> @break
         @case('calendar') <rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/> @break
         @case('content') <rect x="3" y="4" width="18" height="16" rx="2"/><path d="m8 13 2.5-2.5L15 15l2-2 3 3M8 8h.01"/> @break
+        @case('copy') <rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"/> @break
         @case('school') <path d="m3 10 9-5 9 5-9 5-9-5Z"/><path d="M7 12.5V17c3 2 7 2 10 0v-4.5M21 10v6"/> @break
         @case('homepage') <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/> @break
         @case('followup') <path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6M8 12l2.5 2.5L16 9"/> @break

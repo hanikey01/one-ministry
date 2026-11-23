@@ -29,14 +29,91 @@ class PageWorkspaceController extends Controller
         return view('staff.pages.index', compact('settings', 'pages') + ['user' => $request->user()]);
     }
 
+    /** Open the default About Us page, or create the editable fallback draft if it is absent. */
+    public function createAboutPage(Request $request): RedirectResponse
+    {
+        $existing = DB::table('pages')->where('source_key', 'about')->orWhere('slug', 'about-us')->first();
+        if ($existing) {
+            return to_route('staff.pages.edit', $existing->id)->with('status', 'The About Us page already exists.');
+        }
+
+        $id = (string) Str::uuid();
+        $document = app(\App\Services\AboutPageStarterService::class)->document($this->enabledFeatures());
+        $blocks = json_encode($document, JSON_THROW_ON_ERROR);
+        $data = [
+            'title' => 'About Us',
+            'slug' => 'about-us',
+            'body' => app(\App\Services\PageDocumentService::class)->plainText($document, $this->enabledFeatures()),
+            'blocks' => $blocks,
+            'page_type' => 'standard',
+            'source_key' => 'about',
+            'seo_title' => 'About Us',
+            'seo_description' => 'Learn about our ministry, its story, values, people, and public life.',
+        ];
+
+        DB::transaction(function () use ($request, $id, $data): void {
+            DB::table('pages')->insert([...$data, 'id' => $id, 'status' => 'draft', 'created_by' => $request->user()->id, 'updated_by' => $request->user()->id, 'created_at' => now(), 'updated_at' => now()]);
+            $this->revision($id, 1, $data, $request->user()->id);
+            $this->audit($request, 'content.about_page_created', $id, ['slug' => 'about-us', 'status' => 'draft', 'design' => 'proposed_ministry_about_page']);
+        });
+
+        return to_route('staff.pages.edit', $id)->with('status', 'The proposed About Us design is ready as a private draft. Review the story and values before publishing.');
+    }
+
     public function create(Request $request): View
     {
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
-        $starter = ['label' => 'New page', 'slug' => ''];
+        $template = $request->string('template')->toString();
+        $starter = $template === 'crusade'
+            ? ['label' => 'Ministry Crusade', 'slug' => 'crusade-archive']
+            : ['label' => 'New page', 'slug' => ''];
 
         $features = $this->enabledFeatures();
         $elementRegistry = app(\App\Services\PageElementRegistry::class);
-        return view('staff.pages.form', compact('settings', 'starter', 'features') + ['user' => $request->user(), 'page' => null, 'canPublish' => app(PermissionChecker::class)->allows($request->user(), 'content.publish'), 'blocks' => $this->starterDocument('blank'), 'elementCatalog' => $elementRegistry->available($features), 'elementCategories' => $elementRegistry->categories(), 'aiDraftAvailable' => app(ModuleAvailability::class)->visibleToStaff('ai_page_editor', $request->user()), 'aiDraftRoute' => DB::table('ai_task_routes')->where('task_key', 'page_editor')->first()]);
+        return view('staff.pages.form', compact('settings', 'starter', 'features') + ['user' => $request->user(), 'page' => null, 'canPublish' => app(PermissionChecker::class)->allows($request->user(), 'content.publish'), 'blocks' => $this->starterDocument($template === 'crusade' ? 'crusade' : 'blank'), 'elementCatalog' => $elementRegistry->available($features), 'elementCategories' => $elementRegistry->categories(), 'aiDraftAvailable' => app(ModuleAvailability::class)->visibleToStaff('ai_page_editor', $request->user()), 'aiDraftRoute' => DB::table('ai_task_routes')->where('task_key', 'page_editor')->first()]);
+    }
+
+    /** Duplicate any editable page into a new private draft without copying its public identity. */
+    public function duplicate(Request $request, string $page): RedirectResponse
+    {
+        $source = DB::table('pages')->where('id', $page)->firstOrFail();
+        $features = $this->enabledFeatures();
+        $document = $this->editorDocument($source->blocks ?? null);
+        $id = (string) Str::uuid();
+        $title = Str::limit('Copy of '.$source->title, 200, '');
+        $slug = $this->copySlug((string) $source->slug);
+        $data = [
+            'title' => $title,
+            'slug' => $slug,
+            'body' => app(AppServicesPageDocumentService::class)->plainText($document, $features),
+            'blocks' => json_encode($document, JSON_THROW_ON_ERROR),
+            'page_type' => $source->page_type ?: 'standard',
+            'source_key' => null,
+            'seo_title' => Str::limit('Copy of '.($source->seo_title ?: $source->title), 70, ''),
+            'seo_description' => $source->seo_description,
+        ];
+
+        DB::transaction(function () use ($request, $source, $id, $data): void {
+            DB::table('pages')->insert([
+                ...$data,
+                'id' => $id,
+                'status' => 'draft',
+                'review_notes' => null,
+                'created_by' => $request->user()->id,
+                'updated_by' => $request->user()->id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->revision($id, 1, $data, $request->user()->id);
+            $this->audit($request, 'content.page_duplicated', $id, [
+                'source_page_id' => $source->id,
+                'source_status' => $source->status,
+                'slug' => $data['slug'],
+                'status' => 'draft',
+            ]);
+        });
+
+        return to_route('staff.pages.edit', $id)->with('status', 'Page copied as a private draft. Update its title, address, and content before publishing.');
     }
 
     public function preview(Request $request): View
@@ -116,7 +193,7 @@ class PageWorkspaceController extends Controller
         DB::transaction(function () use ($request, $page, $record, $data, $revision): void {
             DB::table('pages')->where('id', $page)->update([...$data, 'status' => 'draft', 'published_at' => null, 'published_by' => null, 'review_notes' => null, 'updated_by' => $request->user()->id, 'updated_at' => now()]);
             $this->revision($page, $revision, ['title' => $record->title, 'slug' => $record->slug, 'seo_title' => $record->seo_title, 'seo_description' => $record->seo_description, ...$data], $request->user()->id);
-            $this->audit($request, 'content.homepage_design_applied', $page, ['revision' => $revision, 'design' => 'three_slide_theme_aware_carousel']);
+            $this->audit($request, 'content.homepage_design_applied', $page, ['revision' => $revision, 'design' => 'three_slide_ministry_homepage_carousel']);
         });
 
         return to_route('staff.pages.edit', $page)->with('status', 'The revised homepage design is now on the canvas as a draft. Review it and publish when ready.');
@@ -263,6 +340,22 @@ class PageWorkspaceController extends Controller
         return $data;
     }
 
+    private function copySlug(string $source): string
+    {
+        $source = Str::slug($source) ?: 'page';
+        $base = Str::limit($source, 150, '');
+        $suffix = '-copy';
+        $candidate = $base.$suffix;
+        $counter = 2;
+
+        while (DB::table('pages')->where('slug', $candidate)->exists()) {
+            $number = '-'.$counter++;
+            $candidate = Str::limit($base, 160 - strlen($suffix.$number), '').$suffix.$number;
+        }
+
+        return $candidate;
+    }
+
     /** Return only a canonical version-2 document to the structured canvas. */
     private function editorDocument(?string $encodedBlocks): array
     {
@@ -335,18 +428,14 @@ class PageWorkspaceController extends Controller
         if ($template === 'homepage') {
             return app(\App\Services\HomepageStarterService::class)->document($this->enabledFeatures());
         }
+        if ($template === 'about') {
+            return app(\App\Services\AboutPageStarterService::class)->document($this->enabledFeatures());
+        }
+        if ($template === 'crusade') {
+            return app(\App\Services\CrusadeArchiveStarterService::class)->document($this->enabledFeatures());
+        }
 
         $documents = [
-            'about' => [
-                $this->starterSection([$this->starterColumn([$hero('ABOUT', 'Tell the story behind your ministry.', 'Introduce the calling, people, and purpose that shape this community.')])], $leadSettings),
-                $this->starterSection([$this->starterColumn([$this->starterElement('rich_text', ['title' => 'Our story', 'text' => 'Replace this text with an honest account of how the ministry began, who it serves, and what God has done through the community.'])])], $standardSettings),
-                $this->starterSection([
-                    $this->starterColumn([$feature('book', 'Our foundation', 'Summarize the convictions that guide the ministry.')]),
-                    $this->starterColumn([$feature('people', 'Our community', 'Describe the people and place the ministry is called to serve.')]),
-                    $this->starterColumn([$feature('globe', 'Our mission', 'Explain the impact the ministry hopes to make.')]),
-                ], $standardSettings + ['title' => 'What shapes us'], ['mobile' => ['stack' => 'stack']]),
-                $this->starterSection([$this->starterColumn([$this->starterElement('call_to_action', ['title' => 'Come and experience the community', 'body' => 'Invite readers to take a practical next step.', 'button_label' => 'Plan a visit', 'button_url' => '/visit'])])], $compactSettings + ['background_color' => 'surface_muted']),
-            ],
             'visit' => [
                 $this->starterSection([$this->starterColumn([$hero('PLAN A VISIT', 'Know what to expect before you arrive.', 'Add the practical details that help a first visit feel simple and welcoming.', 'Find a location', '/locations')])], $leadSettings),
                 $this->starterSection([$this->starterColumn([$this->starterElement('service_times', ['title' => 'Choose a gathering', 'body' => 'Public service times from the ministry schedule appear here.'])])], $standardSettings),

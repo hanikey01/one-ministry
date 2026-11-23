@@ -29,26 +29,26 @@ class PagePublishingTest extends TestCase
 
         $this->postJson('/api/v1/staff/pages', ['title' => 'Admin', 'slug' => 'admin'])->assertUnprocessable();
         $created = $this->postJson('/api/v1/staff/pages', [
-            'title' => 'About us', 'slug' => 'About Us', 'blocks' => $aboutDocument,
+            'title' => 'About us', 'slug' => 'About Story', 'blocks' => $aboutDocument,
             'seo_title' => 'About Hope Community', 'seo_description' => 'Learn about our ministry.',
-        ])->assertCreated()->assertJsonPath('data.slug', 'about-us')->assertJsonPath('data.status', 'draft');
+        ])->assertCreated()->assertJsonPath('data.slug', 'about-story')->assertJsonPath('data.status', 'draft');
         $id = $created->json('data.id');
 
-        $this->getJson('/api/v1/public/pages/about-us')->assertNotFound();
-        $this->postJson('/api/v1/staff/pages', ['title' => 'Duplicate', 'slug' => 'ABOUT us'])->assertUnprocessable();
+        $this->getJson('/api/v1/public/pages/about-story')->assertNotFound();
+        $this->postJson('/api/v1/staff/pages', ['title' => 'Duplicate', 'slug' => 'ABOUT STORY'])->assertUnprocessable();
         $this->patchJson("/api/v1/staff/pages/{$id}/review", ['status' => 'published'])
             ->assertOk()->assertJsonPath('data.status', 'published');
 
-        $published = $this->getJson('/api/v1/public/pages/about-us')
+        $published = $this->getJson('/api/v1/public/pages/about-story')
             ->assertOk()->assertJsonPath('data.title', 'About us')->assertJsonPath('data.body', "Welcome.\n\nWe serve our city.");
         foreach (['created_by', 'updated_by', 'published_by', 'review_notes'] as $privateField) {
             $this->assertArrayNotHasKey($privateField, $published->json('data'));
         }
 
         $this->patchJson("/api/v1/staff/pages/{$id}", [
-            'title' => 'Our story', 'slug' => 'about-us', 'blocks' => $this->document('An updated story.'),
+            'title' => 'Our story', 'slug' => 'about-story', 'blocks' => $this->document('An updated story.'),
         ])->assertOk()->assertJsonPath('data.status', 'draft');
-        $this->getJson('/api/v1/public/pages/about-us')->assertNotFound();
+        $this->getJson('/api/v1/public/pages/about-story')->assertNotFound();
         $this->getJson("/api/v1/staff/pages/{$id}/revisions")
             ->assertOk()->assertJsonCount(2, 'data')->assertJsonPath('data.0.revision', 2);
         $this->assertDatabaseHas('audit_events', ['action' => 'content.page_created', 'subject_id' => $id]);
@@ -62,6 +62,51 @@ class PagePublishingTest extends TestCase
         $this->postJson('/api/v1/staff/pages', ['title' => 'About', 'slug' => 'about'])->assertUnauthorized();
     }
 
+    public function test_staff_about_page_action_opens_the_published_default_without_creating_a_duplicate(): void
+    {
+        $admin = app(InstallMinistry::class)->execute([
+            'name' => 'Hope Community', 'domain' => 'hope.example.org', 'timezone' => 'Africa/Lagos',
+            'location' => 'Main Campus', 'admin_name' => 'Ada Admin', 'admin_email' => 'ada@example.org',
+            'password' => 'long-private-password',
+        ]);
+        $this->actingAs($admin);
+
+        $this->post(route('staff.pages.create-about'))->assertRedirect();
+        $page = DB::table('pages')->where('source_key', 'about')->firstOrFail();
+        $document = json_decode($page->blocks, true, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertSame('published', $page->status);
+        $this->assertSame('about-us', $page->slug);
+        $this->assertCount(6, $document['sections']);
+        $this->post(route('staff.pages.create-about'))->assertRedirect(route('staff.pages.edit', $page->id));
+        $this->assertSame(1, DB::table('pages')->where('source_key', 'about')->count());
+    }
+
+    public function test_staff_can_duplicate_a_published_or_draft_page_as_an_independent_private_draft(): void
+    {
+        $admin = app(InstallMinistry::class)->execute([
+            'name' => 'Hope Community', 'domain' => 'hope.example.org', 'timezone' => 'Africa/Lagos',
+            'location' => 'Main Campus', 'admin_name' => 'Ada Admin', 'admin_email' => 'ada@example.org',
+            'password' => 'long-private-password',
+        ]);
+        $this->actingAs($admin);
+        $source = DB::table('pages')->where('source_key', 'about')->firstOrFail();
+
+        $this->post(route('staff.pages.duplicate', $source->id))->assertRedirect();
+        $copy = DB::table('pages')->where('slug', 'about-us-copy')->firstOrFail();
+
+        $this->assertSame('Copy of About Us', $copy->title);
+        $this->assertSame('draft', $copy->status);
+        $this->assertNull($copy->source_key);
+        $this->assertNull($copy->published_at);
+        $this->assertSame(json_decode($source->blocks, true), json_decode($copy->blocks, true));
+        $this->assertDatabaseHas('content_revisions', ['page_id' => $copy->id, 'revision' => 1]);
+        $this->assertDatabaseHas('audit_events', ['action' => 'content.page_duplicated', 'subject_id' => $copy->id]);
+
+        $this->post(route('staff.pages.duplicate', $source->id))->assertRedirect();
+        $this->assertDatabaseHas('pages', ['slug' => 'about-us-copy-2', 'status' => 'draft']);
+    }
+
     public function test_editor_publish_saves_and_publishes_the_submitted_document_atomically(): void
     {
         $admin = app(InstallMinistry::class)->execute([
@@ -72,7 +117,7 @@ class PagePublishingTest extends TestCase
         $admin->forceFill(['email_verified_at' => now()])->save();
         $this->actingAs($admin);
 
-        $id = $this->postJson('/api/v1/staff/pages', ['title' => 'About us', 'slug' => 'about-us', 'blocks' => $this->document('Old copy.')])
+        $id = $this->postJson('/api/v1/staff/pages', ['title' => 'About us', 'slug' => 'about-story', 'blocks' => $this->document('Old copy.')])
             ->assertCreated()->json('data.id');
         $document = [
             'version' => 2,
@@ -102,7 +147,7 @@ class PagePublishingTest extends TestCase
         ];
 
         $response = $this->putJson("/staff/pages/{$id}", [
-            'title' => 'About us', 'slug' => 'about-us', 'blocks' => json_encode($document), 'publish' => '1',
+            'title' => 'About us', 'slug' => 'about-story', 'blocks' => json_encode($document), 'publish' => '1',
             'document_version' => (string) DB::table('pages')->where('id', $id)->value('updated_at'),
         ])->assertOk()
             ->assertJsonPath('data.status', 'published')
@@ -118,7 +163,7 @@ class PagePublishingTest extends TestCase
         $this->assertSame($response->json('data.document'), $stored);
         $this->assertSame('New published copy', $stored['sections'][0]['columns'][0]['elements'][0]['content']['text']);
         $this->assertDatabaseHas('audit_events', ['action' => 'content.page_published', 'subject_id' => $id]);
-        $this->get('/about-us')->assertOk()
+        $this->get('/about-story')->assertOk()
             ->assertSee('id="published-section"', false)
             ->assertSee(':where(#published-section) { outline: 1px solid #112233; }', false)
             ->assertSee('--page-column-padding: 8px 12px 8px 12px', false);
@@ -138,7 +183,7 @@ class PagePublishingTest extends TestCase
         ]);
         $this->actingAs($admin)->withSession(['mfa_verified_at' => now()->timestamp]);
 
-        $id = $this->postJson('/api/v1/staff/pages', ['title' => 'About us', 'slug' => 'about-us', 'blocks' => $this->document('Welcome.')])
+        $id = $this->postJson('/api/v1/staff/pages', ['title' => 'About us', 'slug' => 'about-story', 'blocks' => $this->document('Welcome.')])
             ->assertCreated()->json('data.id');
         DB::table('pages')->where('id', $id)->update(['blocks' => json_encode([
             'version' => 2,

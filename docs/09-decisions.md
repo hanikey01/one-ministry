@@ -312,3 +312,19 @@ When a question is resolved, record date, decision maker, evidence, alternatives
 **Reason:** Explicit user direction, 2026-11-21. The page designer must be able to create varied, modern layouts without syntactic false negatives, while generated content remains untrusted even when a model is not expected to act maliciously. The existing opaque-origin iframe still permits external image/media/frame requests and user-activated top navigation, so removing all executable-content controls would expose visitor input and navigation to generated code.
 
 **Status:** Implemented in the composition validator and page-generation repair path. No Docker or production asset build was run per user direction; focused provider, compiler, frontend, and browser validation remain release gates.
+
+### D-057 — Three-slide editable homepage baseline
+
+**Decision:** The default editable homepage opens with a three-slide, photographic carousel. Its primary actions lead to service times, events, and About Us rather than an unfinished worship experience. The supporting page uses native page-editor elements for one each of prayer, testimony, contact, departments, events, locations, and feature-gated giving; the events-and-locations “Gather, grow, and serve” section intentionally excludes departments, and the ministry-story call to action leads to About Us. Module-backed elements are included only when their module is enabled. Static photography is installation-local, supporting copy does not invent schedules or ministry records, and the visual system uses semantic canvas, surface, action, brand, ink, muted, and line tokens so light and dark themes remain coherent. A fixed light foreground is permitted only where required for contrast over photographic overlays.
+
+**Reason:** Explicit user direction, 2026-11-22. The worship experience is not complete enough to be the default homepage action, while service times and the existing public connection pathways are usable now.
+
+**Status:** Implemented in the homepage starter, fresh-install default, existing-installation migration, and the revision-preserving “Apply revised homepage design” action. This replaces the former service-times-first baseline without preventing a future, readiness-gated live-service state.
+
+### D-058 — About Us begins as a factual editable default
+
+**Decision:** The proposed About Us design is installed as a published, native page-editor default and is available through an idempotent Pages-workspace action. It provides an editable photographic introduction, origin-story prompt, milestone framework, values, community-service feature, live department and location data, and a service-times call to action. The starter does not fabricate leaders, dates, statistics, quotations, achievements, or ministry history. Staff must replace the explicit story prompts and review the proposed values after installation.
+
+**Reason:** Explicit user direction, 2026-11-22. The visual mockup should guide a real editable About page, but a reusable installation starter cannot truthfully invent local ministry facts or leadership details.
+
+**Status:** Implemented for fresh installations and existing installations through the default-page migration, and exposed through `starterDocument('about')`. Repeated creation opens the existing page instead of creating duplicates.
