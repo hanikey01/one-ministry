@@ -5,7 +5,7 @@
 @php($paragraphs = array_values(array_filter(preg_split('/\r?\n\r?\n/', trim($testimony->body)))))
 <x-layouts.public :settings="$settings" :features="$features" :title="$testimony->title">
     <main class="testimony-story" aria-labelledby="testimony-title">
-        <a class="testimony-story-back" href="{{ route('public.testimonies') }}"><span aria-hidden="true">←</span> All testimonies</a>
+        <a class="public-back-link" href="{{ route('public.testimonies') }}"><x-ui.icon name="arrow-left" :size="16"/> <span>All testimonies</span></a>
         <header class="testimony-story-hero">
             <div class="testimony-story-category"><span aria-hidden="true">✦</span> {{ str($testimony->category)->headline() }} story</div>
             <h1 id="testimony-title">{{ $testimony->title }}</h1>

@@ -104,7 +104,7 @@
                     });
                     document.querySelectorAll('details[open][data-dismiss-on-outside]').forEach((popup) => {
                         if (event.target.closest('.enhanced-select-options.is-portaled')) return;
-                        if (!popup.contains(event.target) && !popup.contains(document.activeElement)) popup.removeAttribute('open');
+                        if (!popup.contains(event.target)) popup.removeAttribute('open');
                     });
                 });
             })();

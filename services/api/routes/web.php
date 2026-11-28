@@ -18,6 +18,7 @@ use App\Http\Controllers\MediaReviewController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\MemberPrayerController;
 use App\Http\Controllers\MemberSchoolController;
+use App\Http\Controllers\MemberServiceReminderController;
 use App\Http\Controllers\CertificateVerificationController;
 use App\Http\Controllers\MemberWorkspaceController;
 use App\Http\Controllers\NavigationWorkspaceController;
@@ -402,6 +403,8 @@ Route::middleware('auth')->post('/member/school/{course}/assessments/{assessment
 Route::middleware('auth')->get('/member/school/{course}/certificate', [MemberSchoolController::class, 'certificate'])->name('member.school.certificate');
 Route::get('/certificates/{code}', [CertificateVerificationController::class, 'show'])->name('public.certificates.verify');
 Route::middleware('auth')->put('/member', [MemberWorkspaceController::class, 'update'])->name('member.update');
+Route::middleware('auth')->post('/member/service-reminders', [MemberServiceReminderController::class, 'store'])->name('member.service-reminders.store');
+Route::middleware('auth')->delete('/member/service-reminders/{subscription}', [MemberServiceReminderController::class, 'destroy'])->name('member.service-reminders.destroy');
 Route::middleware('public_form_guard')->post('/member/prayer', [MemberWorkspaceController::class, 'prayer'])->name('member.prayer');
 Route::middleware('public_form_guard')->post('/member/next-steps', [MemberWorkspaceController::class, 'requestNextStep'])->name('member.next-steps.request');
 Route::get('/storage/{path}', [PublicStorageController::class, 'show'])

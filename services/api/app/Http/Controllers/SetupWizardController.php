@@ -45,6 +45,9 @@ class SetupWizardController extends Controller
             'location_region_code' => ['nullable', 'string', 'max:16'],
             'location_postal_code' => ['nullable', 'string', 'max:32'],
             'location_country_code' => ['required', Rule::in(array_keys($addresses->countries()))],
+            'theme_preset' => ['required', Rule::in(['neutral', 'tech_blue', 'warm'])],
+            'chrome_mode' => ['required', Rule::in(['preset', 'custom'])],
+            'chrome_color' => ['nullable', 'required_if:chrome_mode,custom', 'regex:/^#[0-9A-Fa-f]{6}$/'],
         ]);
 
         if ($request->filled('location_region_code') && ! $addresses->subdivisionName(
@@ -57,7 +60,7 @@ class SetupWizardController extends Controller
         }
 
         $admin = $installer->execute($request->only([
-            'name', 'domain', 'timezone', 'location', 'tagline', 'contact_email', 'theme_preset',
+            'name', 'domain', 'timezone', 'location', 'tagline', 'contact_email', 'theme_preset', 'chrome_mode', 'chrome_color',
             'location_address_line_1', 'location_address_line_2', 'location_city',
             'location_region_code', 'location_postal_code', 'location_country_code',
             'admin_name', 'admin_email', 'password',

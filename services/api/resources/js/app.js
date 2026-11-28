@@ -59,6 +59,88 @@ const setPageInterval = (callback, delay) => {
     return timer;
 };
 
+const initializeDismissibleSurfaces = () => {
+    document.querySelectorAll('details.page-quick-edit, details.workspace-create').forEach((details) => {
+        details.setAttribute('data-dismiss-on-outside', '');
+    });
+
+    addPageListener(document, 'pointerdown', (event) => {
+        if (event.target instanceof Element && event.target.closest('.enhanced-select-options.is-portaled')) return;
+        document.querySelectorAll('details[open][data-dismiss-on-outside]').forEach((details) => {
+            if (!details.contains(event.target)) details.removeAttribute('open');
+        });
+    }, true);
+    addPageListener(document, 'keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        document.querySelectorAll('details[open][data-dismiss-on-outside]').forEach((details) => {
+            details.removeAttribute('open');
+            details.querySelector(':scope > summary')?.focus();
+        });
+    });
+
+    document.querySelectorAll('details[data-viewport-popover]').forEach((popover) => {
+        if (popover.dataset.viewportPopoverInitialized === 'true') return;
+        const trigger = popover.querySelector(':scope > summary');
+        const panel = popover.querySelector(':scope > form, :scope > [data-popover-panel]');
+        if (!trigger || !panel) return;
+        popover.dataset.viewportPopoverInitialized = 'true';
+
+        const position = () => {
+            if (!popover.open) return;
+            const gutter = 16;
+            const triggerRect = trigger.getBoundingClientRect();
+            const width = Math.min(310, window.innerWidth - (gutter * 2));
+            panel.style.width = `${width}px`;
+            panel.style.maxHeight = `${Math.max(180, window.innerHeight - (gutter * 2))}px`;
+            panel.style.overflowY = 'auto';
+            const panelHeight = panel.getBoundingClientRect().height;
+            const left = Math.min(
+                Math.max(gutter, triggerRect.left),
+                Math.max(gutter, window.innerWidth - width - gutter),
+            );
+            const below = triggerRect.bottom + 8;
+            const top = below + panelHeight <= window.innerHeight - gutter
+                ? below
+                : Math.max(gutter, triggerRect.top - panelHeight - 8);
+            panel.style.left = `${left}px`;
+            panel.style.right = 'auto';
+            panel.style.top = `${top}px`;
+        };
+
+        addPageListener(popover, 'toggle', () => {
+            if (!popover.open) return;
+            document.querySelectorAll('details[open][data-dismiss-on-outside]').forEach((other) => {
+                if (other !== popover) other.removeAttribute('open');
+            });
+            position();
+            window.requestAnimationFrame(position);
+        });
+        addPageListener(popover, 'keydown', (event) => {
+            if (event.key !== 'Escape' || !popover.open) return;
+            event.preventDefault();
+            popover.removeAttribute('open');
+            trigger.focus();
+        });
+        addPageListener(window, 'resize', position);
+        addPageListener(window, 'scroll', position, true);
+        pageCleanups.push(() => {
+            delete popover.dataset.viewportPopoverInitialized;
+            panel.removeAttribute('style');
+        });
+    });
+
+    // Native dialogs already handle focus trapping and Escape. This adds the
+    // expected backdrop-click dismissal consistently to every project dialog.
+    document.querySelectorAll('dialog').forEach((dialog) => {
+        if (dialog.dataset.outsideDismissInitialized === 'true') return;
+        dialog.dataset.outsideDismissInitialized = 'true';
+        addPageListener(dialog, 'click', (event) => {
+            if (event.target === dialog && dialog.open) dialog.close();
+        });
+        pageCleanups.push(() => { delete dialog.dataset.outsideDismissInitialized; });
+    });
+};
+
 const initializePublicCarousels = () => {
     document.querySelectorAll('[data-public-carousel]').forEach((carousel) => {
         if (carousel.dataset.carouselInitialized === 'true') return;
@@ -76,11 +158,23 @@ const initializePublicCarousels = () => {
                 const selected = index === active;
                 slide.hidden = !selected;
                 slide.setAttribute('aria-hidden', String(!selected));
+                slide.classList.toggle('is-active', selected);
+                if (slide.classList.contains('public-page-gallery-slide')) {
+                    slide.style.display = selected ? 'block' : 'none';
+                    if ('inert' in slide) slide.inert = !selected;
+                }
             });
             if (status) status.textContent = `${active + 1} of ${slides.length}`;
         };
-        addPageListener(carousel.querySelector('[data-carousel-previous]'), 'click', () => show(active - 1));
-        addPageListener(carousel.querySelector('[data-carousel-next]'), 'click', () => show(active + 1));
+        show(0);
+        addPageListener(carousel, 'click', (event) => {
+            const target = event.target instanceof Element
+                ? event.target.closest('[data-carousel-previous], [data-carousel-next]')
+                : null;
+            if (!target || target.closest('[data-gallery-lightbox]')) return;
+            event.preventDefault();
+            show(active + (target.matches('[data-carousel-previous]') ? -1 : 1));
+        });
         addPageListener(carousel, 'mouseenter', () => { paused = true; });
         addPageListener(carousel, 'mouseleave', () => { paused = false; });
         addPageListener(carousel, 'focusin', () => { paused = true; });
@@ -97,7 +191,8 @@ const initializePublicCarousels = () => {
         });
         addPageListener(carousel, 'pointerdown', (event) => {
             if (event.pointerType === 'mouse' && event.button !== 0) return;
-            if (event.target.closest('a, button, input, select, textarea, video, iframe')) return;
+            const interactiveTarget = event.target.closest('a, button, input, select, textarea, video, iframe');
+            if (interactiveTarget && !interactiveTarget.matches('[data-gallery-lightbox-open]')) return;
             pointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY };
             carousel.setPointerCapture?.(event.pointerId);
             paused = true;
@@ -109,16 +204,138 @@ const initializePublicCarousels = () => {
             pointerStart = null;
             paused = false;
             if (Math.abs(horizontal) >= 44 && Math.abs(horizontal) > Math.abs(vertical)) {
+                carousel.dataset.carouselSwiped = 'true';
+                window.setTimeout(() => { delete carousel.dataset.carouselSwiped; }, 0);
                 show(active + (horizontal < 0 ? 1 : -1));
             }
         });
         addPageListener(carousel, 'pointercancel', () => { pointerStart = null; paused = false; });
-        if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-            setPageInterval(() => {
-                if (!paused && document.visibilityState === 'visible') show(active + 1);
-            }, 6000);
-        }
+        addPageListener(carousel, 'dragstart', (event) => {
+            if (event.target instanceof Element && event.target.closest('[data-carousel-slide] img')) event.preventDefault();
+        });
     });
+};
+
+const initializeGalleryLightboxes = () => {
+    document.querySelectorAll('[data-gallery-lightbox]').forEach((dialog) => {
+        if (!(dialog instanceof HTMLDialogElement) || dialog.dataset.galleryLightboxInitialized === 'true') return;
+        const carousel = dialog.closest('[data-public-carousel]');
+        const triggers = [...(carousel?.querySelectorAll('[data-gallery-lightbox-open]') ?? [])];
+        const image = dialog.querySelector('[data-gallery-lightbox-image]');
+        const status = dialog.querySelector('[data-gallery-lightbox-status]');
+        if (!carousel || !(image instanceof HTMLImageElement) || triggers.length === 0) return;
+        dialog.dataset.galleryLightboxInitialized = 'true';
+        let active = 0;
+        let returnFocus = null;
+        const show = (next) => {
+            active = (next + triggers.length) % triggers.length;
+            const trigger = triggers[active];
+            image.src = trigger.dataset.galleryImage || trigger.querySelector('img')?.src || '';
+            image.alt = trigger.querySelector('img')?.alt || `Gallery image ${active + 1} of ${triggers.length}`;
+            if (status) status.textContent = `${active + 1} of ${triggers.length}`;
+        };
+        const close = () => {
+            if (dialog.open) dialog.close();
+            else dialog.removeAttribute('open');
+        };
+        triggers.forEach((trigger, index) => addPageListener(trigger, 'click', (event) => {
+            if (carousel.dataset.carouselSwiped === 'true') { event.preventDefault(); return; }
+            returnFocus = trigger;
+            show(index);
+            if (!dialog.open && typeof dialog.showModal === 'function') dialog.showModal();
+            else if (!dialog.open) dialog.setAttribute('open', '');
+            document.body.classList.add('gallery-lightbox-open');
+            dialog.querySelector('[data-gallery-lightbox-close]')?.focus();
+        }));
+        addPageListener(dialog.querySelector('[data-gallery-lightbox-close]'), 'click', close);
+        addPageListener(dialog.querySelector('[data-gallery-lightbox-previous]'), 'click', () => show(active - 1));
+        addPageListener(dialog.querySelector('[data-gallery-lightbox-next]'), 'click', () => show(active + 1));
+        addPageListener(dialog, 'click', (event) => {
+            const target = event.target;
+            if (target === dialog || (target instanceof Element && target.matches('.public-page-gallery-lightbox-shell, .public-page-gallery-lightbox-stage'))) close();
+        });
+        addPageListener(dialog, 'keydown', (event) => {
+            if (event.key === 'Escape') { event.preventDefault(); close(); }
+            if (event.key === 'ArrowLeft') { event.preventDefault(); show(active - 1); }
+            if (event.key === 'ArrowRight') { event.preventDefault(); show(active + 1); }
+        });
+        addPageListener(dialog, 'close', () => {
+            document.body.classList.remove('gallery-lightbox-open');
+            returnFocus?.focus();
+            returnFocus = null;
+        });
+        pageCleanups.push(() => {
+            if (dialog.open) dialog.close();
+            document.body.classList.remove('gallery-lightbox-open');
+            delete dialog.dataset.galleryLightboxInitialized;
+        });
+    });
+};
+
+const initializeVideoHeroes = () => {
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    document.querySelectorAll('[data-video-hero]').forEach((video) => {
+        if (!(video instanceof HTMLVideoElement)) return;
+        if (reduceMotion) {
+            video.controls = true;
+            video.pause();
+            return;
+        }
+        video.play().catch(() => { video.controls = true; });
+    });
+    if (!reduceMotion) {
+        document.querySelectorAll('[data-video-hero-embed][data-autoplay-src]').forEach((frame) => {
+            if (frame instanceof HTMLIFrameElement) frame.src = frame.dataset.autoplaySrc;
+        });
+    }
+};
+
+const initializeViewerTimes = () => {
+    const detectedTimezone = (() => {
+        try {
+            const saved = window.localStorage.getItem('ministry-viewer-timezone');
+            if (saved) new Intl.DateTimeFormat('en-US', { timeZone: saved }).format();
+            return saved || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+        } catch (_) {
+            return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+        }
+    })();
+    const zoneLabel = detectedTimezone.replaceAll('_', ' ');
+    const formatOptions = (format) => ({
+        timeZone: detectedTimezone,
+        ...(format === 'time'
+            ? { hour: 'numeric', minute: '2-digit' }
+            : format === 'compact'
+                ? { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }
+                : { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
+    });
+
+    document.querySelectorAll('[data-viewer-time]').forEach((element) => {
+        const instant = new Date(element.getAttribute('datetime') ?? '');
+        if (Number.isNaN(instant.getTime())) return;
+        const sourceTimezone = element.dataset.sourceTimezone || 'UTC';
+        const sourceFormatted = element.dataset.sourceFormatted || '';
+        const primary = element.querySelector('[data-viewer-time-primary]');
+        const source = element.querySelector('[data-viewer-time-source]');
+        const localFormatted = new Intl.DateTimeFormat(undefined, formatOptions(element.dataset.viewerTimeFormat)).format(instant);
+        if (primary) primary.textContent = `${localFormatted} · ${zoneLabel}`;
+        if (source) {
+            const differs = sourceTimezone !== detectedTimezone;
+            source.hidden = !differs;
+            source.textContent = `Ministry time: ${sourceFormatted} · ${sourceTimezone.replaceAll('_', ' ')}`;
+        }
+        element.dataset.viewerTimezone = detectedTimezone;
+    });
+
+    document.querySelectorAll('[data-viewer-date]').forEach((element) => {
+        const instant = new Date(element.dataset.instant ?? '');
+        if (Number.isNaN(instant.getTime())) return;
+        const month = element.querySelector('[data-viewer-month]');
+        const day = element.querySelector('[data-viewer-day]');
+        if (month) month.textContent = new Intl.DateTimeFormat(undefined, { timeZone: detectedTimezone, month: 'short' }).format(instant);
+        if (day) day.textContent = new Intl.DateTimeFormat(undefined, { timeZone: detectedTimezone, day: '2-digit' }).format(instant);
+    });
+    document.querySelectorAll('[data-viewer-timezone-input]').forEach((input) => { input.value = detectedTimezone; });
 };
 
 const initializePage = (force = false) => {
@@ -126,6 +343,10 @@ const initializePage = (force = false) => {
     cleanupPage();
     initializedPageUrl = pageUrl;
     initializePublicCarousels();
+    initializeGalleryLightboxes();
+    initializeVideoHeroes();
+    initializeViewerTimes();
+    initializeDismissibleSurfaces();
 
     const appearanceForm = document.querySelector('[data-appearance-settings]');
     if (appearanceForm) {

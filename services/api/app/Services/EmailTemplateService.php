@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\MinistrySetting;
 use App\Models\User;
+use App\Support\MinistryTheme;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -25,6 +26,7 @@ final class EmailTemplateService
             'member_welcome' => ['name' => 'Member welcome', 'description' => 'Welcome copy for new member accounts.', 'subject' => 'Welcome to {{ ministry_name }}', 'body' => "Hello {{ member_name }},\n\nWelcome to {{ ministry_name }}. Your member account is ready.", 'variables' => ['member_name' => 'Member name', 'ministry_name' => 'Ministry name']],
             'giving_receipt' => ['name' => 'Giving receipt', 'description' => 'Confirmation after a verified donation.', 'subject' => 'Your giving receipt from {{ ministry_name }}', 'body' => "Hello {{ donor_name }},\n\nThank you for your gift of {{ amount }} to {{ fund_name }}. Your receipt reference is {{ receipt_reference }}.", 'variables' => ['donor_name' => 'Donor name', 'amount' => 'Formatted amount and currency', 'fund_name' => 'Donation purpose', 'receipt_reference' => 'Receipt reference', 'ministry_name' => 'Ministry name']],
             'event_confirmation' => ['name' => 'Event confirmation', 'description' => 'Confirmation for an event registration.', 'subject' => 'Registration confirmed for {{ event_name }}', 'body' => "Hello {{ member_name }},\n\nYour registration for {{ event_name }} on {{ event_date }} is confirmed.\n\nLocation: {{ location_name }}", 'variables' => ['member_name' => 'Registrant name', 'event_name' => 'Event name', 'event_date' => 'Formatted event date', 'location_name' => 'Event location', 'action_url' => 'Event link']],
+            'service_reminder' => ['name' => 'Service reminder', 'description' => 'Sent after a member explicitly subscribes to a service reminder.', 'subject' => '{{ service_name }} begins {{ service_date }}', 'body' => "Hello {{ member_name }},\n\nThis is your requested reminder that {{ service_name }} begins {{ service_date }}.\n\nMinistry time: {{ ministry_time }}\nLocation: {{ location_name }}", 'variables' => ['member_name' => 'Member name', 'service_name' => 'Service title', 'service_date' => 'Date in the member timezone', 'ministry_time' => 'Date in the service timezone', 'location_name' => 'Service location', 'action_url' => 'Service times link', 'ministry_name' => 'Ministry name']],
             'follow_up_acknowledgement' => ['name' => 'Follow-up acknowledgement', 'description' => 'Acknowledges a connection or next-step request.', 'subject' => 'We received your {{ request_name }} request', 'body' => "Hello {{ member_name }},\n\nWe received your {{ request_name }} request. A ministry team member will follow up with you.", 'variables' => ['member_name' => 'Member name', 'request_name' => 'Request type']],
             'testimony_published' => ['name' => 'Testimony published', 'description' => 'Notifies a member after an approved testimony is published.', 'subject' => 'Your testimony has been published', 'body' => "Hello {{ member_name }},\n\nYour testimony, “{{ testimony_title }}”, has been reviewed and published.", 'variables' => ['member_name' => 'Member name', 'testimony_title' => 'Testimony title', 'action_url' => 'Public testimony link']],
         ];
@@ -81,7 +83,7 @@ final class EmailTemplateService
         $bodyVariables = $variables;
         if (isset($bodyVariables['action_url'])) $bodyVariables['action_url'] = 'the button below';
         $body = $this->replace($template->body_template, $bodyVariables);
-        $html = view('emails.ministry-transactional', ['settings' => $settings, 'subjectLine' => $subject, 'heading' => $template->name, 'body' => $body, 'actionText' => $actionText, 'actionUrl' => $variables['action_url'] ?? null])->render();
+        $html = view('emails.ministry-transactional', ['settings' => $settings, 'palette' => MinistryTheme::emailPalette($settings), 'subjectLine' => $subject, 'heading' => $template->name, 'body' => $body, 'actionText' => $actionText, 'actionUrl' => $variables['action_url'] ?? null])->render();
         $this->delivery->sendHtml($recipient, $subject, $html, trim($template->name."\n\n".$body), $recipientName);
     }
 
@@ -91,7 +93,7 @@ final class EmailTemplateService
         $samples = collect($template->allowed_variables)->mapWithKeys(fn ($label, $name) => [$name => $name === 'action_url' ? '#' : match ($name) { 'expires_minutes' => '30', 'expires_hours' => '24', 'amount' => '100.00 USD', default => Str::headline($name) }])->all();
         $settings = MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID);
         $samples['ministry_name'] ??= $settings->name;
-        return view('emails.ministry-transactional', ['settings' => $settings, 'subjectLine' => $this->replace($template->subject, $samples), 'heading' => $template->name, 'body' => $this->replace($template->body_template, array_merge($samples, ['action_url' => 'the button below'])), 'actionText' => isset($samples['action_url']) ? 'Continue securely' : null, 'actionUrl' => isset($samples['action_url']) ? '#' : null])->render();
+        return view('emails.ministry-transactional', ['settings' => $settings, 'palette' => MinistryTheme::emailPalette($settings), 'subjectLine' => $this->replace($template->subject, $samples), 'heading' => $template->name, 'body' => $this->replace($template->body_template, array_merge($samples, ['action_url' => 'the button below'])), 'actionText' => isset($samples['action_url']) ? 'Continue securely' : null, 'actionUrl' => isset($samples['action_url']) ? '#' : null])->render();
     }
 
     public function sendTest(string $key, string $recipient): void

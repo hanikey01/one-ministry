@@ -1,6 +1,6 @@
 # Working in the Ministry Platform repository
 
-Read `docs/professional-build-standard.md`, `docs/00-product-master.md`, and `docs/06-build-plan.md` before implementing features. Then read the documents that own the affected area: architecture (`01`), data (`02`), contracts (`03`), module layout (`04`), system rules (`05`), interface (`07`), or operations (`08`). Use `docs/10-permissions-matrix.md` for default grants and scopes. Consult `docs/09-decisions.md` before treating an open choice as settled.
+Read `docs/professional-build-standard.md`, `docs/00-product-master.md`, and `docs/06-build-plan.md` before implementing features. Then read the documents that own the affected area: architecture and module layout (`01`), data (`02`), contracts (`03`), system and permission rules (`05`), interface and performance (`07`), or operations and deployment (`08`). Consult `docs/09-decisions.md` before treating an open choice as settled.
 
 ## Core rules
 
@@ -18,5 +18,4 @@ Read `docs/professional-build-standard.md`, `docs/00-product-master.md`, and `do
 
 Implement in the order of `docs/06-build-plan.md`. Work across affected layers in the same change, including migration, domain logic, interface, and meaningful tests. Validate each phase against its quality gate. Do not present a phase as complete because code compiles. Keep API contract changes synchronized with consumers and update the owning document when behavior changes.
 
-Specifications in this repository are a baseline, not evidence that any feature has already been built or deployed.
-Read `docs/12-implementation-status.md` before continuing implementation so completed work is not repeated or mistaken for a passed phase gate.
+Specifications in this repository are a baseline, not evidence that any feature has already been built or deployed. Inspect the code and tests before continuing implementation so work is not repeated or mistaken for a passed quality gate.

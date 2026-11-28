@@ -14,24 +14,18 @@ Ministry Platform is distributed under the [GNU General Public License v2](LICEN
 | [01 — Architecture](docs/01-architecture.md) | Service boundaries, media architecture, deployment |
 | [02 — Database](docs/02-database.md) | Entities, constraints, privacy classes |
 | [03 — API contracts](docs/03-api-contracts.md) | HTTP and event interfaces |
-| [04 — Services](docs/04-services.md) | Modules and repository structure |
-| [05 — Systems](docs/05-systems.md) | Cross-cutting business rules |
-| [06 — Build plan](docs/06-build-plan.md) | Phases and quality gates |
-| [07 — Design](docs/07-design.md) | Interface and accessibility rules |
-| [08 — Operations](docs/08-operations.md) | Installation, backup, scaling, incidents |
+| [05 — Systems](docs/05-systems.md) | Modules, permissions, and cross-cutting business rules |
+| [06 — Build plan](docs/06-build-plan.md) | Phases, current gates, and verification rules |
+| [07 — Design](docs/07-design.md) | Interface, accessibility, page editor, and performance |
+| [08 — Operations](docs/08-operations.md) | Installation, deployment, backup, scaling, and incidents |
 | [09 — Decisions](docs/09-decisions.md) | Open decisions and decision log |
-| [10 — Permissions](docs/10-permissions-matrix.md) | Default roles, scopes, sensitive actions |
-| [11 — Media delivery](docs/11-media-delivery.md) | Broadcast, meetings, timing, failures, capacity validation |
-| [12 — Implementation status](docs/12-implementation-status.md) | Verified code and outstanding phase gates |
-| [13 — Shared-hosting transition](docs/13-shared-hosting-transition.md) | Laravel-first migration and shared-host deployment baseline |
-| [14 — Shared-hosting deployment](docs/14-shared-hosting-deployment.md) | cPanel, Plesk, DirectAdmin, generic host, upgrade, and restore procedure |
 | [Build standard](docs/professional-build-standard.md) | Cross-project engineering quality rules |
 
 Implementation has started. The current code contains Laravel domain modules and a legacy Next.js transition interface. The target release is a Laravel Blade, Livewire, Alpine.js, and Tailwind application that works on shared PHP hosting. Read `AGENTS.md` before implementation work. Each requirement has one owning document; links elsewhere are references rather than duplicate specifications.
 
 ## Shared-hosting direction
 
-The baseline release must work with PHP, MySQL/MariaDB, host cron, writable Laravel storage, and a database queue/cache. Redis, Docker, persistent workers, Node.js, realtime broadcasting, and self-hosted media are optional enhancements. See [13 — Shared-hosting transition](docs/13-shared-hosting-transition.md). The current `.env.example` uses the shared-host database defaults; Docker Compose provides its own PostgreSQL and Redis values for local development.
+The baseline release must work with PHP, MySQL/MariaDB, host cron, writable Laravel storage, and a database queue/cache. Redis, Docker, persistent workers, Node.js, realtime broadcasting, and self-hosted media are optional enhancements. See [01 — Architecture](docs/01-architecture.md) and [08 — Operations](docs/08-operations.md). The current `.env.example` uses the shared-host database defaults; Docker Compose provides its own PostgreSQL and Redis values for local development.
 
 ## Run the first slice locally
 

@@ -18,14 +18,13 @@ This document is the product baseline. Read it with the following owners before 
 
 | Concern | Owning document |
 | --- | --- |
-| Shared application experience, navigation, theming, app-like interactions, and performance rules | [18 — Application Experience and Performance Contract](18-experience-performance-contract.md) |
-| Interface components, accessibility, page editor, and visual-detail rules | [07 — Experience and Design System](07-design.md) |
-| Laravel/shared-hosting boundaries and deployment profiles | [01 — Architecture](01-architecture.md) and [13 — Shared-Hosting Transition](13-shared-hosting-transition.md) |
-| Domain state rules, feature gating, privacy, and authorization | [05 — Systems](05-systems.md), [02 — Database](02-database.md), and [10 — Permissions Matrix](10-permissions-matrix.md) |
+| Shared application experience, navigation, theming, page editor, accessibility, and performance rules | [07 — Experience and Design System](07-design.md) |
+| Laravel/shared-hosting boundaries, module layout, and deployment profiles | [01 — Architecture](01-architecture.md) and [08 — Operations](08-operations.md) |
+| Domain state rules, feature gating, privacy, permissions, and authorization | [05 — Systems](05-systems.md) and [02 — Database](02-database.md) |
 | APIs and browser/internal contracts | [03 — API Contracts](03-api-contracts.md) |
 | Work sequencing and quality gates | [06 — Build Plan](06-build-plan.md) |
 | Accepted and unresolved product choices | [09 — Decisions](09-decisions.md) |
-| Implemented and actually verified work | [12 — Implementation Status](12-implementation-status.md) |
+| Implementation order and verified quality gates | [06 — Build Plan](06-build-plan.md) and the code/test suite |
 
 Historical audits and status notes describe context; they do not override the documents above. When a requirement conflicts, record the proposed resolution in `09-decisions.md` before implementation.
 
@@ -217,14 +216,12 @@ The phases express dependencies, not a promise that a ministry must wait until P
 1. **Architecture:** `01-architecture.md` owns services, deployment profiles, media paths, failure behavior, and security boundaries.
 2. **Data model:** `02-database.md` owns entities, relationships, constraints, and retention classifications.
 3. **HTTP and event contracts:** `03-api-contracts.md` owns public polling, integration, staff, and video lifecycle interfaces.
-4. **Module specifications:** `04-services.md` owns module boundaries and canonical file responsibilities.
-5. **Cross-cutting systems:** `05-systems.md` owns attendance, identity, privacy, live status, and follow-up rules.
-6. **Build plan:** `06-build-plan.md` owns implementation order, acceptance tests, capacity tests, and release gates.
-7. **Design system:** `07-design.md` owns navigation, responsive patterns, accessibility, and live-service states.
-8. **Operations:** `08-operations.md` owns installation, upgrades, backups, restore, monitoring, and incidents.
-9. **Permissions:** `10-permissions-matrix.md` defines default role grants and scopes.
-10. **Media delivery:** `11-media-delivery.md` details broadcast and meeting behavior, timing, and capacity validation.
-11. **Shared-hosting transition:** `13-shared-hosting-transition.md` owns the Laravel-first migration sequence, shared-host baseline, and Next.js retirement criteria.
+4. **Cross-cutting systems and permissions:** `05-systems.md` owns module rules, permissions, attendance, identity, privacy, live status, and follow-up.
+5. **Build plan:** `06-build-plan.md` owns implementation order, acceptance tests, capacity tests, and release gates.
+6. **Design system:** `07-design.md` owns navigation, responsive patterns, accessibility, page-editor behavior, performance, and live-service states.
+7. **Operations:** `08-operations.md` owns installation, deployment, upgrades, backups, restore, monitoring, and incidents.
+8. **Decisions:** `09-decisions.md` records accepted and unresolved choices.
+9. **Professional build standard:** `professional-build-standard.md` owns the minimum engineering and verification standard.
 
 Keep one canonical owner for each rule. Other documents should link to that owner instead of copying requirements.
 

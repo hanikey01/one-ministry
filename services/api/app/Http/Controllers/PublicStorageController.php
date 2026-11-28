@@ -28,7 +28,7 @@ class PublicStorageController extends Controller
         abort_unless($disk->exists($path), 404);
 
         return $disk->response($path, null, [
-            'Cache-Control' => 'public, max-age=86400',
+            'Cache-Control' => 'public, max-age=86400, stale-while-revalidate=604800',
             'X-Content-Type-Options' => 'nosniff',
         ]);
     }

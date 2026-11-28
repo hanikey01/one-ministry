@@ -25,7 +25,7 @@ class PublicWorkspaceController extends Controller
         return $this->view('public.location', compact('location'));
     }
 
-    public function serviceTimes(): View
+    public function serviceTimes(Request $request): View
     {
         $services = DB::table('service_occurrences')
             ->leftJoin('locations', function ($join): void {
@@ -37,9 +37,30 @@ class PublicWorkspaceController extends Controller
             ->where('service_occurrences.starts_at', '>=', now()->subMinutes(30))
             ->orderBy('service_occurrences.starts_at')
             ->limit(60)
-            ->get(['service_occurrences.id', 'service_occurrences.title', 'service_occurrences.service_type', 'service_occurrences.state', 'service_occurrences.starts_at', 'service_occurrences.timezone', 'locations.name as location_name', 'locations.address as location_address']);
+            ->get(['service_occurrences.id', 'service_occurrences.service_schedule_id', 'service_occurrences.title', 'service_occurrences.service_type', 'service_occurrences.state', 'service_occurrences.starts_at', 'service_occurrences.timezone', 'locations.name as location_name', 'locations.address as location_address']);
 
-        return $this->view('public.service-times', compact('services'));
+        $reminders = collect();
+        $remindersAvailable = DB::table('email_delivery_settings')
+            ->where('enabled', true)
+            ->whereNotNull('from_address')
+            ->whereNotNull('from_name')
+            ->whereNotNull('host')
+            ->whereNotNull('port')
+            ->whereNotNull('username')
+            ->whereNotNull('password_encrypted')
+            ->exists();
+        if ($request->user()) {
+            $personId = DB::table('people')->where('user_id', $request->user()->id)->value('id');
+            if ($personId) {
+                $reminders = DB::table('service_reminder_subscriptions')
+                    ->where('person_id', $personId)
+                    ->where('active', true)
+                    ->get()
+                    ->keyBy('id');
+            }
+        }
+
+        return $this->view('public.service-times', compact('services', 'reminders', 'remindersAvailable'));
     }
 
     public function events(): View

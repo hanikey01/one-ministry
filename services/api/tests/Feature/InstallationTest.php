@@ -7,6 +7,8 @@ use App\Models\FeatureSetting;
 use App\Models\Location;
 use App\Models\MinistrySetting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -23,6 +25,8 @@ class InstallationTest extends TestCase
             'location' => 'Main Campus',
             'tagline' => 'A place to belong',
             'contact_email' => 'hello@example.org',
+            'theme_preset' => 'tech_blue',
+            'chrome_mode' => 'preset',
             'primary_color' => '#17324D',
             'accent_color' => '#D9A441',
             'admin_name' => 'Ada Admin',
@@ -74,6 +78,32 @@ class InstallationTest extends TestCase
         $installer->execute($this->installationInput());
     }
 
+    public function test_installation_ingests_default_artwork_into_the_media_library_and_rewrites_default_pages(): void
+    {
+        Storage::fake('local');
+        Storage::fake('public');
+
+        app(InstallMinistry::class)->execute($this->installationInput());
+
+        $assets = DB::table('media_assets')->where('library', 'media_library')->where('provider', 'local')->get();
+        $this->assertCount(13, $assets);
+        foreach ($assets as $asset) {
+            $this->assertSame('published', $asset->status);
+            $this->assertStringStartsWith('media-library/defaults/', $asset->file_path);
+            $this->assertSame('public', $asset->file_disk);
+            Storage::disk('public')->assertExists($asset->file_path);
+        }
+
+        $homepage = DB::table('pages')->where('source_key', 'homepage')->value('blocks');
+        $about = DB::table('pages')->where('source_key', 'about')->value('blocks');
+        $this->assertStringContainsString('/storage/media-library/defaults/', $homepage);
+        $this->assertStringContainsString('/storage/media-library/defaults/', $about);
+        $this->assertStringNotContainsString('/images/pages/', $homepage);
+        $this->assertStringNotContainsString('/images/pages/', $about);
+
+        $this->get(route('public.media', $assets->first()->id))->assertOk();
+    }
+
     public function test_browser_setup_configures_an_uninstalled_ministry_once(): void
     {
         $response = $this->postJson('/api/v1/installation/setup', $this->installationInput());
@@ -113,6 +143,44 @@ class InstallationTest extends TestCase
             'country_name' => 'Nigeria',
             'is_primary' => true,
         ]);
+    }
+
+    public function test_setup_wizard_stores_a_custom_ministry_colour(): void
+    {
+        $input = $this->installationInput() + [
+            'location_address_line_1' => '12 Unity Avenue',
+            'location_city' => 'Lagos',
+            'location_country_code' => 'NG',
+            'theme_preset' => 'neutral',
+            'chrome_mode' => 'custom',
+            'chrome_color' => '#c2410c',
+        ];
+
+        $this->post(route('setup.store'), $input)->assertRedirect(route('staff.overview'));
+
+        $this->assertDatabaseHas('ministry_settings', [
+            'theme_preset' => 'neutral',
+            'chrome_mode' => 'custom',
+            'chrome_color' => '#C2410C',
+        ]);
+    }
+
+    public function test_setup_wizard_requires_a_valid_colour_when_custom_mode_is_selected(): void
+    {
+        $input = $this->installationInput() + [
+            'location_address_line_1' => '12 Unity Avenue',
+            'location_city' => 'Lagos',
+            'location_country_code' => 'NG',
+            'theme_preset' => 'tech_blue',
+            'chrome_mode' => 'custom',
+            'chrome_color' => 'orange',
+        ];
+
+        $this->from(route('setup.create'))->post(route('setup.store'), $input)
+            ->assertRedirect(route('setup.create'))
+            ->assertSessionHasErrors('chrome_color');
+
+        $this->assertDatabaseCount('ministry_settings', 0);
     }
 
     public function test_setup_wizard_rejects_an_address_title_without_location_details(): void

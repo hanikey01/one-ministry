@@ -28,6 +28,17 @@
     const aiAvailable = form.dataset.aiAvailable === 'true';
     const id = () => `editor-${crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`}`;
     const clone = (value) => JSON.parse(JSON.stringify(value));
+    const copyElementWithFreshIds = (item) => ({ ...clone(item), id:id() });
+    const copyColumnWithFreshIds = (item) => {
+        const copy = { ...clone(item), id:id() };
+        copy.elements = (copy.elements || []).map(copyElementWithFreshIds);
+        return copy;
+    };
+    const copySectionWithFreshIds = (item) => {
+        const copy = { ...clone(item), id:id() };
+        copy.columns = (copy.columns || []).map(copyColumnWithFreshIds);
+        return copy;
+    };
     const objectValue = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
     const prepareDocument = (document) => {
         document.sections = (Array.isArray(document.sections) ? document.sections : []).map((section) => {
@@ -152,7 +163,7 @@
     };
     const renderFloatingNavigator = () => {
         if (!floatingNavigatorTree) return;
-        const node = (kind, label, attributes, level, icon, key) => { const expandable = kind !== 'element'; const collapsed = expandable && collapsedNavigatorNodes.has(key); return `<button type="button" class="page-editor-floating-navigator-node is-${kind}" data-floating-navigator-kind="${kind}" data-level="${level}" ${expandable ? `data-floating-navigator-toggle="${key}" aria-expanded="${collapsed ? 'false' : 'true'}"` : ''} ${attributes}><span class="page-editor-floating-navigator-chevron${expandable ? ' is-toggle' : ''}" aria-hidden="true">${expandable ? (collapsed ? '▸' : '▾') : '·'}</span><span class="page-editor-floating-navigator-icon" aria-hidden="true">${icon}</span><span class="page-editor-floating-navigator-label">${escape(label)}</span></button>`; };
+        const node = (kind, label, attributes, level, icon, key) => { const expandable = kind !== 'element'; const collapsed = expandable && collapsedNavigatorNodes.has(key); return `<button type="button" draggable="true" class="page-editor-floating-navigator-node is-${kind}" data-floating-navigator-kind="${kind}" data-level="${level}" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" ${expandable ? `data-floating-navigator-toggle="${key}" aria-expanded="${collapsed ? 'false' : 'true'}"` : ''} ${attributes}><span class="page-editor-floating-navigator-chevron${expandable ? ' is-toggle' : ''}" aria-hidden="true">${expandable ? (collapsed ? '▸' : '▾') : '·'}</span><span class="page-editor-floating-navigator-icon" aria-hidden="true">${icon}</span><span class="page-editor-floating-navigator-label">${escape(label)}</span></button>`; };
         floatingNavigatorTree.innerHTML = documentState.sections.map((sectionItem, sectionIndex) => {
             const sectionKey = `section:${sectionIndex}`;
             const sectionCollapsed = collapsedNavigatorNodes.has(sectionKey);
@@ -587,8 +598,66 @@
         if (children > 1 && !window.confirm(`Delete this ${selected.kind} and its ${children} child items? You can undo this change before saving.`)) return;
         mutate(() => { if (selected.kind === 'section') { documentState.sections.splice(selected.section, 1); selected.section = Math.max(0, selected.section - 1); selected.kind = 'section'; } else if (selected.kind === 'column') { currentSection().columns.splice(selected.column, 1); selected.column = Math.max(0, selected.column - 1); } else { currentColumn().elements.splice(selected.element, 1); selected.element = Math.max(0, selected.element - 1); } });
     };
-    const duplicateSelected = () => mutate(() => { if (selected.kind === 'section') { const item = clone(currentSection()); item.id = id(); documentState.sections.splice(selected.section + 1, 0, item); selected.section++; } else if (selected.kind === 'column') { const item = clone(currentColumn()); item.id = id(); currentSection().columns.splice(selected.column + 1, 0, item); selected.column++; } else { const item = clone(currentElement()); item.id = id(); currentColumn().elements.splice(selected.element + 1, 0, item); selected.element++; } });
+    const duplicateSelected = () => mutate(() => { if (selected.kind === 'section') { const item = copySectionWithFreshIds(currentSection()); documentState.sections.splice(selected.section + 1, 0, item); selected.section++; } else if (selected.kind === 'column') { const item = copyColumnWithFreshIds(currentColumn()); currentSection().columns.splice(selected.column + 1, 0, item); selected.column++; } else { const item = copyElementWithFreshIds(currentElement()); currentColumn().elements.splice(selected.element + 1, 0, item); selected.element++; } });
     const moveSelected = (direction) => mutate(() => { const list = selected.kind === 'section' ? documentState.sections : selected.kind === 'column' ? currentSection().columns : currentColumn().elements; const index = selected.kind === 'section' ? selected.section : selected.kind === 'column' ? selected.column : selected.element; const next = index + direction; if (next < 0 || next >= list.length) return; [list[index], list[next]] = [list[next], list[index]]; if (selected.kind === 'section') selected.section = next; else if (selected.kind === 'column') selected.column = next; else selected.element = next; });
+    const navigatorLocation = (target) => ({
+        kind:target.dataset.floatingNavigatorKind,
+        section:Number(target.dataset.section || 0),
+        column:Number(target.dataset.column || 0),
+        element:Number(target.dataset.element || 0),
+    });
+    const canDropNavigatorObject = (source, destination) => {
+        if (!source || !destination) return false;
+        if (source.kind === 'section') return destination.kind === 'section' && source.section !== destination.section;
+        if (source.kind === 'column') {
+            if (!['section', 'column'].includes(destination.kind)) return false;
+            const targetSection = destination.section;
+            if (source.section !== targetSection && documentState.sections[source.section]?.columns.length <= 1) return false;
+            if (source.section !== targetSection && documentState.sections[targetSection]?.columns.length >= 12) return false;
+            return destination.kind === 'section' || source.section !== destination.section || source.column !== destination.column;
+        }
+        if (source.kind === 'element') {
+            if (!['column', 'element'].includes(destination.kind)) return false;
+            const targetColumn = documentState.sections[destination.section]?.columns[destination.column];
+            const sameColumn = source.section === destination.section && source.column === destination.column;
+            if (!sameColumn && (targetColumn?.elements.length || 0) >= 60) return false;
+            return destination.kind === 'column' || !sameColumn || source.element !== destination.element;
+        }
+        return false;
+    };
+    const moveNavigatorObject = (source, destination, after = false) => {
+        if (!canDropNavigatorObject(source, destination)) return;
+        mutate(() => {
+            if (source.kind === 'section') {
+                const [moved] = documentState.sections.splice(source.section, 1);
+                let destinationIndex = destination.section + (after ? 1 : 0);
+                if (source.section < destinationIndex) destinationIndex--;
+                destinationIndex = Math.max(0, Math.min(destinationIndex, documentState.sections.length));
+                documentState.sections.splice(destinationIndex, 0, moved);
+                selected = {kind:'section', section:destinationIndex, column:0, element:0};
+            } else if (source.kind === 'column') {
+                const sourceColumns = documentState.sections[source.section].columns;
+                const destinationColumns = documentState.sections[destination.section].columns;
+                let destinationIndex = destination.kind === 'column' ? destination.column + (after ? 1 : 0) : destinationColumns.length;
+                const [moved] = sourceColumns.splice(source.column, 1);
+                if (sourceColumns === destinationColumns && source.column < destinationIndex) destinationIndex--;
+                destinationIndex = Math.max(0, Math.min(destinationIndex, destinationColumns.length));
+                destinationColumns.splice(destinationIndex, 0, moved);
+                selected = {kind:'column', section:destination.section, column:destinationIndex, element:0};
+            } else {
+                const sourceElements = documentState.sections[source.section].columns[source.column].elements;
+                const destinationElements = documentState.sections[destination.section].columns[destination.column].elements;
+                let destinationIndex = destination.kind === 'element' ? destination.element + (after ? 1 : 0) : destinationElements.length;
+                const [moved] = sourceElements.splice(source.element, 1);
+                if (sourceElements === destinationElements && source.element < destinationIndex) destinationIndex--;
+                destinationIndex = Math.max(0, Math.min(destinationIndex, destinationElements.length));
+                destinationElements.splice(destinationIndex, 0, moved);
+                selected = {kind:'element', section:destination.section, column:destination.column, element:destinationIndex};
+            }
+            selectionActive = true;
+            collapsedNavigatorNodes.clear();
+        });
+    };
     const performEditorAction = (name, sectionIndex = selected.section, columnIndex = selected.column) => {
         if (name === 'add-section') return mutate(() => { documentState.sections.push(section()); select('section', documentState.sections.length - 1); });
         if (name === 'add-column') return mutate(() => { documentState.sections[sectionIndex].columns.push(column()); select('column', sectionIndex, documentState.sections[sectionIndex].columns.length - 1); });
@@ -643,6 +712,51 @@
         }
         select(target.dataset.floatingNavigatorKind, Number(target.dataset.section), Number(target.dataset.column || 0), Number(target.dataset.element || 0));
         openInspector();
+    });
+    let draggedNavigatorObject = null;
+    const clearNavigatorDropState = () => floatingNavigatorTree?.querySelectorAll('.is-dragging, .is-drop-before, .is-drop-after, .is-drop-inside').forEach((node) => node.classList.remove('is-dragging', 'is-drop-before', 'is-drop-after', 'is-drop-inside'));
+    floatingNavigatorTree?.addEventListener('dragstart', (event) => {
+        const target = event.target.closest('[data-floating-navigator-kind]');
+        if (!target || event.target.closest('.page-editor-floating-navigator-chevron.is-toggle')) { event.preventDefault(); return; }
+        draggedNavigatorObject = navigatorLocation(target);
+        target.classList.add('is-dragging');
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', JSON.stringify(draggedNavigatorObject));
+    });
+    floatingNavigatorTree?.addEventListener('dragover', (event) => {
+        const target = event.target.closest('[data-floating-navigator-kind]');
+        if (!target || !draggedNavigatorObject) return;
+        const destination = navigatorLocation(target);
+        if (!canDropNavigatorObject(draggedNavigatorObject, destination)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        clearNavigatorDropState();
+        const acceptsInside = (draggedNavigatorObject.kind === 'column' && destination.kind === 'section') || (draggedNavigatorObject.kind === 'element' && destination.kind === 'column');
+        if (acceptsInside) target.classList.add('is-drop-inside');
+        else target.classList.add(event.clientY > target.getBoundingClientRect().top + target.getBoundingClientRect().height / 2 ? 'is-drop-after' : 'is-drop-before');
+    });
+    floatingNavigatorTree?.addEventListener('drop', (event) => {
+        const target = event.target.closest('[data-floating-navigator-kind]');
+        if (!target || !draggedNavigatorObject) return;
+        const destination = navigatorLocation(target);
+        if (!canDropNavigatorObject(draggedNavigatorObject, destination)) return;
+        event.preventDefault();
+        const after = !target.classList.contains('is-drop-inside') && event.clientY > target.getBoundingClientRect().top + target.getBoundingClientRect().height / 2;
+        const source = draggedNavigatorObject;
+        draggedNavigatorObject = null;
+        clearNavigatorDropState();
+        moveNavigatorObject(source, destination, after);
+    });
+    floatingNavigatorTree?.addEventListener('dragend', () => { draggedNavigatorObject = null; clearNavigatorDropState(); });
+    floatingNavigatorTree?.addEventListener('keydown', (event) => {
+        if (!event.altKey || !['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+        const target = event.target.closest('[data-floating-navigator-kind]');
+        if (!target) return;
+        event.preventDefault();
+        const location = navigatorLocation(target);
+        select(location.kind, location.section, location.column, location.element);
+        moveSelected(event.key === 'ArrowUp' ? -1 : 1);
+        floatingNavigatorTree.querySelector('[aria-current="true"]')?.focus();
     });
     libraryTrigger?.addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); openLibrary(); });
     libraryBackdrop?.addEventListener('click', (event) => { event.preventDefault(); closeLibrary(); });

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -9,7 +10,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 /** Delivers published ministry-library assets that a public page references. */
 class PublicMediaController extends Controller
 {
-    public function show(string $asset): BinaryFileResponse
+    public function show(Request $request, string $asset): BinaryFileResponse
     {
         $record = DB::table('media_assets')->where([
             'id' => $asset,
@@ -22,8 +23,21 @@ class PublicMediaController extends Controller
         $path = Storage::disk($record->file_disk ?: 'local')->path($record->file_path);
         abort_unless(is_file($path), 404);
 
-        return response()->file($path, [
+        $response = response()->file($path, [
             'Content-Disposition' => 'inline; filename="'.addslashes($record->file_name ?: $record->title).'"',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
+        $response->setPublic();
+        $response->setMaxAge(86400);
+        $response->setSharedMaxAge(604800);
+        $response->setAutoLastModified();
+        $response->setEtag(hash('sha256', implode('|', [
+            $record->id,
+            (string) filesize($path),
+            (string) filemtime($path),
+        ])));
+        $response->isNotModified($request);
+
+        return $response;
     }
 }

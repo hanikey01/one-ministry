@@ -26,6 +26,8 @@
         @case('bell') <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/> @break
         @case('menu') <path d="M4 7h16M4 12h16M4 17h16"/> @break
         @case('chevron-down') <path d="m6 9 6 6 6-6"/> @break
+        @case('chevron-left') <path d="m15 18-6-6 6-6"/> @break
+        @case('chevron-right') <path d="m9 18 6-6-6-6"/> @break
         @case('close') <path d="m6 6 12 12M18 6 6 18"/> @break
         @case('external') <path d="M15 3h6v6M10 14 21 3M18 13v7a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h7"/> @break
         @case('about') <circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/> @break

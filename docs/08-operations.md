@@ -70,9 +70,9 @@ This Phase 0 archive covers PostgreSQL only. No media object store is configured
 
 ### 6.2 Shared-hosting baseline
 
-The shared-hosting release runs one Laravel application from its `public/` directory. The host must provide PHP 8.4.1 or later, the required extensions in `13-shared-hosting-transition.md`, a supported MySQL/MariaDB or PostgreSQL database, HTTPS, writable Laravel storage/cache directories, and a cron facility. Node.js, Docker, Redis, a persistent worker, and a self-hosted realtime service are not baseline requirements.
+The shared-hosting release runs one Laravel application from its `public/` directory. The host must provide PHP 8.4.1 or later with the extensions reported by `composer check-platform-reqs`, a supported MySQL/MariaDB or PostgreSQL database, HTTPS, writable Laravel storage/cache directories, and a cron facility. Node.js, Docker, Redis, a persistent worker, and a self-hosted realtime service are not baseline requirements.
 
-Install dependencies during packaging or through the host's supported Composer workflow, set environment values outside the web root, point the domain document root to `public/`, run migrations, set writable storage permissions, and complete first-run setup. The concrete cPanel, Plesk, DirectAdmin, generic PHP host, cron, queue, upgrade, rollback, and restore procedure is maintained in [14 — Shared Hosting Deployment Guide](14-shared-hosting-deployment.md).
+Install dependencies during packaging or through the host's supported Composer workflow, set environment values outside the web root, point the domain document root to `public/`, run migrations, set writable storage permissions, and complete first-run setup. This document is the canonical owner for cPanel, Plesk, DirectAdmin, generic PHP host, cron, queue, upgrade, rollback, and restore procedures.
 
 Schedule this cron job once per minute using the PHP binary selected by the host:
 

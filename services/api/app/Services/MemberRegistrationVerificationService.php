@@ -1,12 +1,13 @@
 <?php
 
-namespace AppServices;
+namespace App\Services;
 
-use AppModelsUser;
-use IlluminateSupportFacadesDB;
-use IlluminateSupportFacadesHash;
-use IlluminateSupportStr;
-use IlluminateValidationValidationException;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Throwable;
 
 final class MemberRegistrationVerificationService
 {

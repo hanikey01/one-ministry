@@ -1,5 +1,4 @@
 @php
-    $palette = config('email_theme.'.($settings->theme_preset ?? 'neutral'), config('email_theme.neutral'));
     $logoUrl = $settings->logo_path ? asset('storage/'.$settings->logo_path) : null;
     $supportEmail = $settings->contact_email;
 @endphp

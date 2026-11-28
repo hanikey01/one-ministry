@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Actions\InstallMinistry;
+use App\Services\EmailDeliverySettingsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -12,6 +13,30 @@ use Tests\TestCase;
 class MemberRegistrationVerificationTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_signup_sends_a_code_and_opens_the_verification_step(): void
+    {
+        app(InstallMinistry::class)->execute(['name' => 'Hope Community', 'domain' => 'hope.example.org', 'timezone' => 'UTC', 'location' => 'Main', 'admin_name' => 'Ada Admin', 'admin_email' => 'ada@example.org', 'password' => 'long-private-password']);
+        $this->mock(EmailDeliverySettingsService::class)->shouldReceive('sendHtml')->once();
+
+        $this->post('/register', ['name' => 'New Member', 'email' => 'new@example.org'])
+            ->assertRedirect(route('register.verify'))
+            ->assertSessionHas('member_registration.email', 'new@example.org');
+
+        $this->assertDatabaseHas('member_registration_verifications', ['email' => 'new@example.org']);
+    }
+
+    public function test_signup_mail_failure_returns_to_the_form_without_leaving_a_pending_code(): void
+    {
+        app(InstallMinistry::class)->execute(['name' => 'Hope Community', 'domain' => 'hope.example.org', 'timezone' => 'UTC', 'location' => 'Main', 'admin_name' => 'Ada Admin', 'admin_email' => 'ada@example.org', 'password' => 'long-private-password']);
+        $this->mock(EmailDeliverySettingsService::class)->shouldReceive('sendHtml')->once()->andThrow(new \RuntimeException('Transport unavailable'));
+
+        $this->from('/register')->post('/register', ['name' => 'New Member', 'email' => 'new@example.org'])
+            ->assertRedirect('/register')
+            ->assertSessionHasErrors('email');
+
+        $this->assertDatabaseMissing('member_registration_verifications', ['email' => 'new@example.org']);
+    }
 
     public function test_member_account_is_created_only_after_the_email_code_is_verified(): void
     {

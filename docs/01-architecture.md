@@ -94,7 +94,7 @@ Minimum configuration: public URL, database DSN, encryption/session keys, writab
 
 ## 10. Experience and performance architecture
 
-The shared behavior contract is [18 — Application Experience and Performance Contract](18-experience-performance-contract.md). Laravel server rendering is the required baseline. Livewire navigation, Alpine behavior, browser prefetching, and in-place JSON/Livewire mutations are progressive enhancements that retain ordinary links and form posts as fallbacks.
+The shared behavior contract is owned by [07 — Experience and Design System](07-design.md). Laravel server rendering is the required baseline. Livewire navigation, Alpine behavior, browser prefetching, and in-place JSON/Livewire mutations are progressive enhancements that retain ordinary links and form posts as fallbacks.
 
 Route-specific scripts register through one lifecycle layer and clean up listeners, timers, polling, overlays, and media clients when navigation completes. Shared layouts do not duplicate global browser listeners. Optional SDKs, especially media SDKs, load only when an authorized user reaches the relevant action.
 

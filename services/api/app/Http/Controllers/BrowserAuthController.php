@@ -10,8 +10,10 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class BrowserAuthController extends Controller
 {
@@ -40,7 +42,7 @@ class BrowserAuthController extends Controller
             'email' => ['required', 'email', 'max:254', 'unique:users,email'],
         ]);
         $email = Str::lower($data['email']);
-        $id = $verification->request(trim($data['name']), $email);
+        $id = $this->requestMemberVerification($verification, trim($data['name']), $email);
         $request->session()->put('member_registration', ['id' => $id, 'name' => trim($data['name']), 'email' => $email]);
         return to_route('register.verify')->with('status', 'We sent a six-digit code to '.$email.'.');
     }
@@ -65,7 +67,7 @@ class BrowserAuthController extends Controller
     {
         $pending = $request->session()->get('member_registration');
         if (! $pending) return to_route('register');
-        $id = $verification->request($pending['name'], $pending['email']);
+        $id = $this->requestMemberVerification($verification, $pending['name'], $pending['email']);
         $request->session()->put('member_registration.id', $id);
         $request->session()->forget('member_registration.verified');
         return back()->with('status', 'A new code has been sent.');
@@ -150,5 +152,21 @@ class BrowserAuthController extends Controller
         $request->session()->regenerateToken();
 
         return to_route('login')->with('status', 'You have signed out.');
+    }
+
+    private function requestMemberVerification(MemberRegistrationVerificationService $verification, string $name, string $email): string
+    {
+        try {
+            return $verification->request($name, $email);
+        } catch (ValidationException $error) {
+            throw $error;
+        } catch (Throwable $error) {
+            report($error);
+            Log::warning('Member registration verification email could not be sent.', ['email_domain' => Str::after($email, '@')]);
+
+            throw ValidationException::withMessages([
+                'email' => 'We could not send the verification code. Please confirm the address and try again shortly, or contact the ministry if the problem continues.',
+            ]);
+        }
     }
 }

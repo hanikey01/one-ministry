@@ -85,7 +85,7 @@ class PageWorkspaceController extends Controller
         $data = [
             'title' => $title,
             'slug' => $slug,
-            'body' => app(AppServicesPageDocumentService::class)->plainText($document, $features),
+            'body' => app(\App\Services\PageDocumentService::class)->plainText($document, $features),
             'blocks' => json_encode($document, JSON_THROW_ON_ERROR),
             'page_type' => $source->page_type ?: 'standard',
             'source_key' => null,
@@ -211,22 +211,31 @@ class PageWorkspaceController extends Controller
     public function update(Request $request, string $page): RedirectResponse|JsonResponse
     {
         $record = DB::table('pages')->where('id', $page)->firstOrFail();
-        if (! hash_equals((string) $record->updated_at, (string) $request->input('document_version', ''))) {
-            throw ValidationException::withMessages(['blocks' => 'This page changed in another session. Reload it before saving so those edits are not overwritten.']);
-        }
         $publish = $request->boolean('publish');
         if ($publish) {
             abort_unless(app(PermissionChecker::class)->allows($request->user(), 'content.publish'), 403);
             abort_if($request->user()->email_verified_at === null, 403, 'Verify your email address before publishing.');
         }
         $data = $this->data($request, $page);
-        $revision = (int) DB::table('content_revisions')->where('page_id', $page)->max('revision') + 1;
-        $savedAt=now();
-        DB::transaction(function () use ($request, $page, $data, $revision, $record, $publish, $savedAt): void {
-            $updated=DB::table('pages')->where('id', $page)->where('updated_at', $record->updated_at)->update([...$data, 'status' => $publish ? 'published' : 'draft', 'review_notes' => null, 'published_at' => $publish ? $savedAt : null, 'published_by' => $publish ? $request->user()->id : null, 'updated_by' => $request->user()->id, 'updated_at' => $savedAt]);
-            if($updated!==1) throw ValidationException::withMessages(['blocks'=>'This page changed while it was being saved. Reload it before trying again.']);
+        $submittedVersion = (string) $request->input('document_version', '');
+        $savedAt = now();
+        $revision = DB::transaction(function () use ($request, $page, $data, $record, $publish, $savedAt, $submittedVersion): int {
+            $current = DB::table('pages')->where('id', $page)->lockForUpdate()->firstOrFail();
+            $revision = (int) DB::table('content_revisions')->where('page_id', $page)->max('revision') + 1;
+            $savedOverNewerRevision = $submittedVersion !== '' && ! hash_equals((string) $current->updated_at, $submittedVersion);
+
+            DB::table('pages')->where('id', $page)->update([...$data, 'status' => $publish ? 'published' : 'draft', 'review_notes' => null, 'published_at' => $publish ? $savedAt : null, 'published_by' => $publish ? $request->user()->id : null, 'updated_by' => $request->user()->id, 'updated_at' => $savedAt]);
             $this->revision($page, $revision, $data, $request->user()->id);
-            $this->audit($request, $publish ? 'content.page_published' : 'content.page_updated', $page, ['revision' => $revision, 'previous_status' => $record->status, 'status' => $publish ? 'published' : 'draft']);
+            $this->audit($request, $publish ? 'content.page_published' : 'content.page_updated', $page, [
+                'revision' => $revision,
+                'previous_status' => $current->status ?? $record->status,
+                'status' => $publish ? 'published' : 'draft',
+                'saved_over_newer_revision' => $savedOverNewerRevision,
+                'submitted_document_version' => $submittedVersion ?: null,
+                'previous_document_version' => (string) $current->updated_at,
+            ]);
+
+            return $revision;
         });
 
         $message = $publish ? 'Page saved and published.' : 'Changes saved as a draft. The page needs review before it is public.';
@@ -426,10 +435,14 @@ class PageWorkspaceController extends Controller
         $compactSettings = ['content_width' => 'standard', 'padding' => 'none', 'column_gap' => 'regular'];
 
         if ($template === 'homepage') {
-            return app(\App\Services\HomepageStarterService::class)->document($this->enabledFeatures());
+            return app(\App\Services\DefaultMediaLibrary::class)->resolveDocument(
+                app(\App\Services\HomepageStarterService::class)->document($this->enabledFeatures())
+            );
         }
         if ($template === 'about') {
-            return app(\App\Services\AboutPageStarterService::class)->document($this->enabledFeatures());
+            return app(\App\Services\DefaultMediaLibrary::class)->resolveDocument(
+                app(\App\Services\AboutPageStarterService::class)->document($this->enabledFeatures())
+            );
         }
         if ($template === 'crusade') {
             return app(\App\Services\CrusadeArchiveStarterService::class)->document($this->enabledFeatures());

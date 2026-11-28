@@ -1,6 +1,6 @@
 @php($value = fn ($key, $default = '') => old($key, $item?->{$key} ?? $default))
 <label>Label<input name="label" maxlength="80" required value="{{ $value('label') }}" placeholder="Plan your visit"></label>
-<label>Destination<input name="url" maxlength="1200" required value="{{ $value('url') }}" placeholder="/pages/visit or https://…"></label>
+<label>Destination<input name="url" maxlength="1200" required value="{{ $value('url') }}" placeholder="# or /pages/visit or https://…"><small>Use # for a parent menu that only expands its child links.</small></label>
 @php($parentFieldId = 'public-navigation-parent-'.($item?->id ?? 'new'))
 @php($featureFieldId = 'public-navigation-feature-'.($item?->id ?? 'new'))
 <div class="navigation-field-grid">

@@ -80,6 +80,22 @@ class MinistryTheme
         ];
     }
 
+    /** @return array{canvas:string,surface:string,ink:string,muted:string,line:string,action:string,action_text:string} */
+    public static function emailPalette(?MinistrySetting $settings): array
+    {
+        $tokens = self::tokens($settings);
+
+        return [
+            'canvas' => $tokens['--theme-light-canvas-color'],
+            'surface' => $tokens['--theme-light-surface-color'],
+            'ink' => $tokens['--theme-light-ink'],
+            'muted' => $tokens['--theme-light-muted'],
+            'line' => $tokens['--theme-light-line'],
+            'action' => $tokens['--theme-action-color'],
+            'action_text' => $tokens['--action-foreground'],
+        ];
+    }
+
     /** @return array<string, string> */
     private static function tokens(?MinistrySetting $settings): array
     {

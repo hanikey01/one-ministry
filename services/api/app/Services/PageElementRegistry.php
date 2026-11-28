@@ -14,14 +14,14 @@ final class PageElementRegistry
             'testimonial'=>['quote','name','role'], 'statistics'=>['title','stat_one_value','stat_one_label','stat_two_value','stat_two_label','stat_three_value','stat_three_label'],
             'alert'=>['tone','title','body'], 'progress'=>['title','label','value'], 'table'=>['title','headers','rows'], 'icon'=>['icon','label'],
             'icon_box'=>['icon','title','body','button_label','button_url'], 'icon_list'=>['title','items'], 'image'=>['url','alt','caption','image_hint'],
-            'image_card'=>['url','alt','title','body','button_label','button_url'], 'gallery'=>['images','columns','caption'], 'video_embed'=>['url','title','caption'],
+            'image_card'=>['url','alt','title','body','button_label','button_url'], 'gallery'=>['images','columns','display','caption'], 'video_embed'=>['url','title','caption','presentation'],
             'audio'=>['url','title','caption'], 'file'=>['url','label','description'], 'media_text'=>['media_url','media_alt','placement','title','body','button_label','button_url'],
             'list'=>['title','items','ordered'], 'accordion'=>['title','question_one','answer_one','question_two','answer_two','question_three','answer_three'],
             'tabs'=>['title','tab_one_label','tab_one_content','tab_two_label','tab_two_content','tab_three_label','tab_three_content'],
             'social_links'=>['title','facebook_url','instagram_url','youtube_url'], 'contact_form'=>['title','body','submit_label'],
             'map_directions'=>['title','address','directions_url','button_label'], 'spacer'=>['height'], 'quote'=>['text','attribution'], 'divider'=>[],
             'call_to_action'=>['title','body','button_label','button_url'], 'service_times'=>['title','body'], 'events'=>['title','body'], 'departments'=>['title','body'],
-            'locations'=>['title','body','button_label','button_url'], 'carousel'=>['eyebrow','title','body','slide_one_type','slide_one_media_url','slide_one_title','slide_one_body','slide_one_button_label','slide_one_button_url','slide_two_type','slide_two_media_url','slide_two_title','slide_two_body','slide_two_button_label','slide_two_button_url','slide_three_type','slide_three_media_url','slide_three_title','slide_three_body','slide_three_button_label','slide_three_button_url','slides','button_label','button_url'],
+            'locations'=>['title','body','button_label','button_url'], 'carousel'=>['eyebrow','title','body','slide_one_type','slide_one_presentation','slide_one_media_url','slide_one_title','slide_one_body','slide_one_button_label','slide_one_button_url','slide_two_type','slide_two_presentation','slide_two_media_url','slide_two_title','slide_two_body','slide_two_button_label','slide_two_button_url','slide_three_type','slide_three_presentation','slide_three_media_url','slide_three_title','slide_three_body','slide_three_button_label','slide_three_button_url','slides','button_label','button_url'],
             'live_service'=>['title','body','button_label','button_url'], 'giving'=>['title','body','button_label','button_url'], 'prayer'=>['title','body','button_label','button_url'],
             'sermon_spotlight'=>['title','body','button_label','button_url'], 'books'=>['title','body','button_label','button_url'], 'announcements'=>['title','body'],
             'newsletter'=>['title','body'], 'next_steps'=>['title','body'], 'welcome'=>['title','body'],
@@ -85,9 +85,9 @@ final class PageElementRegistry
             'custom_code'=>['reason'=>'No native element supports this required bespoke interaction or layout.','html'=>'<section class="custom-card"><h2>Custom content</h2><p>Add a bespoke design, then review it before publishing.</p></section>','css'=>'.custom-card { padding: 2rem; border-radius: 1rem; background: #f4f4f5; color: #18181b; }','fallback'=>'Custom content is available on this page.'],
             'html'=>['reason'=>'No native element supports this required bespoke layout.','html'=>'<section><h2>Custom content</h2><p>Add your HTML here.</p></section>','fallback'=>'Custom content is available on this page.'],
             'heading'=>['text'=>'A meaningful heading'], 'paragraph'=>['text'=>'Write a clear paragraph that helps people understand your ministry.'],
-            'alert'=>['tone'=>'info'], 'progress'=>['value'=>'60'], 'gallery'=>['columns'=>'three'], 'media_text'=>['placement'=>'left'], 'list'=>['ordered'=>'no'],
+            'alert'=>['tone'=>'info'], 'progress'=>['value'=>'60'], 'gallery'=>['columns'=>'three', 'display'=>'grid'], 'video_embed'=>['presentation'=>'standard'], 'media_text'=>['placement'=>'left'], 'list'=>['ordered'=>'no'],
             'spacer'=>['height'=>'medium'], 'icon'=>['icon'=>'heart'], 'icon_box'=>['icon'=>'people'], 'locations'=>['button_url'=>'/locations'], 'giving'=>['button_url'=>'/give'],
-            'carousel'=>['slide_one_type'=>'flyer', 'slide_two_type'=>'flyer', 'slide_three_type'=>'flyer'],
+            'carousel'=>['slide_one_type'=>'flyer', 'slide_one_presentation'=>'editorial', 'slide_two_type'=>'flyer', 'slide_two_presentation'=>'editorial', 'slide_three_type'=>'flyer', 'slide_three_presentation'=>'editorial'],
         ];
         if (isset($specific[$type][$field])) return $specific[$type][$field];
         return match ($field) { 'title'=>'Add a clear title', 'body','text','description'=>'Add clear, welcoming content for this page.',
@@ -118,6 +118,8 @@ final class PageElementRegistry
         if ($field==='placement') $rule['enum']=['left','right'];
         if ($field==='ordered') $rule['enum']=['yes','no'];
         if ($field==='height') $rule['enum']=['small','medium','large'];
+        if (preg_match('/^slide_(one|two|three)_type$/', $field)) $rule['enum']=['flyer','video_upload','video_link','video'];
+        if (preg_match('/^slide_(one|two|three)_presentation$/', $field)) $rule['enum']=['editorial','flyer'];
         if ($field==='icon') $rule['enum']=['heart','people','calendar','location','message','book','star','check','hand-heart','globe'];
         if ($field==='value') $rule += ['format'=>'integer','min'=>0,'max_value'=>100];
         if ($field==='button_url'||preg_match('/^slide_(one|two|three)_button_url$/', $field)===1||($type==='button'&&$field==='url')) $rule['format']='internal_or_http_url';
@@ -131,9 +133,10 @@ final class PageElementRegistry
         return match($field){
             'tone'=>[['info','Information'],['success','Success'],['warning','Warning']],
             'icon'=>[['heart','Heart'],['people','People'],['calendar','Calendar'],['location','Location'],['message','Message'],['book','Book'],['star','Star'],['check','Check'],['hand-heart','Care'],['globe','Globe']],
-            'columns'=>[['two','Two'],['three','Three'],['four','Four']], 'placement'=>[['left','Media left'],['right','Media right']],
+            'columns'=>[['two','Two'],['three','Three'],['four','Four']], 'display'=>[['grid','Grid'],['carousel','Carousel']], 'presentation'=>[['standard','Standard video'],['hero','Full-width video hero']], 'placement'=>[['left','Media left'],['right','Media right']],
             'ordered'=>[['no','Bulleted'],['yes','Numbered']], 'height'=>[['small','Small'],['medium','Medium'],['large','Large']],
-            'slide_one_type','slide_two_type','slide_three_type'=>[['flyer','Flyer image'],['video_upload','Uploaded video'],['video_link','YouTube or Vimeo link'],['video','Hosted video (existing slide)']], default=>[]};
+            'slide_one_type','slide_two_type','slide_three_type'=>[['flyer','Image or flyer'],['video_upload','Uploaded video'],['video_link','YouTube or Vimeo link'],['video','Hosted video (existing slide)']],
+            'slide_one_presentation','slide_two_presentation','slide_three_presentation'=>[['editorial','Editorial image with overlay'],['flyer','Unobstructed program flyer']], default=>[]};
     }
     /** @param array<int,string> $keys @return array<string,array<string,mixed>> */
     private function controlDefinitions(array $keys): array

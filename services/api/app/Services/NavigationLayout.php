@@ -43,7 +43,7 @@ final class NavigationLayout
         return $this->defaults($surface, $slot, $this->options($surface));
     }
 
-    /** @return array<int, array{key:string,label:string,icon:string,url:string,match:string,group:string}> */
+    /** @return array<int, array{key:string,label:string,icon:string,url:string,match:string,group:string,parent:?string}> */
     public function entries(string $surface, string $slot, ?object $user, array $features): array
     {
         abort_unless(in_array($surface, self::SURFACES, true) && in_array($slot, ['sidebar', 'mobile'], true), 500);
@@ -112,8 +112,19 @@ final class NavigationLayout
                 'group' => is_array($configuration) && in_array($configuration['group'] ?? null, array_column($options, 'group'), true)
                     ? $configuration['group']
                     : $definition['group'],
+                'parent' => $slot === 'sidebar' && is_array($configuration) && is_string($configuration['parent'] ?? null)
+                    ? $configuration['parent']
+                    : null,
             ];
         }
+
+        $availableKeys = array_fill_keys(array_column($entries, 'key'), true);
+        foreach ($entries as &$entry) {
+            if ($entry['parent'] === $entry['key'] || ! isset($availableKeys[$entry['parent'] ?? ''])) {
+                $entry['parent'] = null;
+            }
+        }
+        unset($entry);
 
         if ($slot === 'mobile') {
             $entries = array_slice($entries, 0, 5);
@@ -122,6 +133,89 @@ final class NavigationLayout
         $request->attributes->set($cacheKey, $entries);
 
         return $entries;
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function treeEntries(string $surface, string $slot, ?object $user, array $features): array
+    {
+        return $this->toTree($this->entries($surface, $slot, $user, $features));
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function publicTree(array $features): array
+    {
+        $entries = DB::table('navigation_items')
+            ->where('is_enabled', true)
+            ->where('visible_desktop', true)
+            ->orderBy('position')
+            ->get()
+            ->filter(fn (object $item): bool => ! $item->required_feature || in_array($item->required_feature, $features, true))
+            ->map(fn (object $item): array => [
+                'key' => (string) $item->id,
+                'parent' => $item->parent_id ? (string) $item->parent_id : null,
+                'label' => $item->label,
+                'url' => $item->url,
+                'icon' => $item->icon ?: 'external',
+                'section' => $item->section ?: 'Main',
+                'open_new_tab' => (bool) $item->open_new_tab,
+            ])->values()->all();
+
+        return $this->toTree($entries);
+    }
+
+    /**
+     * Convert a validated flat navigation list into a stable tree. Orphaned or
+     * cyclic entries remain available at the root rather than disappearing.
+     *
+     * @param array<int, array<string, mixed>> $entries
+     * @return array<int, array<string, mixed>>
+     */
+    public function toTree(array $entries): array
+    {
+        $byKey = [];
+        foreach ($entries as $entry) {
+            if (! is_string($entry['key'] ?? null)) {
+                continue;
+            }
+            $entry['children'] = [];
+            $byKey[$entry['key']] = $entry;
+        }
+
+        $children = [];
+        $roots = [];
+        foreach ($byKey as $key => $entry) {
+            $parent = is_string($entry['parent'] ?? null) ? $entry['parent'] : null;
+            if ($parent && $parent !== $key && isset($byKey[$parent]) && ! $this->wouldCycle($key, $parent, $byKey)) {
+                $children[$parent][] = $key;
+            } else {
+                $roots[] = $key;
+            }
+        }
+
+        $build = function (string $key, int $depth = 0) use (&$build, $byKey, $children): array {
+            $entry = $byKey[$key];
+            $entry['depth'] = $depth;
+            $entry['children'] = array_map(fn (string $child): array => $build($child, $depth + 1), $children[$key] ?? []);
+
+            return $entry;
+        };
+
+        return array_map(fn (string $key): array => $build($key), $roots);
+    }
+
+    /** @param array<string, array<string, mixed>> $entries */
+    private function wouldCycle(string $key, string $parent, array $entries): bool
+    {
+        $seen = [$key => true];
+        while (isset($entries[$parent])) {
+            if (isset($seen[$parent])) {
+                return true;
+            }
+            $seen[$parent] = true;
+            $parent = is_string($entries[$parent]['parent'] ?? null) ? $entries[$parent]['parent'] : '';
+        }
+
+        return false;
     }
 
     /** @return array<string, array{label:string, icon:string, route:string, match:string, group:string, permission:?string, module:?string, feature:?string}> */

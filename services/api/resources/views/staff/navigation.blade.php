@@ -33,7 +33,7 @@
 
                 <div class="navigation-layout-grid">
                     @php($sidebarSections = collect($menuOptions[$surface])->pluck('group')->filter()->unique()->values())
-                    @foreach(['sidebar' => ['Sidebar', 'Choose destinations and the section where each appears.'], 'mobile' => ['Mobile footer', 'Shown at the bottom of the screen on mobile devices.']] as $menuSlot => [$slotLabel, $slotDescription])
+                    @foreach(['sidebar' => ['Sidebar', 'Choose destinations, order them, and optionally place them under a collapsible parent.'], 'mobile' => ['Mobile footer', 'Shown as five direct destinations at the bottom of mobile screens; nested links remain in the menu drawer.']] as $menuSlot => [$slotLabel, $slotDescription])
                         @php($maxSelections = $menuSlot === 'mobile' ? 5 : null)
                         @php($selectedEntries = collect($menuLayouts[$surface][$menuSlot] ?? []))
                         @php($selectedKeys = $selectedEntries->map(fn ($entry) => is_string($entry) ? $entry : ($entry['key'] ?? null))->filter()->values())
@@ -92,7 +92,7 @@
             <section class="navigation-layout-card navigation-public-list">
                 @php($selectedPublicItems = $items->filter(fn ($item) => (bool) $item->is_enabled))
                 @php($availablePublicItems = $items->reject(fn ($item) => (bool) $item->is_enabled))
-                <header class="navigation-layout-card-heading"><div><p>Public menu</p><span>Select links, arrange their order, and choose a section and icon.</span></div><span class="navigation-selection-count" data-navigation-public-count>{{ $selectedPublicItems->count() }} of {{ $items->count() }} selected</span></header>
+                <header class="navigation-layout-card-heading"><div><p>Public menu</p><span>Select links, arrange their order, or place a link under a collapsible parent. Top-level links control sidebar sections and the mobile footer.</span></div><span class="navigation-selection-count" data-navigation-public-count>{{ $selectedPublicItems->count() }} of {{ $items->count() }} selected</span></header>
                 <form id="public-navigation-settings" method="POST" action="{{ route('staff.navigation.reorder') }}" data-navigation-order-form>
                     @csrf @method('PUT')
                     <div data-navigation-order>
@@ -137,7 +137,7 @@
                         @endforeach
                     </div>
                 </details>
-                <form method="POST" action="{{ route('staff.navigation.store') }}">
+                <form method="POST" action="{{ route('staff.navigation.store') }}" data-navigation-custom-add>
                     @csrf
                     @include('staff.navigation-fields', ['item' => null])
                     <button class="button" type="submit"><x-ui.icon name="add" :size="15"/>Add link</button>
@@ -229,7 +229,9 @@
                 panel.style.left = `${left}px`;
                 panel.style.top = `${openBelow ? rect.bottom + 6 : Math.max(12, rect.top - height - 6)}px`;
             };
-            document.querySelectorAll('[data-icon-picker]').forEach((picker) => {
+            const bindIconPicker = (picker) => {
+                if (picker.dataset.iconPickerReady === 'true') return;
+                picker.dataset.iconPickerReady = 'true';
                 const trigger = picker.querySelector('[data-icon-picker-trigger]');
                 const panel = picker.querySelector('[data-icon-picker-panel]');
                 const valueInput = picker.querySelector('[data-icon-picker-value]');
@@ -280,7 +282,8 @@
                 search?.addEventListener('keydown', (event) => {
                     if (event.key === 'Escape') { event.preventDefault(); closeIconPicker(picker, true); }
                 });
-            });
+            };
+            document.querySelectorAll('[data-icon-picker]').forEach(bindIconPicker);
             const dismissIconPickers = (event) => {
                 document.querySelectorAll('[data-icon-picker-panel]:not([hidden])').forEach((panel) => {
                     const owner = document.getElementById(panel.dataset.owner)?.closest('[data-icon-picker]') || document.querySelector(`[aria-controls="${CSS.escape(panel.id)}"]`)?.closest('[data-icon-picker]');
@@ -307,6 +310,19 @@
                 const max = Number(card.dataset.maxSelections);
                 const rows = [...card.querySelectorAll('[data-navigation-row]')];
 
+                const updateParentOptions = () => {
+                    const selectedKeys = new Set([...activeList.querySelectorAll('[data-navigation-row]')].map((row) => row.dataset.navigationKey));
+                    rows.forEach((row) => {
+                        const parent = row.querySelector('[data-navigation-parent]');
+                        if (!parent) return;
+                        [...parent.options].forEach((option) => {
+                            if (option.value) option.disabled = !selectedKeys.has(option.value);
+                        });
+                        if (parent.value && !selectedKeys.has(parent.value)) parent.value = '';
+                        row.dataset.nested = String(Boolean(parent.value));
+                    });
+                };
+
                 const updatePositions = () => {
                     const selectedRows = [...activeList.querySelectorAll('[data-navigation-row]')];
                     selectedRows.forEach((row, index) => {
@@ -319,6 +335,7 @@
                     if (count) count.textContent = `${selectedCount} selected`;
                     if (availableCount) availableCount.textContent = String(Math.max(0, rows.length - selectedCount));
                     if (emptyMessage) emptyMessage.hidden = selectedCount > 0;
+                    updateParentOptions();
                 };
 
                 const moveRow = (row, selected) => {
@@ -328,6 +345,10 @@
                     if (sectionControl) sectionControl.hidden = !selected;
                     const sectionSelect = row.querySelector('[data-navigation-group]');
                     if (sectionSelect) sectionSelect.disabled = !selected;
+                    const parentControl = row.querySelector('[data-navigation-parent-control]');
+                    if (parentControl) parentControl.hidden = !selected;
+                    const parentSelect = row.querySelector('[data-navigation-parent]');
+                    if (parentSelect) parentSelect.disabled = !selected;
                     row.querySelector('[data-navigation-icon]').disabled = !selected;
                     row.querySelector('[data-icon-picker-trigger]').disabled = !selected;
                     row.querySelector('[data-navigation-position]').disabled = !selected;
@@ -350,6 +371,9 @@
 
                 rows.forEach((row) => {
                     const checkbox = row.querySelector('[data-navigation-checkbox]');
+                    row.querySelector('[data-navigation-parent]')?.addEventListener('change', (event) => {
+                        row.dataset.nested = String(Boolean(event.currentTarget.value));
+                    });
                     checkbox.addEventListener('change', () => {
                         if (checkbox.checked && max > 0 && activeList.querySelectorAll('[data-navigation-row]').length >= max) {
                             checkbox.checked = false;
@@ -463,6 +487,36 @@
                 allPublicRows().forEach(bindPublicItem);
                 updateMoveButtons();
 
+                const appendPublicItem = (result) => {
+                    const template = document.createElement('template');
+                    template.innerHTML = result.html.trim();
+                    const node = template.content.firstElementChild;
+                    if (!node) throw new Error('The destination was saved, but the menu could not be updated here. Refresh this page to see it.');
+                    publicList.querySelector('.empty-cell')?.remove();
+                    publicList.append(node);
+                    node.querySelectorAll('[data-icon-picker]').forEach(bindIconPicker);
+                    bindPublicItem(node);
+                    updateMoveButtons();
+                    updateSelectionCount();
+                    return node;
+                };
+
+                const submitNavigationLink = async (form) => {
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        body: new FormData(form),
+                        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin',
+                    });
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        const validationMessage = Object.values(result.errors ?? {}).flat()[0];
+                        throw new Error(validationMessage || result.message || 'This destination could not be added.');
+                    }
+                    appendPublicItem(result);
+                    return result;
+                };
+
                 document.querySelectorAll('[data-navigation-quick-add]').forEach((form) => {
                     const button = form.querySelector('[data-navigation-quick-add-button]');
                     button?.addEventListener('click', async () => {
@@ -471,24 +525,7 @@
                         form.classList.add('is-pending');
                         if (status) { status.classList.remove('is-error'); status.textContent = `Adding ${form.elements.label.value}…`; }
                         try {
-                            const response = await fetch(form.action, {
-                                method: 'POST',
-                                body: new FormData(form),
-                                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                                credentials: 'same-origin',
-                            });
-                            const result = await response.json();
-                            if (!response.ok) throw new Error(result.message || 'This destination could not be added.');
-
-                            const template = document.createElement('template');
-                            template.innerHTML = result.html.trim();
-                            const node = template.content.firstElementChild;
-                            if (!node) throw new Error('The destination was saved, but the menu could not be updated here. Refresh this page to see it.');
-                            publicList.querySelector('.empty-cell')?.remove();
-                            publicList.append(node);
-                            bindPublicItem(node);
-                            updateMoveButtons();
-                            updateSelectionCount();
+                            const result = await submitNavigationLink(form);
                             const section = form.closest('.navigation-destination-grid section');
                             form.remove();
                             if (section && !section.querySelector('form')) section.remove();
@@ -499,6 +536,33 @@
                             if (status) { status.classList.add('is-error'); status.textContent = error.message || 'This destination could not be added. Try again.'; }
                         }
                     });
+                });
+
+                const customForm = document.querySelector('[data-navigation-custom-add]');
+                customForm?.addEventListener('submit', async (event) => {
+                    event.preventDefault();
+                    const button = customForm.querySelector('button[type="submit"]');
+                    if (button?.disabled) return;
+                    if (button) button.disabled = true;
+                    customForm.setAttribute('aria-busy', 'true');
+                    if (status) { status.classList.remove('is-error'); status.textContent = 'Adding custom link…'; }
+                    try {
+                        const result = await submitNavigationLink(customForm);
+                        customForm.reset();
+                        const iconValue = customForm.querySelector('[data-icon-picker-value]');
+                        const iconLabel = customForm.querySelector('[data-icon-picker-label]');
+                        const iconCurrent = customForm.querySelector('[data-icon-picker-current]');
+                        if (iconValue) iconValue.value = '';
+                        if (iconLabel) iconLabel.textContent = 'Choose icon';
+                        const defaultIcon = document.querySelector('#navigation-icon-options')?.content.querySelector('[data-icon="sparkles"] svg');
+                        if (iconCurrent && defaultIcon) iconCurrent.replaceChildren(defaultIcon.cloneNode(true));
+                        if (status) { status.classList.remove('is-error'); status.textContent = result.message; }
+                    } catch (error) {
+                        if (status) { status.classList.add('is-error'); status.textContent = error instanceof Error ? error.message : 'This destination could not be added. Try again.'; }
+                    } finally {
+                        if (button) button.disabled = false;
+                        customForm.removeAttribute('aria-busy');
+                    }
                 });
             }
         })();

@@ -16,7 +16,7 @@ final class AboutPageStarterService
                 $this->column([$this->element('hero', [
                     'eyebrow' => 'ABOUT US',
                     'title' => 'A community shaped by faith, hope, and love.',
-                    'body' => 'Learn the heart behind the ministry, the values that guide its work, and the people it is called to serve.',
+                    'body' => 'Discover the story, values, and people that shape this ministry.',
                     'button_label' => 'View service times',
                     'button_url' => '/service-times',
                 ], [
@@ -28,14 +28,19 @@ final class AboutPageStarterService
                     'button_padding_x' => '25px',
                     'button_padding_y' => '14px',
                     'button_width' => 'auto',
-                    'custom_css' => 'selector { width: 100% !important; max-width: none !important; } selector .public-page-hero { width: min(100%, 590px) !important; min-height: clamp(500px, 60vw, 640px); margin: 0 auto 0 0 !important; justify-self: start !important; align-content: end; justify-items: start; text-align: left; padding: 42px clamp(34px, 5vw, 68px) 52px; background: transparent; } selector small { width: max-content; border: 1px solid color-mix(in srgb, currentColor 34%, transparent); border-radius: 999px; padding: 7px 12px; font-weight: 800; letter-spacing: .17em; } selector h1 { max-width: 11ch; font-family: var(--font-heading, Georgia, serif); font-size: clamp(2.45rem, 3.7vw, 3.7rem); line-height: .98; letter-spacing: -.055em; } selector p { max-width: 40ch; font-size: 1rem; line-height: 1.65; } selector .button { width: fit-content !important; min-width: 0; } @media (max-width: 980px) { selector .public-page-hero { width: min(100%, 560px) !important; min-height: 530px; padding: 38px 42px 48px; } selector h1 { max-width: 11ch; font-size: clamp(2.35rem, 5.6vw, 3.4rem); } } @media (max-width: 620px) { selector .public-page-hero { width: 100% !important; min-height: 500px; padding: 34px 26px 46px; } selector h1 { max-width: 10ch; font-size: clamp(2.25rem, 8.2vw, 2.9rem); line-height: 1; } selector p { max-width: 34ch; font-size: .98rem; line-height: 1.6; } selector small { font-size: .68rem; } }',
+                    'custom_css' => 'selector { width: 100% !important; height: 100%; max-width: none !important; } selector .public-page-hero { box-sizing: border-box; width: 100% !important; min-height: 500px; align-content: end; justify-items: start; text-align: left; padding: clamp(34px, 5vw, 68px); background: linear-gradient(90deg, rgb(0 18 20 / 82%) 0%, rgb(0 18 20 / 58%) 34%, rgb(0 18 20 / 12%) 64%, transparent 78%); color: #ffffff; } selector .public-page-hero > * { position: relative; z-index: 1; } selector small { width: max-content; border: 1px solid rgb(255 255 255 / 58%); border-radius: 999px; padding: 7px 13px; font-weight: 800; letter-spacing: .17em; } selector h1 { max-width: 12ch; font-family: var(--font-heading, Georgia, serif); font-size: clamp(2.2rem, 3.4vw, 3.35rem); line-height: 1; letter-spacing: -.052em; text-wrap: balance; } selector p { max-width: 34ch; font-size: .98rem; line-height: 1.58; } selector .button { width: fit-content !important; min-width: 0; border: 1px solid rgb(255 255 255 / 82%); border-radius: 999px !important; } @media (max-width: 980px) { selector .public-page-hero { min-height: 460px; padding: 38px 32px; background: linear-gradient(90deg, rgb(0 18 20 / 78%) 0%, rgb(0 18 20 / 46%) 48%, transparent 78%); } selector h1 { font-size: clamp(2.05rem, 5vw, 2.8rem); } } @media (max-width: 620px) { selector .public-page-hero { min-height: 430px; padding: 28px 24px 32px; background: linear-gradient(0deg, rgb(0 18 20 / 88%) 0%, rgb(0 18 20 / 48%) 48%, transparent 78%); } selector h1 { max-width: 13ch; font-size: clamp(1.9rem, 7.2vw, 2.35rem); } selector p { max-width: 31ch; font-size: .9rem; line-height: 1.5; } selector small { font-size: .65rem; } }',
                 ])]),
             ], [
-                'content_width' => 'wide', 'min_height' => '680px', 'vertical_alignment' => 'end',
-                'background_image' => '/images/pages/home-arrival-hero.png', 'background_overlay' => 'strong',
-                'overlay_color' => 'brand', 'overlay_opacity' => '72', 'background_position' => 'center_center',
-                'background_size' => 'cover', 'background_repeat' => 'no_repeat', 'overflow' => 'hidden',
+                'content_width' => 'full', 'grid_preset' => 'one', 'column_gap' => 'none',
+                'min_height' => '0px', 'vertical_alignment' => 'stretch', 'background' => 'brand', 'overflow' => 'hidden',
+                'background_image' => '/images/pages/home-arrival-hero.png',
+                'background_position' => 'right_center', 'background_size' => 'cover', 'background_repeat' => 'no_repeat',
                 'custom_class' => 'proposed-about-hero',
+                'custom_css' => 'selector, selector .public-page-structured-columns, selector .public-page-structured-column { width: 100% !important; max-width: none !important; margin: 0 !important; } selector .public-page-structured-columns { padding: 0 !important; }',
+            ], [
+                'desktop' => ['padding' => $this->box('0px', '0px')],
+                'tablet' => ['padding' => $this->box('0px', '0px')],
+                'mobile' => ['padding' => $this->box('0px', '0px'), 'stack' => 'stack'],
             ]),
 
             $this->section([

@@ -19,7 +19,7 @@ class InitialSetupController extends Controller
         }
 
         $admin = $installer->execute($request->only([
-            'name', 'domain', 'timezone', 'location', 'tagline', 'contact_email', 'theme_preset',
+            'name', 'domain', 'timezone', 'location', 'tagline', 'contact_email', 'theme_preset', 'chrome_mode', 'chrome_color',
             'admin_name', 'admin_email', 'password',
         ]));
 

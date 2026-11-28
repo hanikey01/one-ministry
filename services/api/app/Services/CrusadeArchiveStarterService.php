@@ -13,16 +13,15 @@ final class CrusadeArchiveStarterService
     {
         $sections = [
             $this->section([
-                $this->column([$this->element('hero', [
-                    'eyebrow' => 'CRUSADE ARCHIVE',
-                    'title' => 'A record of faith, service, and gathering.',
-                    'body' => 'Add the verified crusade theme, dates, location, and a short introduction to preserve this moment in the ministry journey.',
-                    'button_label' => '', 'button_url' => '',
+                $this->column([$this->element('video_embed', [
+                    'url' => '',
+                    'title' => 'Full crusade recording',
+                    'caption' => 'Add the complete recording as a ministry video upload or a supported external video link.',
+                    'presentation' => 'standard',
                 ], [
-                    'text_color' => '#ffffff',
-                    'custom_css' => 'selector .public-page-hero { min-height: clamp(460px, 58vw, 620px); align-content: end; justify-items: start; padding: clamp(42px, 7vw, 84px); background: linear-gradient(135deg, var(--brand), color-mix(in srgb, var(--action) 64%, var(--brand))); } selector small { width: max-content; border: 1px solid rgb(255 255 255 / 38%); border-radius: 999px; padding: 7px 12px; font-weight: 800; letter-spacing: .16em; } selector h1 { max-width: 12ch; font-family: var(--font-heading, Georgia, serif); font-size: clamp(2.8rem, 5.4vw, 4.8rem); line-height: .98; letter-spacing: -.055em; } selector p { max-width: 54ch; font-size: 1.05rem; line-height: 1.7; } @media (max-width: 620px) { selector .public-page-hero { min-height: 460px; padding: 36px 24px 48px; } selector h1 { font-size: clamp(2.35rem, 9vw, 3.1rem); } selector p { font-size: .98rem; line-height: 1.6; } }',
+                    'custom_css' => 'selector, selector .public-page-video, selector :is(video, iframe) { display: block; box-sizing: border-box; width: 100% !important; max-width: none !important; margin: 0; border: 0; border-radius: 0; } selector .public-page-video { background: var(--ink); } selector .public-page-video :is(video, iframe) { aspect-ratio: 16 / 9; object-fit: contain; } selector figcaption { margin: 0; padding: 14px 20px; background: var(--surface); color: var(--muted); text-align: center; }',
                 ])]),
-            ], ['content_width' => 'wide', 'background' => 'canvas']),
+            ], ['content_width' => 'full', 'column_gap' => 'none', 'background' => 'canvas', 'custom_class' => 'crusade-video-hero-section'], ['desktop' => ['padding' => $this->box('0px', '0px')], 'tablet' => ['padding' => $this->box('0px', '0px')], 'mobile' => ['padding' => $this->box('0px', '0px')]]),
 
             $this->section([
                 $this->column([$this->element('rich_text', [
@@ -35,9 +34,10 @@ final class CrusadeArchiveStarterService
                 $this->column([$this->element('gallery', [
                     'images' => '',
                     'columns' => 'three',
+                    'display' => 'carousel',
                     'caption' => 'Add selected crusade photographs from the Media Library or use approved image URLs.',
                 ], [
-                    'custom_css' => 'selector .public-page-gallery { gap: 18px; } selector .public-page-gallery img { aspect-ratio: 4 / 3; border-radius: 18px; }',
+                    'custom_css' => 'selector .public-page-gallery-carousel { width: 100%; max-width: 100%; margin-inline: auto; } selector .public-page-gallery-carousel-stage { width: 100%; max-width: 100%; min-width: 0; min-height: 0; aspect-ratio: 16 / 9; border-radius: 20px; } selector .public-page-gallery-carousel-stage img { object-fit: cover; } @media (max-width: 760px) { selector .public-page-gallery-carousel-stage { aspect-ratio: 4 / 3; } }',
                 ])]),
             ], ['title' => 'Crusade in images', 'body' => 'A visual record of the people, prayer, service, and gathering throughout the crusade.', 'content_width' => 'wide', 'background' => 'surface_muted', 'custom_css' => 'selector .public-page-structured-heading { margin-bottom: 30px; }']),
 
@@ -47,15 +47,6 @@ final class CrusadeArchiveStarterService
                 $this->column([$this->video('Highlight three', 'Add a final short highlight, testimony, or worship moment.')]),
             ], ['title' => 'Short video highlights', 'body' => 'Each video accepts a ministry upload from the Media Library or a supported YouTube/Vimeo link.', 'content_width' => 'wide', 'grid_preset' => 'three', 'column_gap' => 'regular', 'background' => 'canvas'], ['tablet' => ['column_count' => '2'], 'mobile' => ['stack' => 'stack']]),
 
-            $this->section([
-                $this->column([$this->element('video_embed', [
-                    'url' => '',
-                    'title' => 'Full crusade recording',
-                    'caption' => 'Add the complete recording as a ministry video upload or a supported YouTube/Vimeo link.',
-                ], [
-                    'custom_css' => 'selector .public-page-video { max-width: 1040px; margin: 0 auto; } selector .public-page-video :is(video, iframe) { border-radius: 22px; aspect-ratio: 16 / 9; background: var(--ink); } selector figcaption { margin-top: 16px; color: var(--muted); text-align: center; }',
-                ])]),
-            ], ['title' => 'Watch the full crusade', 'body' => 'Preserve the complete service or event recording here for the ministry archive.', 'content_width' => 'wide', 'background' => 'surface_muted', 'custom_css' => 'selector .public-page-structured-heading { margin-bottom: 30px; }']),
         ];
 
         return $this->documents->normalise(['version' => 2, 'sections' => $sections], $features);

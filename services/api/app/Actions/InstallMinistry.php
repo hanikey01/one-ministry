@@ -7,21 +7,22 @@ use App\Models\FeatureSetting;
 use App\Models\Location;
 use App\Models\MinistrySetting;
 use App\Models\User;
+use App\Services\DefaultMediaLibrary;
 use App\Services\PageDocumentService;
-use App\Support\RoleCatalog;
 use App\Support\AddressCatalog;
+use App\Support\RoleCatalog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class InstallMinistry
 {
     public function __construct(private readonly AddressCatalog $addresses) {}
 
     /**
-     * @param  array{name: string, domain: string, timezone: string, location: string, admin_name: string, admin_email: string, password: string, tagline?: ?string, contact_email?: ?string, theme_preset?: string, location_address_line_1?: ?string, location_address_line_2?: ?string, location_city?: ?string, location_region_code?: ?string, location_postal_code?: ?string, location_country_code?: ?string}  $input
+     * @param  array{name: string, domain: string, timezone: string, location: string, admin_name: string, admin_email: string, password: string, tagline?: ?string, contact_email?: ?string, theme_preset?: string, chrome_mode?: string, chrome_color?: ?string, location_address_line_1?: ?string, location_address_line_2?: ?string, location_city?: ?string, location_region_code?: ?string, location_postal_code?: ?string, location_country_code?: ?string}  $input
      */
     public function execute(array $input): User
     {
@@ -42,6 +43,8 @@ class InstallMinistry
             'tagline' => ['nullable', 'string', 'max:240'],
             'contact_email' => ['nullable', 'email', 'max:254'],
             'theme_preset' => ['nullable', 'in:tech_blue,neutral,warm'],
+            'chrome_mode' => ['nullable', Rule::in(['preset', 'custom'])],
+            'chrome_color' => ['nullable', 'required_if:chrome_mode,custom', 'regex:/^#[0-9A-Fa-f]{6}$/'],
         ])->validate();
 
         if (MinistrySetting::query()->exists()) {
@@ -77,7 +80,8 @@ class InstallMinistry
                 'contact_email' => $input['contact_email'] ?? null,
                 'timezone' => $input['timezone'],
                 'theme_preset' => $input['theme_preset'] ?? 'tech_blue',
-                'chrome_mode' => 'preset',
+                'chrome_mode' => $input['chrome_mode'] ?? 'preset',
+                'chrome_color' => ($input['chrome_mode'] ?? 'preset') === 'custom' ? strtoupper((string) $input['chrome_color']) : null,
                 'public_address' => $locationAddress,
             ]);
 
@@ -164,6 +168,10 @@ class InstallMinistry
 
             FeatureSetting::query()->where('key', '!=', 'attendance')->update(['state' => 'enabled', 'changed_by' => $admin->id]);
 
+            // Turn the packaged starter artwork into installation-owned Media
+            // Library assets before any default page document references it.
+            app(DefaultMediaLibrary::class)->install();
+
             // Every fresh installation starts with a real, editable homepage page.
             // This prevents the public route from depending on a missing fallback view.
             $homepageId = (string) Str::uuid();
@@ -190,7 +198,7 @@ class InstallMinistry
 
             // The public site begins with the matching About Us design too. Both
             // defaults remain ordinary editable pages after installation.
-            $aboutDocument = app(\App\Services\AboutPageStarterService::class)->document(FeatureSetting::query()->where('state', 'enabled')->pluck('key')->all());
+            $aboutDocument = app(PageWorkspaceController::class)->starterDocument('about');
             DB::table('pages')->insert([
                 'id' => (string) Str::uuid(),
                 'title' => 'About Us',

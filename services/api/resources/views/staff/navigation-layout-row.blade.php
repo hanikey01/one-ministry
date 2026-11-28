@@ -1,7 +1,8 @@
 @php($fieldKey = str_replace([':', '.'], '_', $key))
 @php($configuredIcon = is_array($configured) ? ($configured['icon'] ?? $option['icon']) : $option['icon'])
 @php($configuredGroup = is_array($configured) ? ($configured['group'] ?? $option['group']) : $option['group'])
-<article class="navigation-destination-row" data-navigation-row data-selected="{{ $selected ? 'true' : 'false' }}" data-search-text="{{ mb_strtolower($option['label']) }}">
+@php($configuredParent = is_array($configured) ? ($configured['parent'] ?? '') : '')
+<article class="navigation-destination-row" data-navigation-row data-navigation-key="{{ $key }}" data-selected="{{ $selected ? 'true' : 'false' }}" data-nested="{{ $configuredParent ? 'true' : 'false' }}" data-search-text="{{ mb_strtolower($option['label']) }}">
     <input id="menu-choice-{{ $surface }}-{{ $menuSlot }}-{{ $fieldKey }}" type="checkbox" name="menus[{{ $surface }}][{{ $menuSlot }}][]" value="{{ $key }}" data-navigation-checkbox @checked($selected) @disabled($fixed)>
     @if($fixed)<input type="hidden" name="menus[{{ $surface }}][{{ $menuSlot }}][]" value="{{ $key }}">@endif
     <div class="navigation-destination-label">
@@ -14,6 +15,14 @@
             <button class="navigation-move-button navigation-move-button-down" type="button" data-move-down aria-label="Move {{ $option['label'] }} down"><x-ui.icon name="chevron-down" :size="15"/></button>
         </div>
         @if($menuSlot === 'sidebar')
+            <div class="navigation-parent-control" data-navigation-parent-control @if(!$selected) hidden @endif>
+                <select id="navigation-parent-{{ $surface }}-{{ $fieldKey }}" name="parents[{{ $surface }}][sidebar][{{ $fieldKey }}]" aria-label="Parent menu for {{ $option['label'] }}" title="Parent menu" data-navigation-parent @disabled(!$selected)>
+                    <option value="">Top level</option>
+                    @foreach($menuOptions[$surface] as $parentKey => $parentOption)
+                        @if($parentKey !== $key)<option value="{{ $parentKey }}" @selected($configuredParent === $parentKey)>Under {{ $parentOption['label'] }}</option>@endif
+                    @endforeach
+                </select>
+            </div>
             <div class="navigation-section-control" data-navigation-section-control @if(!$selected) hidden @endif>
                 <select id="navigation-section-{{ $surface }}-{{ $fieldKey }}" name="sections[{{ $surface }}][sidebar][{{ $fieldKey }}]" aria-label="Section for {{ $option['label'] }}" title="{{ $configuredGroup }}" data-navigation-group @disabled(!$selected)>
                     @foreach($sidebarSections as $section)

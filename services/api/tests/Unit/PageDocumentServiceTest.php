@@ -208,9 +208,9 @@ class PageDocumentServiceTest extends TestCase
                     'id' => 'lead-carousel', 'type' => 'carousel', 'settings' => [], 'responsive' => [],
                     'content' => [
                         'eyebrow' => '', 'title' => '', 'body' => '', 'slides' => '', 'button_label' => '', 'button_url' => '',
-                        'slide_one_type' => 'flyer', 'slide_one_media_url' => 'https://cdn.example.test/flyer.jpg', 'slide_one_title' => 'Welcome', 'slide_one_body' => 'A welcome flyer', 'slide_one_button_label' => 'Plan a visit', 'slide_one_button_url' => '/visit',
-                        'slide_two_type' => 'video_upload', 'slide_two_media_url' => 'https://cdn.example.test/worship.mp4', 'slide_two_title' => 'Worship', 'slide_two_body' => 'An uploaded video', 'slide_two_button_label' => 'Watch', 'slide_two_button_url' => '/worship',
-                        'slide_three_type' => 'video_link', 'slide_three_media_url' => 'https://www.youtube.com/watch?v=6CKCThJB5w0', 'slide_three_title' => 'Message', 'slide_three_body' => 'An external video', 'slide_three_button_label' => 'Explore', 'slide_three_button_url' => '/sermons',
+                        'slide_one_type' => 'flyer', 'slide_one_presentation' => 'flyer', 'slide_one_media_url' => 'https://cdn.example.test/flyer.jpg', 'slide_one_title' => 'Welcome', 'slide_one_body' => 'A welcome flyer', 'slide_one_button_label' => 'Plan a visit', 'slide_one_button_url' => '/visit',
+                        'slide_two_type' => 'video_upload', 'slide_two_presentation' => 'editorial', 'slide_two_media_url' => 'https://cdn.example.test/worship.mp4', 'slide_two_title' => 'Worship', 'slide_two_body' => 'An uploaded video', 'slide_two_button_label' => 'Watch', 'slide_two_button_url' => '/worship',
+                        'slide_three_type' => 'video_link', 'slide_three_presentation' => 'editorial', 'slide_three_media_url' => 'https://www.youtube.com/watch?v=6CKCThJB5w0', 'slide_three_title' => 'Message', 'slide_three_body' => 'An external video', 'slide_three_button_label' => 'Explore', 'slide_three_button_url' => '/sermons',
                     ],
                 ]],
             ]],
@@ -218,6 +218,7 @@ class PageDocumentServiceTest extends TestCase
 
         $carousel = app(PageDocumentService::class)->normalise($document)['sections'][0]['columns'][0]['elements'][0]['content'];
 
+        $this->assertSame('flyer', $carousel['slide_one_presentation']);
         $this->assertSame('video_upload', $carousel['slide_two_type']);
         $this->assertSame('video_link', $carousel['slide_three_type']);
         $this->assertSame('/sermons', $carousel['slide_three_button_url']);
@@ -234,10 +235,95 @@ class PageDocumentServiceTest extends TestCase
         $this->assertSame('/images/pages/home-service-carousel.png', $lead['content']['slide_three_media_url']);
         $this->assertSame('/service-times', $lead['content']['slide_one_button_url']);
         $this->assertSame('/about-us', $lead['content']['slide_three_button_url']);
+        $this->assertSame('', $lead['content']['slide_one_body']);
+        $this->assertSame('', $lead['content']['slide_two_body']);
+        $this->assertSame('', $lead['content']['slide_three_body']);
+        $this->assertSame('editorial', $lead['content']['slide_one_presentation']);
+        $this->assertSame('editorial', $lead['content']['slide_two_presentation']);
+        $this->assertSame('editorial', $lead['content']['slide_three_presentation']);
         $this->assertStringContainsString('public-page-carousel', $lead['settings']['custom_css']);
         $this->assertStringContainsString('touch-action: pan-y', $lead['settings']['custom_css']);
-        $this->assertStringContainsString('border-color: #fff !important', $lead['settings']['custom_css']);
+        $this->assertStringContainsString('border: 2px solid #ffffff !important', $lead['settings']['custom_css']);
+        $this->assertStringContainsString('color: #ffffff !important', $lead['settings']['custom_css']);
+        $this->assertStringContainsString('background: #ffffff !important; color: var(--brand) !important', $lead['settings']['custom_css']);
         $this->assertStringContainsString('border-radius: 999px !important', $lead['settings']['custom_css']);
+        $this->assertStringContainsString('public-page-carousel-slide--editorial', $lead['settings']['custom_css']);
+        $this->assertStringContainsString('min-height: clamp(380px, 46vw, 540px)', $lead['settings']['custom_css']);
+        $this->assertStringContainsString('min-height: 430px', $lead['settings']['custom_css']);
+        $this->assertStringContainsString('justify-content: end; align-items: center; text-align: center', $lead['settings']['custom_css']);
+        $this->assertStringContainsString('.public-page-carousel-overlay p { display: none; }', $lead['settings']['custom_css']);
+        $this->assertStringContainsString('.public-page-carousel-overlay .button { align-self: center', $lead['settings']['custom_css']);
+    }
+
+    public function test_carousel_flyer_presentation_keeps_media_separate_from_copy(): void
+    {
+        $renderer = file_get_contents(resource_path('views/public/partials/page-element.blade.php'));
+        $styles = file_get_contents(resource_path('css/app.css'));
+        $script = file_get_contents(resource_path('js/app.js'));
+
+        $this->assertStringContainsString('public-page-carousel-slide--flyer', $renderer);
+        $this->assertStringContainsString("data-slide-presentation=\"{{ \$isFlyerPresentation ? 'flyer' : 'editorial' }}\"", $renderer);
+        $this->assertStringContainsString('object-fit:contain', $styles);
+        $this->assertStringContainsString('.public-page-carousel-slide--flyer .public-page-carousel-overlay', $styles);
+        $this->assertStringContainsString('data-carousel-previous', $renderer);
+        $this->assertStringContainsString("addPageListener(carousel, 'pointerdown'", $script);
+        $this->assertStringNotContainsString('}, 6000);', $script);
+    }
+
+    public function test_carousel_image_slide_initialises_video_flags_before_rendering_copy(): void
+    {
+        $rendered = view('public.partials.page-element', [
+            'element' => [
+                'id' => 'flyer-carousel',
+                'type' => 'carousel',
+                'content' => [
+                    'slide_one_type' => 'flyer',
+                    'slide_one_presentation' => 'flyer',
+                    'slide_one_media_url' => '/images/program-flyer.jpg',
+                    'slide_one_title' => 'Upcoming programme',
+                    'slide_one_body' => 'Join us for the next gathering.',
+                    'slide_one_button_label' => '',
+                    'slide_one_button_url' => '',
+                ],
+                'settings' => [],
+                'responsive' => [],
+            ],
+            'features' => [],
+            'pageElementData' => [],
+        ])->render();
+
+        $this->assertStringContainsString('public-page-carousel-slide--flyer', $rendered);
+        $this->assertStringContainsString('/images/program-flyer.jpg', $rendered);
+        $this->assertStringContainsString('Upcoming programme', $rendered);
+        $this->assertStringNotContainsString('>WATCH<', $rendered);
+    }
+
+    public function test_editorial_carousel_slide_omits_featured_label_and_supporting_copy(): void
+    {
+        $rendered = view('public.partials.page-element', [
+            'element' => [
+                'id' => 'editorial-carousel',
+                'type' => 'carousel',
+                'content' => [
+                    'slide_one_type' => 'flyer',
+                    'slide_one_presentation' => 'editorial',
+                    'slide_one_media_url' => '/images/community.jpg',
+                    'slide_one_title' => 'Faith expressed through care.',
+                    'slide_one_body' => '',
+                    'slide_one_button_label' => 'About us',
+                    'slide_one_button_url' => '/about-us',
+                ],
+                'settings' => [],
+                'responsive' => [],
+            ],
+            'features' => [],
+            'pageElementData' => [],
+        ])->render();
+
+        $this->assertStringContainsString('Faith expressed through care.', $rendered);
+        $this->assertStringContainsString('About us', $rendered);
+        $this->assertStringNotContainsString('FEATURED', $rendered);
+        $this->assertStringNotContainsString('<p>', $rendered);
     }
 
     public function test_homepage_starter_keeps_connection_pathways_unique_and_points_its_story_to_about(): void
@@ -288,12 +374,20 @@ class PageDocumentServiceTest extends TestCase
 
         $this->assertSame(2, $document['version']);
         $this->assertCount(6, $document['sections']);
+        $this->assertCount(1, $document['sections'][0]['columns']);
         $this->assertSame('hero', $document['sections'][0]['columns'][0]['elements'][0]['type']);
         $this->assertSame('/service-times', $document['sections'][0]['columns'][0]['elements'][0]['content']['button_url']);
+        $this->assertSame('Discover the story, values, and people that shape this ministry.', $document['sections'][0]['columns'][0]['elements'][0]['content']['body']);
         $this->assertSame('auto', $document['sections'][0]['columns'][0]['elements'][0]['settings']['button_width']);
         $this->assertStringContainsString('align-content: end', $document['sections'][0]['columns'][0]['elements'][0]['settings']['custom_css']);
-        $this->assertStringContainsString('margin: 0 auto 0 0', $document['sections'][0]['columns'][0]['elements'][0]['settings']['custom_css']);
+        $this->assertStringContainsString('min-height: 500px', $document['sections'][0]['columns'][0]['elements'][0]['settings']['custom_css']);
+        $this->assertStringContainsString('font-size: clamp(2.2rem, 3.4vw, 3.35rem)', $document['sections'][0]['columns'][0]['elements'][0]['settings']['custom_css']);
+        $this->assertStringContainsString('linear-gradient(90deg', $document['sections'][0]['columns'][0]['elements'][0]['settings']['custom_css']);
         $this->assertSame('/images/pages/home-arrival-hero.png', $document['sections'][0]['settings']['background_image']);
+        $this->assertSame('right_center', $document['sections'][0]['settings']['background_position']);
+        $this->assertSame('cover', $document['sections'][0]['settings']['background_size']);
+        $this->assertSame('full', $document['sections'][0]['settings']['content_width']);
+        $this->assertSame(['top' => '0px', 'right' => '0px', 'bottom' => '0px', 'left' => '0px'], $document['sections'][0]['responsive']['mobile']['padding']);
         $this->assertSame(['image_card', 'image_card'], collect($document['sections'][5]['columns'])->map(fn (array $column) => $column['elements'][0]['type'])->all());
         $this->assertSame(['/departments', '/locations'], collect($document['sections'][5]['columns'])->map(fn (array $column) => $column['elements'][0]['content']['button_url'])->all());
         $this->assertSame(['/images/pages/home-service-carousel.png', '/images/pages/home-arrival-hero.png'], collect($document['sections'][5]['columns'])->map(fn (array $column) => $column['elements'][0]['content']['url'])->all());
@@ -310,12 +404,27 @@ class PageDocumentServiceTest extends TestCase
         $videos = $elements->where('type', 'video_embed')->values();
 
         $this->assertSame(2, $document['version']);
-        $this->assertSame('hero', $document['sections'][0]['columns'][0]['elements'][0]['type']);
+        $this->assertCount(4, $document['sections']);
+        $this->assertSame('video_embed', $document['sections'][0]['columns'][0]['elements'][0]['type']);
+        $this->assertSame('standard', $document['sections'][0]['columns'][0]['elements'][0]['content']['presentation']);
+        $this->assertSame('Full crusade recording', $document['sections'][0]['columns'][0]['elements'][0]['content']['title']);
+        $this->assertSame('full', $document['sections'][0]['settings']['content_width']);
+        $this->assertStringContainsString('width: 100% !important', $document['sections'][0]['columns'][0]['elements'][0]['settings']['custom_css']);
         $this->assertSame('gallery', $document['sections'][2]['columns'][0]['elements'][0]['type']);
         $this->assertSame('', $document['sections'][2]['columns'][0]['elements'][0]['content']['images']);
+        $this->assertSame('carousel', $document['sections'][2]['columns'][0]['elements'][0]['content']['display']);
         $this->assertCount(4, $videos);
-        $this->assertSame(['Highlight one', 'Highlight two', 'Highlight three', 'Full crusade recording'], $videos->pluck('content.title')->all());
+        $this->assertSame(['Full crusade recording', 'Highlight one', 'Highlight two', 'Highlight three'], $videos->pluck('content.title')->all());
         $this->assertSame(['', '', '', ''], $videos->pluck('content.url')->all());
+        $this->assertStringNotContainsString('Watch the full crusade', json_encode($document, JSON_THROW_ON_ERROR));
+    }
+
+    public function test_structured_elements_and_editor_wrappers_stretch_across_their_column(): void
+    {
+        $styles = file_get_contents(resource_path('css/app.css'));
+
+        $this->assertStringContainsString('.public-page-structured-column > :is(.public-page-element, [data-page-editor-object="element"]) { width: 100%; max-width: 100%; justify-self: stretch; }', $styles);
+        $this->assertStringContainsString('.public-page-structured-column > [data-page-editor-object="element"] > .public-page-element', $styles);
     }
 
     public function test_page_objects_only_accept_bounded_overflow_settings(): void

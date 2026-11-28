@@ -74,7 +74,7 @@ class HomepageService
                     'position' => $position + 1,
                     'is_published' => true,
                     'media_type' => $slide['media_type'] ?? 'image',
-                    'media_url' => $slide['media_url'] ?? null,
+                    'media_url' => app(DefaultMediaLibrary::class)->resolveUrl($slide['media_url'] ?? null),
                     'eyebrow' => $slide['eyebrow'] ?? $theme['eyebrows'][$position],
                     'title' => $slide['title'],
                     'body' => $slide['body'] ?? null,

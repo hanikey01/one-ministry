@@ -171,7 +171,7 @@ When a question is resolved, record date, decision maker, evidence, alternatives
 
 ### D-034 — Unified application-experience and performance contract
 
-**Decision:** The product uses one explicit cross-cutting contract for the application experience: neutral defaults; ministry-owned branding, terminology, navigation, and sidebar treatment; semantic tokens; accent-derived primary action foregrounds; theme-aware overlays and notifications; scoped, app-like navigation and saves; and measured performance rules. The contract is `18-experience-performance-contract.md` and is read with the Product Master before feature design.
+**Decision:** The product uses one explicit cross-cutting contract for the application experience: neutral defaults; ministry-owned branding, terminology, navigation, and sidebar treatment; semantic tokens; accent-derived primary action foregrounds; theme-aware overlays and notifications; scoped, app-like navigation and saves; and measured performance rules. The contract is consolidated into `07-design.md` and is read with the Product Master before feature design.
 
 **Reason:** Design and performance decisions had accumulated across an audit, implementation notes, and individual feature discussions. A dedicated contract prevents future features from reintroducing inconsistent styling, full-page saves, clipping overlays, duplicate navigation behavior, or deployment assumptions that break shared-host portability.
 
@@ -327,4 +327,20 @@ When a question is resolved, record date, decision maker, evidence, alternatives
 
 **Reason:** Explicit user direction, 2026-11-22. The visual mockup should guide a real editable About page, but a reusable installation starter cannot truthfully invent local ministry facts or leadership details.
 
-**Status:** Implemented for fresh installations and existing installations through the default-page migration, and exposed through `starterDocument('about')`. Repeated creation opens the existing page instead of creating duplicates.
+**Status:** Implemented for fresh installations through the current default-page starter and exposed through `starterDocument('about')`. Repeated creation opens the existing page instead of creating duplicates. No data-rewrite migration is required before launch.
+
+### D-059 — Page-editor saves remain available and revision-preserving
+
+**Decision:** A valid page-editor save is serialized against the page row and always becomes the next immutable content revision, even when the submitted editor version is older than the current page version. The previous revision remains recoverable, and the audit event records the submitted version, prior server version, and whether the save followed newer work. The server returns the authoritative normalized document and new version for the active editor to adopt. Publishing permissions, validation, and review rules remain unchanged.
+
+**Reason:** Explicit user direction, 2026-11-27. Blocking an active editor with a mandatory reload can discard unsaved work. Revision preservation provides recovery and provenance without making saving unavailable.
+
+**Status:** Implemented in the browser page-editor save path. Database-backed concurrency and browser multi-session verification remain release-gate work.
+
+### D-060 — Sidebar navigation uses a bounded hierarchy
+
+**Decision:** Public, member, and staff sidebars support collapsible parent, child, and grandchild destinations configured from Staff Navigation. Parent chains must reference a selected destination on the same surface, cannot contain cycles, and stop at three levels. The active destination opens and marks its ancestor chain; a nested parent retains an Overview route when it has a real destination. A public custom destination of `#` is an explicit group-only parent: its summary expands children, it has no Overview link or new-tab behavior, and it is excluded from the flat mobile footer. Permission, module, feature, and publication filtering still runs before rendering, and an unavailable parent promotes its otherwise valid children to the root rather than hiding them. Mobile footers remain flat, direct, and limited to five destinations; the mobile drawer exposes the complete hierarchy.
+
+**Reason:** Explicit user direction, 2026-11-27. Flat sidebars become difficult to scan as the platform grows, while deeply recursive or nested bottom navigation would reduce usability and accessibility.
+
+**Status:** Implemented in the navigation service, all three sidebar renderers, the Staff Navigation editor, hierarchy validation, active-state behavior, and focused tree tests. Browser and assistive-technology verification remain release-gate work.

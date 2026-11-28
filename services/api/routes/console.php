@@ -17,3 +17,4 @@ Schedule::command('ministry:refresh-ai-model-catalogs')->dailyAt('04:10')->witho
 // Run hourly because installations may use any IANA time zone. The command
 // computes the ministry-local date and its durable delivery key prevents repeats.
 Schedule::command('birthdays:send-reminders --days=1')->hourly()->withoutOverlapping();
+Schedule::command('services:send-reminders --limit=100')->everyFiveMinutes()->withoutOverlapping();

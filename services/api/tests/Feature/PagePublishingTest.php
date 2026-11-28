@@ -169,6 +169,33 @@ class PagePublishingTest extends TestCase
             ->assertSee('--page-column-padding: 8px 12px 8px 12px', false);
     }
 
+    public function test_editor_preserves_stale_submissions_as_a_new_revision_instead_of_requiring_reload(): void
+    {
+        $admin = app(InstallMinistry::class)->execute([
+            'name' => 'Hope Community', 'domain' => 'hope.example.org', 'timezone' => 'Africa/Lagos',
+            'location' => 'Main Campus', 'admin_name' => 'Ada Admin', 'admin_email' => 'ada@example.org',
+            'password' => 'long-private-password',
+        ]);
+        $this->actingAs($admin);
+        $page = DB::table('pages')->where('source_key', 'about')->firstOrFail();
+        $staleVersion = (string) $page->updated_at;
+        DB::table('pages')->where('id', $page->id)->update(['updated_at' => now()->addSecond()]);
+
+        $response = $this->putJson(route('staff.pages.update', $page->id), [
+            'title' => $page->title,
+            'slug' => $page->slug,
+            'seo_title' => $page->seo_title,
+            'seo_description' => $page->seo_description,
+            'blocks' => json_encode($this->document('Saved without discarding the active editor draft.'), JSON_THROW_ON_ERROR),
+            'document_version' => $staleVersion,
+        ])->assertOk();
+
+        $this->assertSame('Saved without discarding the active editor draft.', $response->json('data.document.sections.0.columns.0.elements.0.content.text'));
+        $this->assertDatabaseHas('content_revisions', ['page_id' => $page->id, 'revision' => 2]);
+        $audit = DB::table('audit_events')->where('subject_id', $page->id)->where('action', 'content.page_updated')->latest('created_at')->firstOrFail();
+        $this->assertTrue(json_decode($audit->changes_json, true, 512, JSON_THROW_ON_ERROR)['saved_over_newer_revision']);
+    }
+
     public function test_publishing_accepts_a_standalone_button_without_a_destination(): void
     {
         $admin = app(InstallMinistry::class)->execute([

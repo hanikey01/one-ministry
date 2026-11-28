@@ -3,7 +3,7 @@
     $fileSize = static function ($bytes): string { if (!$bytes) return ''; $units=['B','KB','MB','GB']; $power=min((int) floor(log($bytes,1024)),3); return number_format($bytes/(1024**$power),$power>1?1:0).' '.$units[$power]; };
 @endphp
 <x-layouts.public :title="$item->title" :settings="$settings" :features="$features">
-    <a class="library-back-link" href="{{ route('public.library', 'sermon-series') }}"><x-ui.icon name="arrow-left" :size="15"/> All sermon series</a>
+    <a class="public-back-link" href="{{ route('public.library', 'sermon-series') }}"><x-ui.icon name="arrow-left" :size="16"/> <span>All sermon series</span></a>
     <section class="series-detail-hero">
         <div class="series-detail-cover">@if($cover)<img src="{{ $cover }}" alt="{{ $item->cover_image_alt ?: $item->title.' artwork' }}">@else<x-ui.icon name="archive" :size="42"/>@endif</div>
         <div><p>TEACHING SERIES</p><h1>{{ $item->title }}</h1><span>{{ $item->description ?: 'Explore every published message in this series.' }}</span><small>{{ $messages->count() }} {{ str('message')->plural($messages->count()) }}</small></div>

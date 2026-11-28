@@ -3,7 +3,7 @@
 @php($departmentPlural = $terminology->label('department', 'plural'))
 <x-layouts.public :title="$department->name" :settings="$settings" :features="$features">
     <article class="department-public-detail">
-        <a class="public-back-link" href="{{ route('public.departments') }}">← All {{ $departmentPlural }}</a>
+        <a class="public-back-link" href="{{ route('public.departments') }}"><x-ui.icon name="arrow-left" :size="16"/> <span>All {{ $departmentPlural }}</span></a>
         <section class="department-detail-hero"><div class="department-detail-cover" @if($department->image_url) style="background-image:linear-gradient(180deg,transparent,rgb(7 20 41 / 70%)),url('{{ $department->image_url }}')" role="img" aria-label="{{ $department->image_alt }}" @endif></div><div><p>{{ $department->category ?: 'MINISTRY '.str($departmentSingular)->upper() }}</p><h1>{{ $department->name }}</h1><span>{{ $department->description ?: 'Connect with this ministry '.str($departmentSingular)->lower().'.' }}</span><small>{{ number_format($memberCount) }} {{ Str::plural('member',$memberCount) }}</small></div></section>
         <div class="department-public-action"><h2>Take your next step</h2>
             @auth

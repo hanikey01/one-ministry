@@ -18,12 +18,16 @@ class MinistryThemeTest extends TestCase
 
         $theme = MinistryTheme::publicTheme($settings);
         $variables = $this->variables(MinistryTheme::cssVariables($settings));
+        $email = MinistryTheme::emailPalette($settings);
 
         $this->assertSame('#692306', $theme['chrome_color']);
         $this->assertSame('#FFFFFF', $theme['chrome_foreground']);
         $this->assertNotSame('#F6F9FF', $theme['light']['canvas']);
         $this->assertNotSame('#071426', $theme['dark']['canvas']);
         $this->assertSame('#C2410C', $variables['--theme-action-color']);
+        $this->assertSame('#C2410C', $email['action']);
+        $this->assertSame($variables['--action-foreground'], $email['action_text']);
+        $this->assertSame($theme['light']['canvas'], $email['canvas']);
         $this->assertSame('#692306', $variables['--theme-chrome-color']);
         $this->assertSame('#692306', $variables['--theme-light-sidebar-color']);
         $this->assertSame('#692306', $variables['--theme-dark-sidebar-color']);

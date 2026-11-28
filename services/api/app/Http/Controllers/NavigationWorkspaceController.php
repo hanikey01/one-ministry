@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -33,7 +34,7 @@ class NavigationWorkspaceController extends Controller
         return view('staff.navigation', [
             'settings' => MinistrySetting::findOrFail(MinistrySetting::SINGLETON_ID),
             'user' => $request->user(),
-            'items' => DB::table('navigation_items')->orderBy('parent_id')->orderBy('position')->get(),
+            'items' => $this->orderedPublicItems(),
             'pages' => DB::table('pages')->where('status', 'published')->orderBy('title')->get(['title', 'slug']),
             'features' => FeatureSetting::query()->pluck('key')->all(),
             'icons' => self::ICONS,
@@ -59,10 +60,13 @@ class NavigationWorkspaceController extends Controller
         }
         $rules['icons'] = ['nullable', 'array'];
         $rules['positions'] = ['nullable', 'array'];
+        $rules['parents'] = ['nullable', 'array'];
         $rules['sections'] = ['sometimes', 'array'];
         foreach (NavigationLayout::SURFACES as $surface) {
             $rules["sections.{$surface}.sidebar"] = ['sometimes', 'array'];
             $rules["sections.{$surface}.sidebar.*"] = ['sometimes', 'string', 'max:60'];
+            $rules["parents.{$surface}.sidebar"] = ['sometimes', 'array'];
+            $rules["parents.{$surface}.sidebar.*"] = ['nullable', 'string', 'max:255'];
         }
         $validated = $request->validate($rules);
         $menuData = [];
@@ -101,7 +105,13 @@ class NavigationWorkspaceController extends Controller
                         'icon' => $icon,
                         'position' => (int) $position,
                         'group' => $section,
+                        'parent' => $slot === 'sidebar'
+                            ? (data_get($validated, "parents.{$surface}.sidebar.{$fieldKey}") ?: null)
+                            : null,
                     ];
+                }
+                if ($slot === 'sidebar') {
+                    $this->validateLayoutHierarchy($items);
                 }
                 $positions = array_column($items, 'position');
                 if (count($positions) !== count(array_unique($positions))) {
@@ -112,6 +122,7 @@ class NavigationWorkspaceController extends Controller
                     'key' => $item['key'],
                     'icon' => $item['icon'],
                     'group' => $item['group'],
+                    'parent' => $item['parent'],
                 ], fn ($value): bool => $value !== null), $items);
             }
         }
@@ -162,7 +173,7 @@ class NavigationWorkspaceController extends Controller
                     'item' => $item,
                     'icons' => self::ICONS,
                     'publicSections' => self::PUBLIC_SECTIONS,
-                    'items' => DB::table('navigation_items')->orderBy('parent_id')->orderBy('position')->get(),
+                    'items' => $this->orderedPublicItems(),
                     'features' => FeatureSetting::query()->pluck('key')->all(),
                 ])->render(),
             ], 201);
@@ -203,13 +214,30 @@ class NavigationWorkspaceController extends Controller
             'sections.*' => ['required', Rule::in(self::PUBLIC_SECTIONS)],
             'icons' => ['sometimes', 'array'],
             'icons.*' => ['required', Rule::in(self::ICONS)],
+            'parents' => ['sometimes', 'array'],
+            'parents.*' => ['nullable', 'uuid', Rule::exists('navigation_items', 'id')],
         ]);
+        $parentMap = DB::table('navigation_items')->pluck('parent_id', 'id')->map(fn ($parent) => $parent ?: null)->all();
+        foreach (($data['parents'] ?? []) as $id => $parent) {
+            if (array_key_exists($id, $parentMap)) {
+                $parentMap[$id] = $parent ?: null;
+            }
+        }
+        $this->validatePublicHierarchy($parentMap);
+        $enabledIds = array_fill_keys($data['enabled'] ?? [], true);
+        foreach ($enabledIds as $id => $_enabled) {
+            $parent = $parentMap[$id] ?? null;
+            if ($parent && ! isset($enabledIds[$parent])) {
+                throw ValidationException::withMessages(['parents' => 'Select a parent menu before placing an enabled link beneath it.']);
+            }
+        }
         DB::transaction(function () use ($data, $request): void {
             $enabled = array_flip($data['enabled'] ?? []);
             foreach ($data['items'] as $position => $id) {
                 $changes = ['position' => $position + 1, 'is_enabled' => isset($enabled[$id]), 'updated_at' => now()];
                 if (isset($data['sections'][$id])) $changes['section'] = $data['sections'][$id];
                 if (isset($data['icons'][$id])) $changes['icon'] = $data['icons'][$id];
+                if (array_key_exists($id, $data['parents'] ?? [])) $changes['parent_id'] = $data['parents'][$id] ?: null;
                 DB::table('navigation_items')->where('id', $id)->update($changes);
             }
             $this->audit($request, 'navigation.reordered', MinistrySetting::SINGLETON_ID, [
@@ -217,6 +245,7 @@ class NavigationWorkspaceController extends Controller
                 'enabled' => $data['enabled'] ?? [],
                 'sections' => $data['sections'] ?? [],
                 'icons' => $data['icons'] ?? [],
+                'parents' => $data['parents'] ?? [],
             ]);
         });
         return back()->with('status', 'Public menu changes saved.');
@@ -251,13 +280,95 @@ class NavigationWorkspaceController extends Controller
         return [...$core, ...$pages];
     }
 
+    private function orderedPublicItems(): Collection
+    {
+        $items = DB::table('navigation_items')->orderBy('position')->get();
+        $known = $items->keyBy('id');
+        $children = $items->groupBy(fn (object $item): string => $item->parent_id ?: '__root__');
+        $ordered = collect();
+        $seen = [];
+        $append = function (object $item) use (&$append, &$seen, $children, $ordered): void {
+            if (isset($seen[$item->id])) {
+                return;
+            }
+            $seen[$item->id] = true;
+            $ordered->push($item);
+            foreach ($children->get($item->id, collect()) as $child) {
+                $append($child);
+            }
+        };
+
+        foreach ($items->filter(fn (object $item): bool => ! $item->parent_id || ! $known->has($item->parent_id)) as $root) {
+            $append($root);
+        }
+        foreach ($items as $item) {
+            $append($item);
+        }
+
+        return $ordered;
+    }
+
     private function data(Request $request, ?string $item = null): array
     {
         $data = $request->validate(['label' => ['required', 'string', 'max:80'], 'url' => ['required', 'string', 'max:1200'], 'icon' => ['nullable', Rule::in(self::ICONS)], 'section' => ['nullable', Rule::in(self::PUBLIC_SECTIONS)], 'parent_id' => ['nullable', 'uuid', Rule::exists('navigation_items', 'id')->where(fn ($query) => $item ? $query->where('id', '!=', $item) : $query)], 'required_feature' => ['nullable', 'string', 'max:80', Rule::exists('feature_settings', 'key')]]);
         $url = trim($data['url']);
-        abort_unless(str_starts_with($url, '/') || filter_var($url, FILTER_VALIDATE_URL), 422, 'Enter an internal path beginning with / or a valid URL.');
+        if ($url !== '#' && ! str_starts_with($url, '/') && ! filter_var($url, FILTER_VALIDATE_URL)) {
+            throw ValidationException::withMessages([
+                'url' => 'Enter # for a parent-only menu, an internal path beginning with /, or a complete URL beginning with https://.',
+            ]);
+        }
         $section = $data['section'] ?? ($item ? DB::table('navigation_items')->where('id', $item)->value('section') : 'Main');
-        return [...$data, 'url' => $url, 'section' => $section ?: 'Main', 'parent_id' => $data['parent_id'] ?? null, 'visible_desktop' => $request->boolean('visible_desktop'), 'visible_mobile' => $request->boolean('visible_mobile'), 'open_new_tab' => $request->boolean('open_new_tab')];
+        $parentId = $data['parent_id'] ?? null;
+        if ($parentId) {
+            $parentMap = DB::table('navigation_items')->pluck('parent_id', 'id')->map(fn ($parent) => $parent ?: null)->all();
+            $candidate = $item ?: '__new__';
+            $parentMap[$candidate] = $parentId;
+            $this->validatePublicHierarchy($parentMap);
+        }
+
+        return [...$data, 'url' => $url, 'section' => $section ?: 'Main', 'parent_id' => $parentId, 'visible_desktop' => $request->boolean('visible_desktop'), 'visible_mobile' => $request->boolean('visible_mobile'), 'open_new_tab' => $url !== '#' && $request->boolean('open_new_tab')];
+    }
+
+    /** @param array<int, array{key:string,parent:?string}> $items */
+    private function validateLayoutHierarchy(array $items): void
+    {
+        $parents = collect($items)->mapWithKeys(fn (array $item): array => [$item['key'] => $item['parent'] ?: null])->all();
+        foreach ($parents as $key => $parent) {
+            if ($parent !== null && ! array_key_exists($parent, $parents)) {
+                throw ValidationException::withMessages(['menus' => 'A parent menu must also be selected in the same sidebar.']);
+            }
+            $this->validateParentChain($key, $parents);
+        }
+    }
+
+    /** @param array<string, ?string> $parents */
+    private function validatePublicHierarchy(array $parents): void
+    {
+        foreach ($parents as $key => $parent) {
+            if ($parent !== null && ! array_key_exists($parent, $parents)) {
+                throw ValidationException::withMessages(['parents' => 'Choose an available parent menu.']);
+            }
+            $this->validateParentChain((string) $key, $parents);
+        }
+    }
+
+    /** @param array<string, ?string> $parents */
+    private function validateParentChain(string $key, array $parents): void
+    {
+        $seen = [$key => true];
+        $parent = $parents[$key] ?? null;
+        $depth = 0;
+        while ($parent !== null) {
+            if (isset($seen[$parent])) {
+                throw ValidationException::withMessages(['parents' => 'A menu cannot contain itself or create a circular hierarchy.']);
+            }
+            $seen[$parent] = true;
+            $depth++;
+            if ($depth >= 3) {
+                throw ValidationException::withMessages(['parents' => 'Sidebar menus support up to three levels.']);
+            }
+            $parent = $parents[$parent] ?? null;
+        }
     }
 
     private function audit(Request $request, string $action, string $subject, array $changes, string $subjectType = 'navigation_items'): void

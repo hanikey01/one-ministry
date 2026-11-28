@@ -1,7 +1,7 @@
 <x-layouts.public :title="$location->name" :settings="$settings" :features="$features">
     @php($locationLabel = app(\App\Support\MinistryTerminology::class)->label('location'))
     <section class="location-public-detail">
-        <a class="location-public-back" href="{{ route('public.locations') }}"><span>←</span><span>All {{ str($locationLabel)->plural()->lower() }}</span></a>
+        <a class="public-back-link" href="{{ route('public.locations') }}"><x-ui.icon name="arrow-left" :size="16"/><span>All {{ str($locationLabel)->plural()->lower() }}</span></a>
         <header class="location-detail-hero">
             <div class="location-detail-hero-map" aria-hidden="true"><x-ui.icon name="location" :size="54"/><span>{{ $location->is_primary ? 'Primary '.$locationLabel : $locationLabel }}</span></div>
             <div class="location-detail-hero-copy"><p>PLAN YOUR VISIT</p><h1>{{ $location->name }}</h1><span>{{ $location->address ?: 'Contact the ministry for directions and gathering details.' }}</span></div>

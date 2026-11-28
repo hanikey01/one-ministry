@@ -12,11 +12,10 @@
             </div>
             <nav class="workspace-nav" aria-label="{{ $surface === 'member' ? 'Member' : 'Staff' }} navigation">
                 @if($surface === 'member')
-                    @foreach(collect(app(\App\Services\NavigationLayout::class)->entries('member', 'sidebar', auth()->user(), $surfaceFeatures))->groupBy('group') as $group => $entries)
-                        <p>{{ $group }}</p>
-                        @foreach($entries as $entry)
-                            <a href="{{ $entry['url'] }}" wire:navigate.hover @class(['is-active' => request()->routeIs($entry['match'], $entry['match'].'.*') && (!str_starts_with($entry['key'], 'page:') || request()->route('slug') === str($entry['key'])->after(':'))]) @if(request()->routeIs($entry['match'], $entry['match'].'.*') && (!str_starts_with($entry['key'], 'page:') || request()->route('slug') === str($entry['key'])->after(':'))) aria-current="page" @endif><x-ui.icon :name="$entry['icon']"/><span>{{ $entry['label'] }}</span></a>
-                        @endforeach
+                    @foreach(collect(app(\App\Services\NavigationLayout::class)->treeEntries('member', 'sidebar', auth()->user(), $surfaceFeatures))->groupBy('group') as $group => $entries)
+                        <div class="workspace-nav-group"><p>{{ $group }}</p>
+                            @foreach($entries as $entry) @include('components.workspace-navigation-node', ['node' => $entry]) @endforeach
+                        </div>
                     @endforeach
                 @else
                     @auth <x-staff-navigation /> @else {{ $navigation ?? '' }} @endauth
